@@ -1,0 +1,918 @@
+# SAS Scuba Application - Technical Architecture Plan
+
+## Overview
+
+A production-grade scuba diving management system with a Laravel REST API backend serving both a Next.js web frontend and mobile applications. The architecture prioritizes security, scalability, and modern development practices.
+
+## Architecture Decisions
+
+> [!NOTE]
+> **Multi-Tenancy**: Single shared interface with dive center selection dropdown. Users can switch between authorized dive centers within the application.
+
+> [!NOTE]
+> **Mobile Platform**: Flutter application for iOS and Android, consuming the same Laravel API. Type-safe API client with code generation from OpenAPI spec.
+
+> [!NOTE]
+> **Authentication**: 
+> - **Web**: Laravel Sanctum with HTTP-only cookies (session-based)
+> - **Mobile (Flutter)**: Laravel Sanctum with API tokens (Bearer authentication)
+> - **Security**: CSRF protection for web, rate limiting for both platforms
+
+> [!IMPORTANT]
+> **Security Enhancements**:
+> - Cryptomining protection with strict CSP
+> - Web Workers disabled to prevent cryptojacking
+> - CPU usage monitoring and alerts
+> - All configurations from environment variables
+
+## Proposed Changes
+
+### Architecture Overview
+
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        WEB[Next.js Web App<br/>TypeScript + React<br/>Session Auth]
+        MOBILE[Flutter Mobile App<br/>iOS + Android<br/>Token Auth]
+    end
+    
+    subgraph "CDN Layer"
+        CDN[CloudFlare / AWS CloudFront<br/>Static Assets + Caching]
+    end
+    
+    subgraph "Application Layer"
+        LB[Load Balancer<br/>NGINX]
+        API1[Laravel API + Sanctum<br/>Instance 1]
+        API2[Laravel API + Sanctum<br/>Instance 2]
+        API3[Laravel API + Sanctum<br/>Instance N]
+    end
+    
+    subgraph "Cache Layer"
+        REDIS[Redis Cluster<br/>Sessions + Cache + Tokens]
+    end
+    
+    subgraph "Data Layer"
+        DB[(MySQL Primary<br/>Multi-tenant)]
+        DB_REPLICA[(MySQL Replica<br/>Read scaling)]
+        S3[S3 / Cloud Storage<br/>Documents + Images]
+    end
+    
+    subgraph "Queue Layer"
+        QUEUE[Queue Workers<br/>Jobs + Notifications]
+    end
+    
+    WEB --> CDN
+    MOBILE --> LB
+    CDN --> LB
+    LB --> API1
+    LB --> API2
+    LB --> API3
+    API1 --> REDIS
+    API2 --> REDIS
+    API3 --> REDIS
+    API1 --> DB
+    API2 --> DB
+    API3 --> DB
+    DB --> DB_REPLICA
+    API1 --> S3
+    API1 --> QUEUE
+    QUEUE --> DB
+```
+
+---
+
+### Backend: Laravel API
+
+#### Project Structure
+
+```
+sas-scuba-api/
+├── app/
+│   ├── Console/
+│   ├── Exceptions/
+│   │   └── Handler.php
+│   ├── Http/
+│   │   ├── Controllers/
+│   │   │   ├── Api/
+│   │   │   │   └── V1/              # API Versioning
+│   │   │   │       ├── Auth/
+│   │   │   │       │   ├── LoginController.php
+│   │   │   │       │   ├── RegisterController.php
+│   │   │   │       │   └── LogoutController.php
+│   │   │   │       ├── BookingController.php
+│   │   │   │       ├── CustomerController.php
+│   │   │   │       ├── DiveSiteController.php
+│   │   │   │       ├── EquipmentController.php
+│   │   │   │       ├── InvoiceController.php
+│   │   │   │       ├── PaymentController.php
+│   │   │   │       └── ServiceController.php
+│   │   ├── Middleware/
+│   │   │   ├── EnsureJsonRequest.php
+│   │   │   ├── ForceJsonResponse.php
+│   │   │   ├── CheckDiveCenterAccess.php
+│   │   │   └── ThrottleRequests.php
+│   │   ├── Requests/
+│   │   │   ├── Booking/
+│   │   │   │   ├── CreateBookingRequest.php
+│   │   │   │   └── UpdateBookingRequest.php
+│   │   │   ├── Customer/
+│   │   │   │   ├── CreateCustomerRequest.php
+│   │   │   │   └── UpdateCustomerRequest.php
+│   │   │   └── ...
+│   │   └── Resources/
+│   │       ├── BookingResource.php
+│   │       ├── BookingCollection.php
+│   │       ├── CustomerResource.php
+│   │       └── ...
+│   ├── Models/
+│   │   ├── Booking.php
+│   │   ├── Customer.php
+│   │   ├── DiveCenter.php
+│   │   ├── Equipment.php
+│   │   └── ...
+│   ├── Policies/
+│   │   ├── BookingPolicy.php
+│   │   └── CustomerPolicy.php
+│   ├── Repositories/          # Repository Pattern
+│   │   ├── BookingRepository.php
+│   │   └── CustomerRepository.php
+│   ├── Services/              # Business Logic
+│   │   ├── BookingService.php
+│   │   ├── PaymentService.php
+│   │   └── NotificationService.php
+│   └── Traits/
+│       ├── HasUuid.php
+│       └── BelongsToDiveCenter.php
+├── bootstrap/
+├── config/
+│   ├── cors.php
+│   ├── sanctum.php
+│   └── services.php
+├── database/
+│   ├── migrations/
+│   ├── seeders/
+│   └── factories/
+├── routes/
+│   ├── api.php               # API routes
+│   └── web.php
+├── storage/
+├── tests/
+│   ├── Feature/
+│   │   └── Api/
+│   └── Unit/
+├── .env.example
+├── composer.json
+└── phpunit.xml
+```
+
+#### [NEW] Laravel Configuration Files
+
+**Key Features:**
+- Laravel 11.x with PHP 8.2+
+- Laravel Sanctum for authentication
+- Repository + Service pattern for clean architecture
+- API versioning (v1, v2)
+- Robust error handling and logging
+
+---
+
+### Frontend: Next.js Application
+
+#### Project Structure
+
+```
+sas-scuba-web/
+├── public/
+│   ├── images/
+│   └── fonts/
+├── src/
+│   ├── app/                   # App Router (Next.js 14+)
+│   │   ├── (auth)/
+│   │   │   ├── login/
+│   │   │   │   └── page.tsx
+│   │   │   └── register/
+│   │   │       └── page.tsx
+│   │   ├── (dashboard)/
+│   │   │   ├── layout.tsx
+│   │   │   ├── page.tsx
+│   │   │   ├── bookings/
+│   │   │   │   ├── page.tsx
+│   │   │   │   ├── [id]/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   └── new/
+│   │   │   │       └── page.tsx
+│   │   │   ├── customers/
+│   │   │   │   ├── page.tsx
+│   │   │   │   └── [id]/
+│   │   │   │       └── page.tsx
+│   │   │   ├── equipment/
+│   │   │   ├── dive-sites/
+│   │   │   ├── invoices/
+│   │   │   └── reports/
+│   │   ├── api/               # API routes (for ISR, webhooks)
+│   │   ├── layout.tsx
+│   │   └── page.tsx
+│   ├── components/
+│   │   ├── ui/                # Shadcn/UI components
+│   │   │   ├── button.tsx
+│   │   │   ├── card.tsx
+│   │   │   ├── dialog.tsx
+│   │   │   ├── form.tsx
+│   │   │   ├── input.tsx
+│   │   │   ├── select.tsx
+│   │   │   └── table.tsx
+│   │   ├── layout/
+│   │   │   ├── Header.tsx
+│   │   │   ├── Sidebar.tsx
+│   │   │   └── Footer.tsx
+│   │   ├── bookings/
+│   │   │   ├── BookingCard.tsx
+│   │   │   ├── BookingForm.tsx
+│   │   │   └── BookingCalendar.tsx
+│   │   ├── customers/
+│   │   │   ├── CustomerTable.tsx
+│   │   │   └── CustomerForm.tsx
+│   │   └── shared/
+│   │       ├── DataTable.tsx
+│   │       ├── SearchBar.tsx
+│   │       └── LoadingSpinner.tsx
+│   ├── lib/
+│   │   ├── api/
+│   │   │   ├── client.ts      # Axios/Fetch wrapper
+│   │   │   ├── endpoints.ts   # API endpoint constants
+│   │   │   └── services/
+│   │   │       ├── auth.service.ts
+│   │   │       ├── booking.service.ts
+│   │   │       └── customer.service.ts
+│   │   ├── hooks/
+│   │   │   ├── useAuth.ts
+│   │   │   ├── useBookings.ts
+│   │   │   └── useCustomers.ts
+│   │   ├── store/             # Zustand store
+│   │   │   ├── authStore.ts
+│   │   │   └── uiStore.ts
+│   │   ├── utils/
+│   │   │   ├── format.ts
+│   │   │   ├── validation.ts
+│   │   │   └── constants.ts
+│   │   └── types/
+│   │       ├── booking.types.ts
+│   │       ├── customer.types.ts
+│   │       └── api.types.ts
+│   ├── styles/
+│   │   └── globals.css
+│   └── middleware.ts          # Auth middleware
+├── .env.local.example
+├── next.config.js
+├── package.json
+├── tsconfig.json
+└── tailwind.config.ts
+```
+
+**Key Features:**
+- Next.js 14+ with App Router
+- TypeScript strict mode
+- Shadcn/UI component library
+- TanStack Query (React Query) for data fetching
+- Zustand for lightweight state management
+- Tailwind CSS for styling
+- Server-side rendering (SSR) and static generation
+
+---
+
+### Security Implementation
+
+#### 1. Authentication & Authorization
+
+**Laravel Backend:**
+
+```php
+// config/sanctum.php
+'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', 'localhost,localhost:3000')),
+'middleware' => [
+    'authenticate_session' => Laravel\Sanctum\Http\Middleware\AuthenticateSession::class,
+    'encrypt_cookies' => App\Http\Middleware\EncryptCookies::class,
+    'verify_csrf_token' => App\Http\Middleware\VerifyCsrfToken::class,
+],
+```
+
+**Routes:**
+- Web: Session-based with HTTP-only cookies
+- Mobile: Token-based (Bearer tokens)
+- CSRF protection for web
+- Rate limiting per endpoint
+
+**Authorization:**
+- Laravel Policies for resource access
+- Role-based access control (Admin, Instructor, DiveMaster, Agent)
+- Row-level security via dive_center_id
+
+#### 2. CORS Configuration
+
+```php
+// config/cors.php
+return [
+    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    'allowed_methods' => ['*'],
+    'allowed_origins' => [
+        env('FRONTEND_URL', 'http://localhost:3000'),
+        env('MOBILE_APP_SCHEME', 'sasscuba://'),
+    ],
+    'allowed_origins_patterns' => [
+        env('APP_ENV') === 'production' ? '/\.sasscuba\.com$/' : null,
+    ],
+    'allowed_headers' => ['*'],
+    'exposed_headers' => ['X-Total-Count', 'X-Page-Count'],
+    'max_age' => 0,
+    'supports_credentials' => true,
+];
+```
+
+#### 3. Input Validation & Sanitization
+
+- Laravel Form Requests for all inputs
+- HTML purification for rich text
+- File upload validation (type, size, virus scan)
+- SQL injection prevention (Eloquent ORM)
+- XSS protection
+
+#### 4. Rate Limiting
+
+```php
+// routes/api.php
+Route::middleware(['throttle:60,1'])->group(function () {
+    // Public endpoints
+});
+
+Route::middleware(['auth:sanctum', 'throttle:120,1'])->group(function () {
+    // Authenticated endpoints
+});
+```
+
+#### 5. Security Headers & Cryptomining Protection
+
+```php
+// app/Http/Middleware/SecurityHeaders.php
+public function handle($request, Closure $next)
+{
+    $response = $next($request);
+    
+    // Prevent cryptomining scripts
+    $response->headers->set('Content-Security-Policy', 
+        "default-src 'self'; " .
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " .
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " .
+        "font-src 'self' https://fonts.gstatic.com; " .
+        "img-src 'self' data: https:; " .
+        "connect-src 'self' " . env('FRONTEND_URL') . "; " .
+        "worker-src 'none'; " .  // Block Web Workers (common for mining)
+        "object-src 'none'; " .   // Block plugins
+        "base-uri 'self'; " .
+        "form-action 'self'; " .
+        "frame-ancestors 'none';"
+    );
+    
+    // Additional security headers
+    $response->headers->set('X-Frame-Options', 'DENY');
+    $response->headers->set('X-Content-Type-Options', 'nosniff');
+    $response->headers->set('X-XSS-Protection', '1; mode=block');
+    $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+    $response->headers->set('Permissions-Policy', 
+        'geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=()'
+    );
+    
+    // Block known mining domains
+    $response->headers->set('X-Mining-Block', '1');
+    
+    return $response;
+}
+```
+
+**Next.js CSP Configuration:**
+
+```typescript
+// next.config.js
+const securityHeaders = [
+  {
+    key: 'Content-Security-Policy',
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline'",  // Next.js requires unsafe-eval in dev
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      "img-src 'self' blob: data: https:",
+      "connect-src 'self' " + process.env.NEXT_PUBLIC_API_URL,
+      "worker-src 'none'",  // Prevent Web Workers (cryptomining vector)
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+    ].join('; '),
+  },
+  {
+    key: 'X-DNS-Prefetch-Control',
+    value: 'on'
+  },
+  {
+    key: 'X-Frame-Options',
+    value: 'DENY'
+  },
+];
+
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: securityHeaders,
+      },
+    ];
+  },
+};
+```
+
+**Cryptomining Prevention Checklist:**
+- ✅ Strict Content Security Policy
+- ✅ Web Workers disabled
+- ✅ Subresource Integrity (SRI) for external scripts
+- ✅ Browser extension detection
+- ✅ CPU usage monitoring (alert if >80% for >5s)
+- ✅ Known mining domain blocklist
+
+---
+
+### Scalability Strategy
+
+#### 1. Database Optimization
+
+- **Indexes**: Add indexes on frequently queried fields
+  - `customers.email`, `bookings.booking_date`, `bookings.status`
+- **Query Optimization**: Use eager loading to prevent N+1 queries
+- **Read Replicas**: Master-slave replication for read-heavy operations
+- **Connection Pooling**: Use persistent connections
+- **Partitioning**: Partition large tables by date (e.g., audit_logs)
+
+#### 2. Caching Strategy
+
+```php
+// Multi-layer caching
+1. Redis: Session storage, API response caching
+2. Application Cache: Frequently accessed data (dive sites, services)
+3. CDN: Static assets, API responses for public data
+4. Browser Cache: Assets with versioning
+```
+
+**Cache Invalidation:**
+- Tag-based cache clearing
+- Event-driven cache invalidation
+- Time-based expiration for static data
+
+#### 3. Queue System
+
+```php
+// Async processing via Laravel Queues
+- Email notifications
+- PDF invoice generation
+- Report generation
+- Image optimization
+- Bulk imports/exports
+```
+
+#### 4. API Response Optimization
+
+- **Pagination**: Default 20 items per page
+- **Partial Responses**: Allow field selection (`?fields=id,name,email`)
+- **Data Compression**: Gzip/Brotli compression
+- **ETags**: HTTP caching for unchanged resources
+- **Lazy Loading**: Load related data on demand
+
+#### 5. Horizontal Scaling
+
+- Stateless API servers (session in Redis)
+- Load balancer distribution
+- Auto-scaling based on CPU/memory
+- Microservices readiness (future)
+
+---
+
+### API Design
+
+#### RESTful Conventions
+
+```typescript
+// Endpoints follow REST standards
+GET    /api/v1/bookings              # List bookings
+POST   /api/v1/bookings              # Create booking
+GET    /api/v1/bookings/{id}         # Get booking details
+PUT    /api/v1/bookings/{id}         # Update booking
+DELETE /api/v1/bookings/{id}         # Delete booking
+PATCH  /api/v1/bookings/{id}/status  # Partial update
+
+// Nested resources
+GET    /api/v1/bookings/{id}/invoices
+GET    /api/v1/customers/{id}/bookings
+```
+
+#### Response Format
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "customer": {
+      "id": 1,
+      "full_name": "John Doe"
+    },
+    "booking_date": "2025-12-20",
+    "status": "confirmed"
+  },
+  "meta": {
+    "timestamp": "2025-12-15T09:54:07Z",
+    "version": "1.0.0"
+  }
+}
+```
+
+#### Error Format
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "The given data was invalid.",
+    "details": {
+      "email": ["The email field is required."],
+      "booking_date": ["The booking date must be a future date."]
+    }
+  },
+  "meta": {
+    "timestamp": "2025-12-15T09:54:07Z"
+  }
+}
+```
+
+#### API Versioning
+
+- URL versioning: `/api/v1/`, `/api/v2/`
+- Backward compatibility for 2 versions
+- Deprecation headers for old versions
+
+#### Mobile-Specific Endpoints (Flutter)
+
+```dart
+// Optimized for mobile bandwidth and offline-first architecture
+GET  /api/v1/mobile/dashboard           # Aggregated dashboard data
+GET  /api/v1/mobile/bookings/upcoming   # Pre-filtered upcoming bookings
+GET  /api/v1/mobile/dive-centers        # User's accessible dive centers
+POST /api/v1/mobile/sync                # Bulk sync for offline data
+GET  /api/v1/mobile/profile             # Complete user profile with preferences
+
+// Dive center switching
+POST /api/v1/mobile/switch-dive-center  # Switch active dive center context
+```
+
+#### Multi-Tenancy Implementation
+
+**Web & Mobile**: User selects dive center from dropdown/picker. The selected `dive_center_id` is:
+- Stored in session/state
+- Sent with each API request as header: `X-Dive-Center-Id`
+- Validated against user's authorized dive centers
+
+```php
+// Laravel Middleware: CheckDiveCenterAccess.php
+public function handle(Request $request, Closure $next)
+{
+    $diveCenterId = $request->header('X-Dive-Center-Id');
+    
+    if (!$diveCenterId) {
+        return response()->json(['error' => 'Dive center not specified'], 400);
+    }
+    
+    // Check if user has access to this dive center
+    $hasAccess = $request->user()->diveCenter()
+        ->where('id', $diveCenterId)
+        ->exists();
+    
+    if (!$hasAccess) {
+        return response()->json(['error' => 'Unauthorized access to dive center'], 403);
+    }
+    
+    // Store in request for use in controllers
+    $request->merge(['current_dive_center_id' => $diveCenterId]);
+    
+    return $next($request);
+}
+```
+
+---
+
+### Modern UI/UX Design
+
+#### Design System
+
+- **Component Library**: Shadcn/UI (Radix UI primitives)
+- **Styling**: Tailwind CSS with custom design tokens
+- **Theme**: Dark mode support via CSS variables
+- **Typography**: Inter font family
+- **Color Palette**: Ocean-themed blues and teals
+- **Icons**: Lucide React icons
+
+#### Responsive Design
+
+- Mobile-first approach
+- Breakpoints: 640px, 768px, 1024px, 1280px, 1536px
+- Touch-friendly UI elements (minimum 44x44px)
+- Progressive Web App (PWA) capabilities
+
+#### Key Features
+
+- **Dashboard**: Real-time booking statistics, charts
+- **Calendar View**: Drag-and-drop booking management
+- **Search & Filters**: Advanced filtering with instant results
+- **Notifications**: Toast notifications for actions
+- **Loading States**: Skeleton loaders for better UX
+- **Error Handling**: User-friendly error messages
+- **Accessibility**: WCAG 2.1 AA compliance
+
+---
+
+## Verification Plan
+
+### Automated Tests
+
+#### Backend Tests
+```bash
+# Feature tests for API endpoints
+php artisan test --filter=BookingControllerTest
+php artisan test --filter=AuthenticationTest
+
+# Test coverage
+php artisan test --coverage
+```
+
+#### Frontend Tests
+```bash
+# Component tests
+npm run test
+
+# E2E tests with Playwright
+npm run test:e2e
+
+# Type checking
+npm run type-check
+```
+
+### Manual Verification
+
+1. **Authentication Flow**
+   - Register new user
+   - Login/logout
+   - Password reset
+   - Session persistence
+
+2. **Booking Flow**
+   - Create booking
+   - Edit booking
+   - Cancel booking
+   - Generate invoice
+
+3. **Mobile API**
+   - Test with Postman/Insomnia
+   - Verify token authentication
+   - Check response times (<200ms)
+
+4. **Security Checks**
+   - OWASP Top 10 vulnerabilities
+   - SQL injection attempts
+   - XSS attempts
+   - CSRF protection
+   - Rate limiting
+
+5. **Performance**
+   - Load testing (Apache JMeter)
+   - Database query optimization
+   - Page load speed (<3s)
+   - API response time (<200ms)
+
+---
+
+## Environment Configuration
+
+### Laravel (.env)
+
+```bash
+# Application
+APP_NAME="SAS Scuba"
+APP_ENV=production
+APP_KEY=base64:GENERATED_KEY_HERE
+APP_DEBUG=false
+APP_URL=https://api.sasscuba.com
+
+# Frontend URLs (CORS)
+FRONTEND_URL=https://app.sasscuba.com
+MOBILE_APP_SCHEME=sasscuba://
+SANCTUM_STATEFUL_DOMAINS=app.sasscuba.com,localhost:3000
+
+# Database
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=sas_scuba
+DB_USERNAME=root
+DB_PASSWORD=
+
+# Redis Cache
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+REDIS_CLIENT=phpredis
+
+# Session & Cache
+SESSION_DRIVER=redis
+SESSION_LIFETIME=120
+CACHE_DRIVER=redis
+QUEUE_CONNECTION=redis
+
+# Mail
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=noreply@sasscuba.com
+MAIL_FROM_NAME="${APP_NAME}"
+
+# File Storage
+FILESYSTEM_DISK=s3
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=sas-scuba-uploads
+AWS_USE_PATH_STYLE_ENDPOINT=false
+
+# Security
+RATELIMIT_PER_MINUTE=60
+RATELIMIT_AUTH_PER_MINUTE=120
+SESSION_SECURE_COOKIE=true
+SESSION_SAME_SITE=lax
+
+# Payment Gateway (Stripe example)
+STRIPE_KEY=
+STRIPE_SECRET=
+STRIPE_WEBHOOK_SECRET=
+
+# Third-party Services
+GOOGLE_MAPS_API_KEY=
+TWILIO_SID=
+TWILIO_TOKEN=
+TWILIO_FROM=
+
+# Monitoring & Analytics
+SENTRY_LARAVEL_DSN=
+GOOGLE_ANALYTICS_ID=
+
+# Feature Flags
+FEATURE_BOOKINGS_ENABLED=true
+FEATURE_PAYMENTS_ENABLED=true
+FEATURE_MULTI_CURRENCY=false
+```
+
+### Next.js (.env.local)
+
+```bash
+# API Configuration
+NEXT_PUBLIC_API_URL=https://api.sasscuba.com
+NEXT_PUBLIC_API_VERSION=v1
+NEXT_PUBLIC_APP_NAME="SAS Scuba"
+
+# Authentication
+NEXT_PUBLIC_SANCTUM_ENDPOINT=https://api.sasscuba.com/sanctum/csrf-cookie
+NEXTAUTH_URL=https://app.sasscuba.com
+NEXTAUTH_SECRET=GENERATED_SECRET_HERE
+
+# Feature Flags
+NEXT_PUBLIC_ENABLE_DARK_MODE=true
+NEXT_PUBLIC_ENABLE_NOTIFICATIONS=true
+NEXT_PUBLIC_ENABLE_PWA=true
+
+# Google Services
+NEXT_PUBLIC_GOOGLE_MAPS_KEY=
+NEXT_PUBLIC_GOOGLE_ANALYTICS_ID=
+
+# Payment
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+
+# File Upload
+NEXT_PUBLIC_MAX_FILE_SIZE=10485760  # 10MB in bytes
+NEXT_PUBLIC_ALLOWED_FILE_TYPES=image/jpeg,image/png,application/pdf
+
+# App Configuration
+NEXT_PUBLIC_ITEMS_PER_PAGE=20
+NEXT_PUBLIC_BOOKING_ADVANCE_DAYS=90
+NEXT_PUBLIC_CURRENCY=USD
+NEXT_PUBLIC_DATE_FORMAT=YYYY-MM-DD
+NEXT_PUBLIC_TIME_FORMAT=HH:mm
+
+# Security
+NEXT_PUBLIC_ENABLE_CSP=true
+NEXT_PUBLIC_ENABLE_MINING_PROTECTION=true
+
+# Development
+NEXT_TELEMETRY_DISABLED=1
+```
+
+### Environment Variable Usage
+
+**Laravel Example:**
+```php
+// In controllers/services
+$bookingEnabled = config('app.feature_bookings_enabled', true);
+$rateLimit = config('app.ratelimit_per_minute', 60);
+$apiUrl = config('app.frontend_url');
+```
+
+**Next.js Example:**
+```typescript
+// lib/config.ts
+export const config = {
+  api: {
+    baseUrl: process.env.NEXT_PUBLIC_API_URL!,
+    version: process.env.NEXT_PUBLIC_API_VERSION || 'v1',
+  },
+  features: {
+    darkMode: process.env.NEXT_PUBLIC_ENABLE_DARK_MODE === 'true',
+    notifications: process.env.NEXT_PUBLIC_ENABLE_NOTIFICATIONS === 'true',
+  },
+  uploads: {
+    maxSize: parseInt(process.env.NEXT_PUBLIC_MAX_FILE_SIZE || '10485760'),
+    allowedTypes: process.env.NEXT_PUBLIC_ALLOWED_FILE_TYPES?.split(',') || [],
+  },
+  security: {
+    enableCSP: process.env.NEXT_PUBLIC_ENABLE_CSP === 'true',
+    miningProtection: process.env.NEXT_PUBLIC_ENABLE_MINING_PROTECTION === 'true',
+  },
+};
+
+// Usage in components
+import { config } from '@/lib/config';
+
+const apiClient = axios.create({
+  baseURL: `${config.api.baseUrl}/api/${config.api.version}`,
+});
+```
+
+---
+
+## Technology Stack Summary
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Frontend** | Next.js 14+ | React framework with SSR |
+| | TypeScript | Type safety |
+| | Tailwind CSS | Utility-first CSS |
+| | Shadcn/UI | Component library |
+| | TanStack Query | Data fetching & caching |
+| | Zustand | State management |
+| | React Hook Form | Form handling |
+| | Zod | Runtime validation |
+| **Backend** | Laravel 11 | PHP framework |
+| | Laravel Sanctum | Authentication |
+| | MySQL 8.4 | Primary database |
+| | Redis | Cache & sessions |
+| | Laravel Horizon | Queue management |
+| **Infrastructure** | NGINX | Web server / Load balancer |
+| | Docker | Containerization |
+| | AWS S3 / CloudFlare R2 | File storage |
+| | CloudFlare | CDN |
+| **DevOps** | GitHub Actions | CI/CD |
+| | PHPUnit | Backend testing |
+| | Playwright | E2E testing |
+| | Laravel Telescope | Debugging |
+
+---
+
+## Development Timeline Estimate
+
+| Phase | Duration | Tasks |
+|-------|----------|-------|
+| Setup & Configuration | 2-3 days | Laravel + Next.js setup, database migrations |
+| Authentication System | 2-3 days | Sanctum setup, login/register flows |
+| Core API Development | 5-7 days | CRUD endpoints for all resources |
+| Frontend UI Components | 5-7 days | Reusable components, layouts |
+| Business Logic | 7-10 days | Booking flow, payment processing |
+| Testing & QA | 3-5 days | Unit + integration + E2E tests |
+| **Total** | **24-35 days** | ~5-7 weeks for MVP |
+
+---
+
+## Next Steps After Approval
+
+1. Initialize Laravel project in workspace
+2. Set up database migrations
+3. Configure Laravel Sanctum
+4. Initialize Next.js project
+5. Create base components
+6. Implement authentication flow
+7. Build core features iteratively

@@ -1,0 +1,19 @@
+# SAS Scuba Implementation Tasks
+
+- [ ] **Backend: sas-scuba-api**
+    - [/] Initialize Laravel Project (Repair/Reinstall) <!-- id: init-backend -->
+    - [ ] Configure Environment (.env) <!-- id: env-config -->
+    - [ ] Setup Directory Structure (Controllers, Services, Repos)
+    - [ ] Database Schema & Migrations
+    - [ ] Authentication (Sanctum)
+    - [ ] API Routes & Controllers
+        - [ ] Auth (Login, Register)
+        - [ ] Bookings
+        - [ ] Customers
+    - [ ] Security Hardening
+
+- [ ] **Frontend: sas-scuba-web**
+    - [/] Initialize Next.js Project <!-- id: init-frontend -->
+    - [ ] Setup Shadcn/UI & Tailwind
+    - [ ] Authentication Pages
+    - [ ] Dashboard Implementation
