@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\BookingDive;
 use App\Models\Booking;
 use Illuminate\Http\Request;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 class BookingDiveController extends Controller
 {
+    use AuthorizesDiveCenterAccess;
     /**
      * Display a listing of the resource.
      */
@@ -185,18 +187,12 @@ class BookingDiveController extends Controller
      */
     public function show(Request $request, BookingDive $bookingDive)
     {
-        $user = $request->user();
-        
-        // Verify dive belongs to user's dive center
-        if ($user->dive_center_id) {
-            $bookingDive->load(['booking' => function ($query) use ($user) {
-                $query->where('dive_center_id', $user->dive_center_id);
-            }]);
-            
-            if (!$bookingDive->booking) {
-                return response()->json(['message' => 'Dive not found'], 404);
-            }
+        // Verify dive belongs to user's dive center (via booking relationship)
+        $bookingDive->load('booking');
+        if (!$bookingDive->booking) {
+            abort(404, 'Dive not found');
         }
+        $this->authorizeDiveCenterAccess($bookingDive->booking, 'Unauthorized access to this dive');
         
         $bookingDive->load(['booking.customer', 'diveSite', 'boat', 'priceListItem', 'bookingInstructors.user']);
         return $bookingDive;
@@ -207,16 +203,15 @@ class BookingDiveController extends Controller
      */
     public function update(Request $request, BookingDive $bookingDive)
     {
+        // Verify dive belongs to user's dive center (via booking relationship)
+        $bookingDive->load('booking');
+        if (!$bookingDive->booking) {
+            abort(404, 'Dive not found');
+        }
+        $this->authorizeDiveCenterAccess($bookingDive->booking, 'Unauthorized access to this dive');
+        
         $user = $request->user();
         $diveCenterId = $user->dive_center_id;
-
-        // Verify dive belongs to user's dive center
-        if ($diveCenterId) {
-            $bookingDive->load('booking');
-            if (!$bookingDive->booking || $bookingDive->booking->dive_center_id !== $diveCenterId) {
-                return response()->json(['message' => 'Dive not found'], 404);
-            }
-        }
 
         $validated = $request->validate([
             'booking_id' => 'sometimes|exists:bookings,id',
@@ -258,15 +253,12 @@ class BookingDiveController extends Controller
      */
     public function destroy(Request $request, BookingDive $bookingDive)
     {
-        $user = $request->user();
-        
-        // Verify dive belongs to user's dive center
-        if ($user->dive_center_id) {
-            $bookingDive->load('booking');
-            if (!$bookingDive->booking || $bookingDive->booking->dive_center_id !== $user->dive_center_id) {
-                return response()->json(['message' => 'Dive not found'], 404);
-            }
+        // Verify dive belongs to user's dive center (via booking relationship)
+        $bookingDive->load('booking');
+        if (!$bookingDive->booking) {
+            abort(404, 'Dive not found');
         }
+        $this->authorizeDiveCenterAccess($bookingDive->booking, 'Unauthorized access to this dive');
 
         $bookingDive->delete();
         return response()->noContent();
@@ -277,15 +269,12 @@ class BookingDiveController extends Controller
      */
     public function complete(Request $request, BookingDive $bookingDive)
     {
-        $user = $request->user();
-        
-        // Verify dive belongs to user's dive center
-        if ($user->dive_center_id) {
-            $bookingDive->load('booking');
-            if (!$bookingDive->booking || $bookingDive->booking->dive_center_id !== $user->dive_center_id) {
-                return response()->json(['message' => 'Dive not found'], 404);
-            }
+        // Verify dive belongs to user's dive center (via booking relationship)
+        $bookingDive->load('booking');
+        if (!$bookingDive->booking) {
+            abort(404, 'Dive not found');
         }
+        $this->authorizeDiveCenterAccess($bookingDive->booking, 'Unauthorized access to this dive');
 
         // Prevent completing dive twice
         if ($bookingDive->status === 'Completed') {
@@ -318,15 +307,12 @@ class BookingDiveController extends Controller
      */
     public function log(Request $request, BookingDive $bookingDive)
     {
-        $user = $request->user();
-        
-        // Verify dive belongs to user's dive center
-        if ($user->dive_center_id) {
-            $bookingDive->load('booking');
-            if (!$bookingDive->booking || $bookingDive->booking->dive_center_id !== $user->dive_center_id) {
-                return response()->json(['message' => 'Dive not found'], 404);
-            }
+        // Verify dive belongs to user's dive center (via booking relationship)
+        $bookingDive->load('booking');
+        if (!$bookingDive->booking) {
+            abort(404, 'Dive not found');
         }
+        $this->authorizeDiveCenterAccess($bookingDive->booking, 'Unauthorized access to this dive');
 
         $bookingDive->load([
             'booking.customer',

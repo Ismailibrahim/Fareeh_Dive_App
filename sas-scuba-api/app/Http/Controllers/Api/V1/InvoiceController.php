@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Booking;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 
 class InvoiceController extends Controller
 {
+    use AuthorizesDiveCenterAccess;
     /**
      * Display a listing of invoices.
      */
@@ -216,12 +218,8 @@ class InvoiceController extends Controller
      */
     public function show(Request $request, Invoice $invoice)
     {
-        $user = $request->user();
-        
         // Verify invoice belongs to user's dive center
-        if ($user->dive_center_id && $invoice->dive_center_id !== $user->dive_center_id) {
-            return response()->json(['message' => 'Invoice not found'], 404);
-        }
+        $this->authorizeDiveCenterAccess($invoice, 'Unauthorized access to this invoice');
 
         $invoice->load([
             'booking.customer',
@@ -240,12 +238,8 @@ class InvoiceController extends Controller
      */
     public function update(Request $request, Invoice $invoice)
     {
-        $user = $request->user();
-        
         // Verify invoice belongs to user's dive center
-        if ($user->dive_center_id && $invoice->dive_center_id !== $user->dive_center_id) {
-            return response()->json(['message' => 'Invoice not found'], 404);
-        }
+        $this->authorizeDiveCenterAccess($invoice, 'Unauthorized access to this invoice');
 
         // Prevent editing if fully paid
         if ($invoice->isFullyPaid() && $invoice->status === 'Paid') {
@@ -270,12 +264,8 @@ class InvoiceController extends Controller
      */
     public function destroy(Request $request, Invoice $invoice)
     {
-        $user = $request->user();
-        
         // Verify invoice belongs to user's dive center
-        if ($user->dive_center_id && $invoice->dive_center_id !== $user->dive_center_id) {
-            return response()->json(['message' => 'Invoice not found'], 404);
-        }
+        $this->authorizeDiveCenterAccess($invoice, 'Unauthorized access to this invoice');
 
         // Prevent deletion if payments exist
         if ($invoice->payments()->exists()) {
@@ -293,12 +283,8 @@ class InvoiceController extends Controller
      */
     public function addDamageCharge(Request $request, Invoice $invoice)
     {
-        $user = $request->user();
-        
         // Verify invoice belongs to user's dive center
-        if ($user->dive_center_id && $invoice->dive_center_id !== $user->dive_center_id) {
-            return response()->json(['message' => 'Invoice not found'], 404);
-        }
+        $this->authorizeDiveCenterAccess($invoice, 'Unauthorized access to this invoice');
 
         $validated = $request->validate([
             'booking_equipment_id' => 'required|exists:booking_equipment,id',

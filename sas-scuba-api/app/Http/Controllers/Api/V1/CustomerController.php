@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\Customer;
 use Illuminate\Http\Request;
 
 class CustomerController extends Controller
 {
+    use AuthorizesDiveCenterAccess;
     /**
      * Display a listing of the resource.
      */
@@ -19,14 +21,23 @@ class CustomerController extends Controller
         $query = Customer::select('id', 'full_name', 'email', 'phone', 'passport_no', 'nationality', 'gender', 'date_of_birth', 'dive_center_id', 'created_at', 'updated_at')
             ->where('dive_center_id', $user->dive_center_id);
         
-        // Add server-side search
+        // Add server-side search with sanitization
         if ($request->has('search') && !empty($request->get('search'))) {
             $search = $request->get('search');
-            $query->where(function($q) use ($search) {
-                $q->where('full_name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('passport_no', 'like', "%{$search}%");
-            });
+            // Sanitize search input: remove special characters except spaces, @, ., and -
+            $search = preg_replace('/[^a-zA-Z0-9\s@.-]/', '', $search);
+            // Limit search length to prevent abuse
+            $search = substr($search, 0, 100);
+            // Trim whitespace
+            $search = trim($search);
+            
+            if (!empty($search)) {
+                $query->where(function($q) use ($search) {
+                    $q->where('full_name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('passport_no', 'like', "%{$search}%");
+                });
+            }
         }
         
         // Get pagination parameters
@@ -63,6 +74,9 @@ class CustomerController extends Controller
      */
     public function show(Customer $customer)
     {
+        // Verify customer belongs to user's dive center
+        $this->authorizeDiveCenterAccess($customer, 'Unauthorized access to this customer');
+        
         $customer->load('emergencyContacts');
         return $customer;
     }
@@ -72,6 +86,9 @@ class CustomerController extends Controller
      */
     public function update(Request $request, Customer $customer)
     {
+        // Verify customer belongs to user's dive center
+        $this->authorizeDiveCenterAccess($customer, 'Unauthorized access to this customer');
+        
         $validated = $request->validate([
             'full_name' => 'sometimes|string|max:255',
             'email' => 'nullable|email|max:255',
@@ -91,6 +108,9 @@ class CustomerController extends Controller
      */
     public function destroy(Customer $customer)
     {
+        // Verify customer belongs to user's dive center
+        $this->authorizeDiveCenterAccess($customer, 'Unauthorized access to this customer');
+        
         $customer->delete();
         return response()->noContent();
     }

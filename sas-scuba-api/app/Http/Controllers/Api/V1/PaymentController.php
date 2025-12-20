@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\Payment;
 use App\Models\Invoice;
 use Illuminate\Http\Request;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
+    use AuthorizesDiveCenterAccess;
     /**
      * Display a listing of payments.
      */
@@ -103,13 +105,12 @@ class PaymentController extends Controller
      */
     public function show(Request $request, Payment $payment)
     {
-        $user = $request->user();
-        
         // Verify payment belongs to invoice from user's dive center
         $payment->load('invoice');
-        if ($user->dive_center_id && $payment->invoice->dive_center_id !== $user->dive_center_id) {
-            return response()->json(['message' => 'Payment not found'], 404);
+        if (!$payment->invoice) {
+            abort(404, 'Payment not found');
         }
+        $this->authorizeDiveCenterAccess($payment->invoice, 'Unauthorized access to this payment');
 
         $payment->load(['invoice.booking.customer']);
         return response()->json($payment);
@@ -120,13 +121,12 @@ class PaymentController extends Controller
      */
     public function update(Request $request, Payment $payment)
     {
-        $user = $request->user();
-        
         // Verify payment belongs to invoice from user's dive center
         $payment->load('invoice');
-        if ($user->dive_center_id && $payment->invoice->dive_center_id !== $user->dive_center_id) {
-            return response()->json(['message' => 'Payment not found'], 404);
+        if (!$payment->invoice) {
+            abort(404, 'Payment not found');
         }
+        $this->authorizeDiveCenterAccess($payment->invoice, 'Unauthorized access to this payment');
 
         $validated = $request->validate([
             'amount' => 'sometimes|numeric|min:0.01',
@@ -158,13 +158,12 @@ class PaymentController extends Controller
      */
     public function destroy(Request $request, Payment $payment)
     {
-        $user = $request->user();
-        
         // Verify payment belongs to invoice from user's dive center
         $payment->load('invoice');
-        if ($user->dive_center_id && $payment->invoice->dive_center_id !== $user->dive_center_id) {
-            return response()->json(['message' => 'Payment not found'], 404);
+        if (!$payment->invoice) {
+            abort(404, 'Payment not found');
         }
+        $this->authorizeDiveCenterAccess($payment->invoice, 'Unauthorized access to this payment');
 
         $invoice = $payment->invoice;
         $payment->delete();

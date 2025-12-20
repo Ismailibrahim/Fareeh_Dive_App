@@ -13,6 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        // Add security headers to all API responses
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+        // Add error handling middleware
+        $middleware->append(\App\Http\Middleware\ErrorHandler::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

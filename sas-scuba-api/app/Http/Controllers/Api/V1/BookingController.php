@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\Booking;
 use Illuminate\Http\Request;
 
 class BookingController extends Controller
 {
+    use AuthorizesDiveCenterAccess;
     /**
      * Display a listing of the resource.
      */
@@ -29,6 +31,8 @@ class BookingController extends Controller
      */
     public function store(Request $request)
     {
+        $user = $request->user();
+        
         $validated = $request->validate([
             'dive_center_id' => 'required|exists:dive_centers,id',
             'customer_id' => 'required|exists:customers,id',
@@ -38,6 +42,13 @@ class BookingController extends Controller
             'status' => 'sometimes|string|in:Pending,Confirmed,Completed,Cancelled',
             'notes' => 'nullable|string',
         ]);
+
+        // Verify dive center ID matches user's dive center
+        $this->authorizeDiveCenterId($validated['dive_center_id'], 'Cannot create booking for another dive center');
+        
+        // Verify customer belongs to user's dive center
+        $customer = \App\Models\Customer::findOrFail($validated['customer_id']);
+        $this->authorizeDiveCenterAccess($customer, 'Customer does not belong to your dive center');
 
         // Map start_date to booking_date for database
         $bookingData = [
@@ -56,8 +67,11 @@ class BookingController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Booking $booking)
+    public function show(Request $request, Booking $booking)
     {
+        // Verify booking belongs to user's dive center
+        $this->authorizeDiveCenterAccess($booking, 'Unauthorized access to this booking');
+        
         return $booking->load(['customer', 'diveCenter']);
     }
 
@@ -66,6 +80,9 @@ class BookingController extends Controller
      */
     public function update(Request $request, Booking $booking)
     {
+        // Verify booking belongs to user's dive center
+        $this->authorizeDiveCenterAccess($booking, 'Unauthorized access to this booking');
+        
         $validated = $request->validate([
             'status' => 'sometimes|string|in:Pending,Confirmed,Completed,Cancelled',
             'notes' => 'nullable|string',
@@ -98,6 +115,9 @@ class BookingController extends Controller
      */
     public function destroy(Booking $booking)
     {
+        // Verify booking belongs to user's dive center
+        $this->authorizeDiveCenterAccess($booking, 'Unauthorized access to this booking');
+        
         $booking->delete();
         return response()->noContent();
     }

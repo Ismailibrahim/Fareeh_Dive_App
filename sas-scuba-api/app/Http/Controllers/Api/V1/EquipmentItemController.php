@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\EquipmentItem;
 use Illuminate\Http\Request;
 
 class EquipmentItemController extends Controller
 {
+    use AuthorizesDiveCenterAccess;
     /**
      * Display a listing of the resource.
      */
@@ -51,6 +53,8 @@ class EquipmentItemController extends Controller
      */
     public function store(Request $request)
     {
+        $user = $request->user();
+        
         $validated = $request->validate([
             'equipment_id' => 'required|exists:equipment,id',
             'location_id' => 'nullable|exists:locations,id',
@@ -90,8 +94,15 @@ class EquipmentItemController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(EquipmentItem $equipmentItem)
+    public function show(Request $request, EquipmentItem $equipmentItem)
     {
+        // Verify equipment item belongs to user's dive center (via equipment relationship)
+        $equipmentItem->load('equipment');
+        if (!$equipmentItem->equipment) {
+            abort(404, 'Equipment item not found');
+        }
+        $this->authorizeDiveCenterAccess($equipmentItem->equipment, 'Unauthorized access to this equipment item');
+        
         return $equipmentItem->load(['equipment', 'location']);
     }
 
@@ -100,6 +111,13 @@ class EquipmentItemController extends Controller
      */
     public function update(Request $request, EquipmentItem $equipmentItem)
     {
+        // Verify equipment item belongs to user's dive center (via equipment relationship)
+        $equipmentItem->load('equipment');
+        if (!$equipmentItem->equipment) {
+            abort(404, 'Equipment item not found');
+        }
+        $this->authorizeDiveCenterAccess($equipmentItem->equipment, 'Unauthorized access to this equipment item');
+        
         $validated = $request->validate([
             'equipment_id' => 'sometimes|exists:equipment,id',
             'location_id' => 'nullable|exists:locations,id',
@@ -116,6 +134,12 @@ class EquipmentItemController extends Controller
             'last_service_date' => 'nullable|date',
             'next_service_date' => 'nullable|date',
         ]);
+
+        // If equipment_id is being changed, verify new equipment belongs to user's dive center
+        if (isset($validated['equipment_id']) && $validated['equipment_id'] != $equipmentItem->equipment_id) {
+            $newEquipment = \App\Models\Equipment::findOrFail($validated['equipment_id']);
+            $this->authorizeDiveCenterAccess($newEquipment, 'Equipment does not belong to your dive center');
+        }
 
         // Auto-calculate next_service_date if not provided and conditions are met
         if (!isset($validated['next_service_date']) && 
@@ -145,6 +169,13 @@ class EquipmentItemController extends Controller
      */
     public function destroy(EquipmentItem $equipmentItem)
     {
+        // Verify equipment item belongs to user's dive center (via equipment relationship)
+        $equipmentItem->load('equipment');
+        if (!$equipmentItem->equipment) {
+            abort(404, 'Equipment item not found');
+        }
+        $this->authorizeDiveCenterAccess($equipmentItem->equipment, 'Unauthorized access to this equipment item');
+        
         $equipmentItem->delete();
         return response()->noContent();
     }

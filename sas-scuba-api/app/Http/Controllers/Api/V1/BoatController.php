@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\Boat;
 use Illuminate\Http\Request;
 
 class BoatController extends Controller
 {
+    use AuthorizesDiveCenterAccess;
     /**
      * Display a listing of the resource.
      */
@@ -49,8 +51,11 @@ class BoatController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Boat $boat)
+    public function show(Request $request, Boat $boat)
     {
+        // Verify boat belongs to user's dive center
+        $this->authorizeDiveCenterAccess($boat, 'Unauthorized access to this boat');
+        
         return $boat;
     }
 
@@ -59,6 +64,9 @@ class BoatController extends Controller
      */
     public function update(Request $request, Boat $boat)
     {
+        // Verify boat belongs to user's dive center
+        $this->authorizeDiveCenterAccess($boat, 'Unauthorized access to this boat');
+        
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'capacity' => 'nullable|integer|min:1',
@@ -74,6 +82,9 @@ class BoatController extends Controller
      */
     public function destroy(Boat $boat)
     {
+        // Verify boat belongs to user's dive center
+        $this->authorizeDiveCenterAccess($boat, 'Unauthorized access to this boat');
+        
         $boat->delete();
         return response()->noContent();
     }

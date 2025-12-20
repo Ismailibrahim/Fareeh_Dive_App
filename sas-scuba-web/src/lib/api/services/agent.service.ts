@@ -1,6 +1,9 @@
 import apiClient from "../client";
 import { PaginationParams, PaginatedResponse } from "./customer.service";
 
+// Re-export PaginatedResponse for convenience
+export type { PaginatedResponse } from "./customer.service";
+
 export interface AgentContact {
     id?: number;
     contact_person_name: string;

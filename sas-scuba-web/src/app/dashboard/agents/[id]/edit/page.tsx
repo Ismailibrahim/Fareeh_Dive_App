@@ -14,8 +14,14 @@ export default function EditAgentPage() {
 
     useEffect(() => {
         const fetchAgent = async () => {
+            const agentId = params.id as string;
+            if (!agentId) {
+                router.push("/dashboard/agents");
+                return;
+            }
+            
             try {
-                const data = await agentService.getById(params.id);
+                const data = await agentService.getById(agentId);
                 setAgent(data);
             } catch (error) {
                 console.error("Failed to fetch agent", error);
@@ -25,9 +31,7 @@ export default function EditAgentPage() {
             }
         };
 
-        if (params.id) {
-            fetchAgent();
-        }
+        fetchAgent();
     }, [params.id, router]);
 
     if (loading) {
@@ -53,7 +57,7 @@ export default function EditAgentPage() {
             <div className="flex-1 p-8 pt-6">
                 <div className="max-w-5xl mx-auto">
                     <h2 className="text-3xl font-bold tracking-tight mb-6">Edit Agent</h2>
-                    <AgentForm initialData={agent} agentId={params.id} />
+                    <AgentForm initialData={agent} agentId={params.id as string} />
                 </div>
             </div>
         </div>

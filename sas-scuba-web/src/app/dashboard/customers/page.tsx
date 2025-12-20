@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useMemo } from "react";
+import { useDebouncedCallback } from "use-debounce";
 import { Header } from "@/components/layout/Header";
-import { Customer, customerService, PaginatedResponse } from "@/lib/api/services/customer.service";
+import { Customer } from "@/lib/api/services/customer.service";
 import { Pagination } from "@/components/ui/pagination";
+import { useCustomers, useDeleteCustomer } from "@/lib/hooks/use-customers";
 import {
     Table,
     TableBody,
@@ -37,66 +39,57 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function CustomersPage() {
-    const [customers, setCustomers] = useState<Customer[]>([]);
-    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-    const [pagination, setPagination] = useState({
-        total: 0,
-        per_page: 20,
-        last_page: 1,
-        current_page: 1,
-    });
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
 
     // Delete state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
 
-    const fetchCustomers = useCallback(async (page = 1, search = "") => {
-        setLoading(true);
-        try {
-            const response = await customerService.getAll({
-                page,
+    // Debounce search term (500ms delay)
+    const debouncedSearch = useDebouncedCallback((value: string) => {
+        setDebouncedSearchTerm(value);
+        setCurrentPage(1); // Reset to first page on new search
+    }, 500);
+
+    // Fetch customers using React Query
+    const { data: customersData, isLoading, error } = useCustomers({
+        page: currentPage,
+        per_page: 20,
+        search: debouncedSearchTerm || undefined,
+    });
+
+    // Delete mutation
+    const deleteMutation = useDeleteCustomer();
+
+    // Extract customers and pagination from response
+    const customers = useMemo(() => {
+        if (!customersData) return [];
+        return customersData.data || [];
+    }, [customersData]);
+
+    const pagination = useMemo(() => {
+        if (!customersData) {
+            return {
+                total: 0,
                 per_page: 20,
-                search: search || undefined,
-            });
-            
-            // Handle Laravel pagination response
-            if (response.data && Array.isArray(response.data)) {
-                setCustomers(response.data);
-                setPagination({
-                    total: response.total || 0,
-                    per_page: response.per_page || 20,
-                    last_page: response.last_page || 1,
-                    current_page: response.current_page || page,
-                });
-            } else {
-                // Fallback for non-paginated response
-                const customerList = Array.isArray(response) ? response : (response as any).data || [];
-                setCustomers(customerList);
-            }
-        } catch (error) {
-            console.error("Failed to fetch customers", error);
-            setCustomers([]);
-        } finally {
-            setLoading(false);
+                last_page: 1,
+                current_page: 1,
+            };
         }
-    }, []);
+        return {
+            total: customersData.total || 0,
+            per_page: customersData.per_page || 20,
+            last_page: customersData.last_page || 1,
+            current_page: customersData.current_page || currentPage,
+        };
+    }, [customersData, currentPage]);
 
-    // Initial load
-    useEffect(() => {
-        fetchCustomers(1, "");
-    }, [fetchCustomers]);
-
-    // Debounced search
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            setCurrentPage(1);
-            fetchCustomers(1, searchTerm);
-        }, 300); // 300ms debounce
-        
-        return () => clearTimeout(timeoutId);
-    }, [searchTerm, fetchCustomers]);
+    const handleSearchChange = (value: string) => {
+        setSearchTerm(value);
+        debouncedSearch(value);
+    };
 
     const handleDeleteClick = (customer: Customer) => {
         setCustomerToDelete(customer);
@@ -106,15 +99,16 @@ export default function CustomersPage() {
     const confirmDelete = async () => {
         if (!customerToDelete) return;
         try {
-            await customerService.delete(customerToDelete.id);
-            // Refresh current page after delete
-            fetchCustomers(currentPage, searchTerm);
-        } catch (error) {
-            console.error("Failed to delete customer", error);
-        } finally {
+            await deleteMutation.mutateAsync(customerToDelete.id);
             setDeleteDialogOpen(false);
             setCustomerToDelete(null);
+        } catch (error) {
+            console.error("Failed to delete customer", error);
         }
+    };
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
     };
 
     return (
@@ -138,7 +132,7 @@ export default function CustomersPage() {
                             placeholder="Search customers..."
                             className="pl-8"
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => handleSearchChange(e.target.value)}
                         />
                     </div>
                 </div>
@@ -157,10 +151,16 @@ export default function CustomersPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {loading ? (
+                            {isLoading ? (
                                 <TableRow>
                                     <TableCell colSpan={8} className="h-24 text-center">
                                         Loading...
+                                    </TableCell>
+                                </TableRow>
+                            ) : error ? (
+                                <TableRow>
+                                    <TableCell colSpan={8} className="h-24 text-center text-red-600">
+                                        Error loading customers. Please try again.
                                     </TableCell>
                                 </TableRow>
                             ) : customers.length === 0 ? (
@@ -230,10 +230,7 @@ export default function CustomersPage() {
                         <Pagination
                             currentPage={pagination.current_page}
                             totalPages={pagination.last_page}
-                            onPageChange={(page) => {
-                                setCurrentPage(page);
-                                fetchCustomers(page, searchTerm);
-                            }}
+                            onPageChange={handlePageChange}
                             itemsPerPage={pagination.per_page}
                             totalItems={pagination.total}
                         />
@@ -242,8 +239,12 @@ export default function CustomersPage() {
 
                 {/* Mobile Card View */}
                 <div className="grid grid-cols-1 gap-4 md:hidden">
-                    {loading ? (
+                    {isLoading ? (
                         <div className="text-center p-4">Loading...</div>
+                    ) : error ? (
+                        <div className="text-center p-4 border rounded-md bg-red-50 text-red-600">
+                            Error loading customers. Please try again.
+                        </div>
                     ) : customers.length === 0 ? (
                         <div className="text-center p-4 border rounded-md bg-muted/50">No customers found.</div>
                     ) : (

@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\DiveSite;
 use Illuminate\Http\Request;
 
 class DiveSiteController extends Controller
 {
+    use AuthorizesDiveCenterAccess;
     /**
      * Display a listing of the resource.
      */
@@ -46,8 +48,11 @@ class DiveSiteController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(DiveSite $diveSite)
+    public function show(Request $request, DiveSite $diveSite)
     {
+        // Verify dive site belongs to user's dive center
+        $this->authorizeDiveCenterAccess($diveSite, 'Unauthorized access to this dive site');
+        
         return $diveSite;
     }
 
@@ -56,6 +61,9 @@ class DiveSiteController extends Controller
      */
     public function update(Request $request, DiveSite $diveSite)
     {
+        // Verify dive site belongs to user's dive center
+        $this->authorizeDiveCenterAccess($diveSite, 'Unauthorized access to this dive site');
+        
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'max_depth' => 'nullable|integer|min:0',
@@ -76,6 +84,9 @@ class DiveSiteController extends Controller
      */
     public function destroy(DiveSite $diveSite)
     {
+        // Verify dive site belongs to user's dive center
+        $this->authorizeDiveCenterAccess($diveSite, 'Unauthorized access to this dive site');
+        
         $diveSite->delete();
         return response()->noContent();
     }

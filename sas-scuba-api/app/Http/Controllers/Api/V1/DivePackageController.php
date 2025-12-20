@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\DivePackage;
 use App\Models\Booking;
 use Illuminate\Http\Request;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 class DivePackageController extends Controller
 {
+    use AuthorizesDiveCenterAccess;
     /**
      * Display a listing of dive packages.
      */
@@ -120,12 +122,8 @@ class DivePackageController extends Controller
      */
     public function show(Request $request, DivePackage $divePackage)
     {
-        $user = $request->user();
-        
         // Verify package belongs to user's dive center
-        if ($user->dive_center_id && $divePackage->dive_center_id !== $user->dive_center_id) {
-            return response()->json(['message' => 'Package not found'], 404);
-        }
+        $this->authorizeDiveCenterAccess($divePackage, 'Unauthorized access to this dive package');
 
         $divePackage->load(['customer', 'packagePriceListItem', 'bookings.bookingDives', 'bookingDives']);
         return response()->json($divePackage);
@@ -136,12 +134,8 @@ class DivePackageController extends Controller
      */
     public function update(Request $request, DivePackage $divePackage)
     {
-        $user = $request->user();
-        
         // Verify package belongs to user's dive center
-        if ($user->dive_center_id && $divePackage->dive_center_id !== $user->dive_center_id) {
-            return response()->json(['message' => 'Package not found'], 404);
-        }
+        $this->authorizeDiveCenterAccess($divePackage, 'Unauthorized access to this dive package');
 
         $validated = $request->validate([
             'package_end_date' => 'nullable|date|after:package_start_date',
@@ -160,12 +154,8 @@ class DivePackageController extends Controller
      */
     public function destroy(Request $request, DivePackage $divePackage)
     {
-        $user = $request->user();
-        
         // Verify package belongs to user's dive center
-        if ($user->dive_center_id && $divePackage->dive_center_id !== $user->dive_center_id) {
-            return response()->json(['message' => 'Package not found'], 404);
-        }
+        $this->authorizeDiveCenterAccess($divePackage, 'Unauthorized access to this dive package');
 
         // Prevent deletion if dives have been used
         if ($divePackage->package_dives_used > 0) {
@@ -183,12 +173,8 @@ class DivePackageController extends Controller
      */
     public function status(Request $request, DivePackage $divePackage)
     {
-        $user = $request->user();
-        
         // Verify package belongs to user's dive center
-        if ($user->dive_center_id && $divePackage->dive_center_id !== $user->dive_center_id) {
-            return response()->json(['message' => 'Package not found'], 404);
-        }
+        $this->authorizeDiveCenterAccess($divePackage, 'Unauthorized access to this dive package');
 
         return response()->json([
             'remaining_dives' => $divePackage->remainingDives(),

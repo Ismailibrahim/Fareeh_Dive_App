@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\PriceList;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class PriceListController extends Controller
 {
+    use AuthorizesDiveCenterAccess;
     /**
      * Display a listing of price lists for the authenticated user's dive center.
      */
@@ -112,20 +114,10 @@ class PriceListController extends Controller
     public function show(Request $request, $id)
     {
         try {
-            $user = $request->user();
-            $diveCenterId = $user->dive_center_id;
+            $priceList = PriceList::findOrFail($id);
             
-            if (!$diveCenterId) {
-                return response()->json(['message' => 'Dive center not found'], 404);
-            }
-
-            $priceList = PriceList::where('id', $id)
-                ->where('dive_center_id', $diveCenterId)
-                ->first();
-
-            if (!$priceList) {
-                return response()->json(['message' => 'Price list not found'], 404);
-            }
+            // Verify price list belongs to user's dive center
+            $this->authorizeDiveCenterAccess($priceList, 'Unauthorized access to this price list');
 
             $priceList->load('items');
             $diveCenter = $user->diveCenter;
@@ -151,13 +143,10 @@ class PriceListController extends Controller
                 return response()->json(['message' => 'Dive center not found'], 404);
             }
 
-            $priceList = PriceList::where('id', $id)
-                ->where('dive_center_id', $diveCenterId)
-                ->first();
-
-            if (!$priceList) {
-                return response()->json(['message' => 'Price list not found'], 404);
-            }
+            $priceList = PriceList::findOrFail($id);
+            
+            // Verify price list belongs to user's dive center
+            $this->authorizeDiveCenterAccess($priceList, 'Unauthorized access to this price list');
 
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
@@ -179,23 +168,13 @@ class PriceListController extends Controller
     /**
      * Remove the specified price list.
      */
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         try {
-            $user = $request->user();
-            $diveCenterId = $user->dive_center_id;
+            $priceList = PriceList::findOrFail($id);
             
-            if (!$diveCenterId) {
-                return response()->json(['message' => 'Dive center not found'], 404);
-            }
-
-            $priceList = PriceList::where('id', $id)
-                ->where('dive_center_id', $diveCenterId)
-                ->first();
-
-            if (!$priceList) {
-                return response()->json(['message' => 'Price list not found'], 404);
-            }
+            // Verify price list belongs to user's dive center
+            $this->authorizeDiveCenterAccess($priceList, 'Unauthorized access to this price list');
 
             $priceList->delete();
 

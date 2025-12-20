@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\Equipment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EquipmentController extends Controller
 {
+    use AuthorizesDiveCenterAccess;
     /**
      * Display a listing of the resource.
      */
@@ -30,13 +32,22 @@ class EquipmentController extends Controller
             $query->where('category', $request->category);
         }
 
-        // Add server-side search
+        // Add server-side search with sanitization
         if ($request->has('search') && !empty($request->get('search'))) {
             $search = $request->get('search');
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('category', 'like', "%{$search}%");
-            });
+            // Sanitize search input: remove special characters except spaces, @, ., and -
+            $search = preg_replace('/[^a-zA-Z0-9\s@.-]/', '', $search);
+            // Limit search length to prevent abuse
+            $search = substr($search, 0, 100);
+            // Trim whitespace
+            $search = trim($search);
+            
+            if (!empty($search)) {
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('category', 'like', "%{$search}%");
+                });
+            }
         }
 
         // Get pagination parameters
@@ -70,8 +81,11 @@ class EquipmentController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Equipment $equipment)
+    public function show(Request $request, Equipment $equipment)
     {
+        // Verify equipment belongs to user's dive center
+        $this->authorizeDiveCenterAccess($equipment, 'Unauthorized access to this equipment');
+        
         return $equipment->load('equipmentItems');
     }
 
@@ -80,6 +94,9 @@ class EquipmentController extends Controller
      */
     public function update(Request $request, Equipment $equipment)
     {
+        // Verify equipment belongs to user's dive center
+        $this->authorizeDiveCenterAccess($equipment, 'Unauthorized access to this equipment');
+        
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'category' => 'nullable|string|max:255',
@@ -98,6 +115,9 @@ class EquipmentController extends Controller
      */
     public function destroy(Equipment $equipment)
     {
+        // Verify equipment belongs to user's dive center
+        $this->authorizeDiveCenterAccess($equipment, 'Unauthorized access to this equipment');
+        
         $equipment->delete();
         return response()->noContent();
     }

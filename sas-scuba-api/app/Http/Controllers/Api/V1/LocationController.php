@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\Location;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class LocationController extends Controller
 {
+    use AuthorizesDiveCenterAccess;
     /**
      * Display a listing of the resource.
      */
@@ -56,14 +58,10 @@ class LocationController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Location $location)
+    public function show(Request $request, Location $location)
     {
-        $user = request()->user();
-        
-        // Ensure the location belongs to the user's dive center
-        if ($user->dive_center_id && $location->dive_center_id !== $user->dive_center_id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        // Verify location belongs to user's dive center
+        $this->authorizeDiveCenterAccess($location, 'Unauthorized access to this location');
 
         return $location;
     }
@@ -73,12 +71,8 @@ class LocationController extends Controller
      */
     public function update(Request $request, Location $location)
     {
-        $user = $request->user();
-        
-        // Ensure the location belongs to the user's dive center
-        if ($user->dive_center_id && $location->dive_center_id !== $user->dive_center_id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        // Verify location belongs to user's dive center
+        $this->authorizeDiveCenterAccess($location, 'Unauthorized access to this location');
 
         $validated = $request->validate([
             'name' => [
@@ -102,12 +96,8 @@ class LocationController extends Controller
      */
     public function destroy(Location $location)
     {
-        $user = request()->user();
-        
-        // Ensure the location belongs to the user's dive center
-        if ($user->dive_center_id && $location->dive_center_id !== $user->dive_center_id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        // Verify location belongs to user's dive center
+        $this->authorizeDiveCenterAccess($location, 'Unauthorized access to this location');
 
         $location->delete();
         return response()->noContent();

@@ -5,11 +5,20 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 
 Route::prefix('v1')->group(function () {
-    // Auth Routes
-    Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/login', [AuthController::class, 'login']);
+    // Auth Routes with strict rate limiting (5 requests per minute)
+    Route::middleware(['throttle:5,1'])->group(function () {
+        Route::post('/register', [AuthController::class, 'register']);
+        Route::post('/login', [AuthController::class, 'login']);
+    });
 
-    Route::middleware('auth:sanctum')->group(function () {
+    // Public pre-registration routes (no authentication required)
+    Route::prefix('pre-registration')->group(function () {
+        Route::get('/{token}', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'getByToken']);
+        Route::post('/{token}/submit', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'submit']);
+    });
+
+    // Authenticated routes with standard rate limiting (60 requests per minute)
+    Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/user', [AuthController::class, 'user']);
         // Dive Center Settings
@@ -26,7 +35,29 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('customer-certifications', \App\Http\Controllers\Api\V1\CustomerCertificationController::class);
         Route::apiResource('customer-insurances', \App\Http\Controllers\Api\V1\CustomerInsuranceController::class);
         Route::apiResource('customer-accommodations', \App\Http\Controllers\Api\V1\CustomerAccommodationController::class);
-        Route::post('upload', [\App\Http\Controllers\Api\V1\FileUploadController::class, 'upload']);
+        
+        // Pre-registration management routes (staff only)
+        Route::prefix('pre-registration')->group(function () {
+            Route::post('/links', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'generateLink']);
+            Route::get('/submissions', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'index']);
+            Route::get('/submissions/{id}', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'show']);
+            Route::post('/submissions/{id}/approve', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'approve']);
+            Route::post('/submissions/{id}/reject', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'reject']);
+        });
+        
+        // File management routes
+        Route::prefix('files')->group(function () {
+            Route::post('/upload', [\App\Http\Controllers\Api\V1\FileUploadController::class, 'upload']);
+            Route::get('/{entityType}/{entityId}', [\App\Http\Controllers\Api\V1\FileUploadController::class, 'index']);
+            Route::get('/{fileId}', [\App\Http\Controllers\Api\V1\FileUploadController::class, 'show']);
+            Route::delete('/{fileId}', [\App\Http\Controllers\Api\V1\FileUploadController::class, 'destroy']);
+        });
+        
+        // Storage routes
+        Route::prefix('storage')->group(function () {
+            Route::get('/usage', [\App\Http\Controllers\Api\V1\FileStorageController::class, 'usage']);
+            Route::get('/files/{fileId}/download', [\App\Http\Controllers\Api\V1\FileStorageController::class, 'download']);
+        });
         Route::apiResource('bookings', \App\Http\Controllers\Api\V1\BookingController::class);
         Route::apiResource('booking-dives', \App\Http\Controllers\Api\V1\BookingDiveController::class);
         Route::post('booking-dives/{bookingDive}/complete', [\App\Http\Controllers\Api\V1\BookingDiveController::class, 'complete']);

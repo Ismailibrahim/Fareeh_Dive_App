@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useMemo } from "react";
+import { useDebouncedCallback } from "use-debounce";
 import { Header } from "@/components/layout/Header";
-import { EquipmentItem, equipmentItemService, PaginatedResponse } from "@/lib/api/services/equipment-item.service";
+import { EquipmentItem } from "@/lib/api/services/equipment-item.service";
 import { Pagination } from "@/components/ui/pagination";
+import { useEquipmentItems, useDeleteEquipmentItem } from "@/lib/hooks/use-equipment-items";
 import {
     Table,
     TableBody,
@@ -39,76 +41,57 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function EquipmentItemsPage() {
-    const [equipmentItems, setEquipmentItems] = useState<EquipmentItem[]>([]);
-    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-    const [pagination, setPagination] = useState({
-        total: 0,
-        per_page: 20,
-        last_page: 1,
-        current_page: 1,
-    });
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
 
     // Delete state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<EquipmentItem | null>(null);
 
-    const fetchEquipmentItems = useCallback(async (page = 1, search = "") => {
-        setLoading(true);
-        try {
-            const response = await equipmentItemService.getAll({
-                page,
+    // Debounce search term (500ms delay)
+    const debouncedSearch = useDebouncedCallback((value: string) => {
+        setDebouncedSearchTerm(value);
+        setCurrentPage(1); // Reset to first page on new search
+    }, 500);
+
+    // Fetch equipment items using React Query
+    const { data: itemsData, isLoading, error } = useEquipmentItems({
+        page: currentPage,
+        per_page: 20,
+        search: debouncedSearchTerm || undefined,
+    });
+
+    // Delete mutation
+    const deleteMutation = useDeleteEquipmentItem();
+
+    // Extract items and pagination from response
+    const equipmentItems = useMemo(() => {
+        if (!itemsData) return [];
+        return itemsData.data || [];
+    }, [itemsData]);
+
+    const pagination = useMemo(() => {
+        if (!itemsData) {
+            return {
+                total: 0,
                 per_page: 20,
-                search: search || undefined,
-            });
-            
-            // Handle Laravel pagination response
-            if (response.data && Array.isArray(response.data)) {
-                setEquipmentItems(response.data);
-                setPagination({
-                    total: response.total || 0,
-                    per_page: response.per_page || 20,
-                    last_page: response.last_page || 1,
-                    current_page: response.current_page || page,
-                });
-            } else {
-                // Fallback for non-paginated response
-                const itemsList = Array.isArray(response) ? response : (response as any).data || [];
-                setEquipmentItems(itemsList);
-            }
-        } catch (error) {
-            console.error("Failed to fetch equipment items", error);
-            setEquipmentItems([]);
-        } finally {
-            setLoading(false);
+                last_page: 1,
+                current_page: 1,
+            };
         }
-    }, []);
-
-    // Initial load
-    useEffect(() => {
-        fetchEquipmentItems(1, "");
-    }, [fetchEquipmentItems]);
-
-    // Debounced search
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            setCurrentPage(1);
-            fetchEquipmentItems(1, searchTerm);
-        }, 300); // 300ms debounce
-        
-        return () => clearTimeout(timeoutId);
-    }, [searchTerm, fetchEquipmentItems]);
-
-    // Refresh data when page comes into focus (e.g., when navigating back from edit page)
-    useEffect(() => {
-        const handleFocus = () => {
-            fetchEquipmentItems(currentPage, searchTerm);
+        return {
+            total: itemsData.total || 0,
+            per_page: itemsData.per_page || 20,
+            last_page: itemsData.last_page || 1,
+            current_page: itemsData.current_page || currentPage,
         };
-        
-        window.addEventListener('focus', handleFocus);
-        return () => window.removeEventListener('focus', handleFocus);
-    }, [currentPage, searchTerm, fetchEquipmentItems]);
+    }, [itemsData, currentPage]);
+
+    const handleSearchChange = (value: string) => {
+        setSearchTerm(value);
+        debouncedSearch(value);
+    };
 
     const handleDeleteClick = (item: EquipmentItem) => {
         setItemToDelete(item);
@@ -118,15 +101,16 @@ export default function EquipmentItemsPage() {
     const confirmDelete = async () => {
         if (!itemToDelete) return;
         try {
-            await equipmentItemService.delete(itemToDelete.id);
-            // Refresh current page after delete
-            fetchEquipmentItems(currentPage, searchTerm);
-        } catch (error) {
-            console.error("Failed to delete equipment item", error);
-        } finally {
+            await deleteMutation.mutateAsync(itemToDelete.id);
             setDeleteDialogOpen(false);
             setItemToDelete(null);
+        } catch (error) {
+            console.error("Failed to delete equipment item", error);
         }
+    };
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
     };
 
     const getStatusVariant = (status: string) => {
@@ -168,7 +152,7 @@ export default function EquipmentItemsPage() {
                             placeholder="Search equipment items..."
                             className="pl-8"
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => handleSearchChange(e.target.value)}
                         />
                     </div>
                 </div>
@@ -190,10 +174,16 @@ export default function EquipmentItemsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {loading ? (
+                            {isLoading ? (
                                 <TableRow>
                                     <TableCell colSpan={11} className="h-24 text-center">
                                         Loading...
+                                    </TableCell>
+                                </TableRow>
+                            ) : error ? (
+                                <TableRow>
+                                    <TableCell colSpan={11} className="h-24 text-center text-red-600">
+                                        Error loading equipment items. Please try again.
                                     </TableCell>
                                 </TableRow>
                             ) : equipmentItems.length === 0 ? (
@@ -303,7 +293,7 @@ export default function EquipmentItemsPage() {
                             totalPages={pagination.last_page}
                             onPageChange={(page) => {
                                 setCurrentPage(page);
-                                fetchEquipmentItems(page, searchTerm);
+                                handlePageChange(page);
                             }}
                             itemsPerPage={pagination.per_page}
                             totalItems={pagination.total}
@@ -313,8 +303,12 @@ export default function EquipmentItemsPage() {
 
                 {/* Mobile Card View */}
                 <div className="grid grid-cols-1 gap-4 md:hidden">
-                    {loading ? (
+                    {isLoading ? (
                         <div className="text-center p-4">Loading...</div>
+                    ) : error ? (
+                        <div className="text-center p-4 border rounded-md bg-red-50 text-red-600">
+                            Error loading equipment items. Please try again.
+                        </div>
                     ) : equipmentItems.length === 0 ? (
                         <div className="text-center p-4 border rounded-md bg-muted/50">No equipment items found.</div>
                     ) : (
