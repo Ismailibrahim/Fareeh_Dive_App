@@ -58,7 +58,8 @@ export interface PreRegistrationSubmissionDetail extends PreRegistrationSubmissi
         certification_name: string;
         certification_no?: string;
         certification_date: string;
-        expiry_date?: string;
+        last_dive_date?: string;
+        no_of_dives?: number;
         agency?: string;
         instructor?: string;
         file_url?: string;
@@ -108,7 +109,8 @@ export interface PreRegistrationFormData {
         certification_name: string;
         certification_no?: string;
         certification_date: string;
-        expiry_date?: string;
+        last_dive_date?: string;
+        no_of_dives?: number;
         agency?: string;
         instructor?: string;
         file_url?: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,41 +20,21 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Shield, ChevronDown, Plus, Edit, Trash2, Calendar, Phone, FileText, Building } from "lucide-react";
-import { CustomerInsurance, customerInsuranceService } from "@/lib/api/services/customer-insurance.service";
+import { CustomerInsurance } from "@/lib/api/services/customer-insurance.service";
+import { useCustomerInsurances, useDeleteCustomerInsurance } from "@/lib/hooks/use-customer-insurances";
 import { format, isAfter, addDays } from "date-fns";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 interface CustomerInsuranceSectionProps {
     customerId: number | string;
 }
 
 export function CustomerInsuranceSection({ customerId }: CustomerInsuranceSectionProps) {
-    const router = useRouter();
-    const [insurance, setInsurance] = useState<CustomerInsurance | null>(null);
-    const [loading, setLoading] = useState(true);
     const [isOpen, setIsOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-    useEffect(() => {
-        const fetchInsurance = async () => {
-            setLoading(true);
-            try {
-                const data = await customerInsuranceService.getAll(Number(customerId));
-                const insurances = Array.isArray(data) ? data : [];
-                // Since it's one-to-one, get the first (and should be only) insurance
-                setInsurance(insurances.length > 0 ? insurances[0] : null);
-            } catch (error) {
-                console.error("Failed to fetch insurance", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        if (customerId) {
-            fetchInsurance();
-        }
-    }, [customerId]);
+    const { data: insurance, isLoading } = useCustomerInsurances(customerId);
+    const deleteMutation = useDeleteCustomerInsurance();
 
     const handleDeleteClick = () => {
         setDeleteDialogOpen(true);
@@ -63,13 +43,10 @@ export function CustomerInsuranceSection({ customerId }: CustomerInsuranceSectio
     const confirmDelete = async () => {
         if (!insurance) return;
         try {
-            await customerInsuranceService.delete(insurance.id);
-            setInsurance(null);
-            router.refresh();
+            await deleteMutation.mutateAsync(insurance.id);
+            setDeleteDialogOpen(false);
         } catch (error) {
             console.error("Failed to delete insurance", error);
-        } finally {
-            setDeleteDialogOpen(false);
         }
     };
 
@@ -114,7 +91,7 @@ export function CustomerInsuranceSection({ customerId }: CustomerInsuranceSectio
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                         <CardContent className="space-y-4">
-                            {loading ? (
+                            {isLoading ? (
                                 <div className="flex items-center justify-center py-8">
                                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                                 </div>

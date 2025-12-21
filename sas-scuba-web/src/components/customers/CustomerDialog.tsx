@@ -24,9 +24,11 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { customerService, CustomerFormData } from "@/lib/api/services/customer.service";
 import { nationalityService, Nationality } from "@/lib/api/services/nationality.service";
-import { Plus, Flag } from "lucide-react";
+import { countryService, Country } from "@/lib/api/services/country.service";
+import { Plus, Flag, Globe } from "lucide-react";
 import { useEffect } from "react";
 
 const customerSchema = z.object({
@@ -34,6 +36,10 @@ const customerSchema = z.object({
     // Handle empty string or valid email
     email: z.string().email().or(z.literal("")),
     phone: z.string().optional(),
+    address: z.string().optional(),
+    city: z.string().optional(),
+    zip_code: z.string().optional(),
+    country: z.string().optional(),
     passport_no: z.string().optional(),
     nationality: z.string().optional(),
     gender: z.string().optional(),
@@ -49,6 +55,8 @@ export function CustomerDialog({ onSuccess }: CustomerDialogProps) {
     const [loading, setLoading] = useState(false);
     const [nationalities, setNationalities] = useState<Nationality[]>([]);
     const [loadingNationalities, setLoadingNationalities] = useState(true);
+    const [countries, setCountries] = useState<Country[]>([]);
+    const [loadingCountries, setLoadingCountries] = useState(true);
 
     useEffect(() => {
         const fetchNationalities = async () => {
@@ -64,12 +72,30 @@ export function CustomerDialog({ onSuccess }: CustomerDialogProps) {
         fetchNationalities();
     }, []);
 
+    useEffect(() => {
+        const fetchCountries = async () => {
+            try {
+                const data = await countryService.getAll();
+                setCountries(data);
+            } catch (error) {
+                console.error("Failed to fetch countries", error);
+            } finally {
+                setLoadingCountries(false);
+            }
+        };
+        fetchCountries();
+    }, []);
+
     const form = useForm<CustomerFormData>({
         resolver: zodResolver(customerSchema),
         defaultValues: {
             full_name: "",
             email: "",
             phone: "",
+            address: "",
+            city: "",
+            zip_code: "",
+            country: "",
             passport_no: "",
             nationality: "",
             gender: "",
@@ -98,7 +124,7 @@ export function CustomerDialog({ onSuccess }: CustomerDialogProps) {
                     <Plus className="mr-2 h-4 w-4" /> Add Customer
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
                     <DialogTitle>Add Customer</DialogTitle>
                     <DialogDescription>
@@ -229,16 +255,101 @@ export function CustomerDialog({ onSuccess }: CustomerDialogProps) {
                                 control={form.control}
                                 name="date_of_birth"
                                 render={({ field }) => (
-                                    <FormItem>
+                                    <FormItem className="flex flex-col">
                                         <FormLabel>Date of Birth</FormLabel>
                                         <FormControl>
-                                            <Input type="date" {...field} />
+                                            <DatePicker
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                                placeholder="Pick a date"
+                                                maxDate={new Date().toISOString().split('T')[0]}
+                                            />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
                         </div>
+                        <FormField
+                            control={form.control}
+                            name="address"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Address</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="123 Main Street" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="city"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>City</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="New York" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="zip_code"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Zip Code</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="10001" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                        <FormField
+                            control={form.control}
+                            name="country"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Country</FormLabel>
+                                    <Select 
+                                        onValueChange={field.onChange} 
+                                        value={field.value}
+                                        disabled={loadingCountries || countries.length === 0}
+                                    >
+                                        <FormControl>
+                                            <div className="relative">
+                                                <Globe className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                                                <SelectTrigger className="pl-9">
+                                                    <SelectValue placeholder={
+                                                        loadingCountries 
+                                                            ? "Loading..." 
+                                                            : countries.length === 0 
+                                                            ? "No countries available" 
+                                                            : "Select country"
+                                                    } />
+                                                </SelectTrigger>
+                                            </div>
+                                        </FormControl>
+                                        {countries.length > 0 && (
+                                            <SelectContent>
+                                                {countries.map((country) => (
+                                                    <SelectItem key={country.id} value={country.name}>
+                                                        {country.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        )}
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                         <DialogFooter>
                             <Button type="submit" disabled={loading}>
                                 {loading ? "Saving..." : "Save Customer"}

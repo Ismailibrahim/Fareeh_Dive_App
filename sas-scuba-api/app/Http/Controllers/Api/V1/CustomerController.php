@@ -18,7 +18,7 @@ class CustomerController extends Controller
         $user = $request->user();
         
         // Select only needed columns for better performance
-        $query = Customer::select('id', 'full_name', 'email', 'phone', 'passport_no', 'nationality', 'gender', 'date_of_birth', 'dive_center_id', 'created_at', 'updated_at')
+        $query = Customer::select('id', 'full_name', 'email', 'phone', 'address', 'city', 'zip_code', 'country', 'passport_no', 'nationality', 'gender', 'date_of_birth', 'departure_date', 'departure_flight', 'departure_to', 'dive_center_id', 'created_at', 'updated_at')
             ->where('dive_center_id', $user->dive_center_id);
         
         // Add server-side search with sanitization
@@ -58,10 +58,17 @@ class CustomerController extends Controller
             'full_name' => 'required|string|max:255',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:50',
+            'address' => 'nullable|string',
+            'city' => 'nullable|string|max:255',
+            'zip_code' => 'nullable|string|max:20',
+            'country' => 'nullable|string|max:255',
             'passport_no' => 'nullable|string|max:50',
             'date_of_birth' => 'nullable|date',
             'gender' => 'nullable|string',
             'nationality' => 'nullable|string',
+            'departure_date' => 'nullable|date',
+            'departure_flight' => 'nullable|string|max:255',
+            'departure_to' => 'nullable|string|max:255',
             'dive_center_id' => 'required|exists:dive_centers,id',
         ]);
 
@@ -93,10 +100,17 @@ class CustomerController extends Controller
             'full_name' => 'sometimes|string|max:255',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:50',
+            'address' => 'nullable|string',
+            'city' => 'nullable|string|max:255',
+            'zip_code' => 'nullable|string|max:20',
+            'country' => 'nullable|string|max:255',
             'passport_no' => 'nullable|string|max:50',
             'date_of_birth' => 'nullable|date',
             'gender' => 'nullable|string',
             'nationality' => 'nullable|string',
+            'departure_date' => 'nullable|date',
+            'departure_flight' => 'nullable|string|max:255',
+            'departure_to' => 'nullable|string|max:255',
         ]);
 
         $customer->update($validated);

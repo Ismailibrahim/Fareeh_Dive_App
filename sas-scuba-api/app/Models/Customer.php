@@ -11,10 +11,17 @@ class Customer extends Model
         'full_name',
         'email',
         'phone',
+        'address',
+        'city',
+        'zip_code',
+        'country',
         'passport_no',
         'date_of_birth',
         'gender',
         'nationality',
+        'departure_date',
+        'departure_flight',
+        'departure_to',
     ];
 
     public function emergencyContacts()

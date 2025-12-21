@@ -6,6 +6,7 @@ export interface Boat {
     name: string;
     capacity?: number;
     active: boolean;
+    is_owned: boolean; // true = Owned, false = Rented
     created_at: string;
     updated_at: string;
 }
@@ -14,6 +15,7 @@ export interface BoatFormData {
     name: string;
     capacity?: number;
     active?: boolean;
+    is_owned?: boolean;
 }
 
 export const boatService = {

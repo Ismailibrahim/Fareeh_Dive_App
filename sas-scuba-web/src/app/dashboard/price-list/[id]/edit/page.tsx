@@ -4,10 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import { Header } from "@/components/layout/Header";
 import { PriceListForm } from "@/components/price-list/PriceListForm";
 import { PriceListItemTable } from "@/components/price-list/PriceListItemTable";
-import { PriceListItemForm } from "@/components/price-list/PriceListItemForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, List, Package, ChevronDown, Eye, ArrowLeft } from "lucide-react";
+import { Plus, List, Package, ChevronDown, Eye, ArrowLeft, Calculator, Receipt } from "lucide-react";
 import { priceListService, PriceList, PriceListItem } from "@/lib/api/services/price-list.service";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -22,18 +21,22 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { BulkPriceAdjustDialog } from "@/components/price-list/BulkPriceAdjustDialog";
+import { BulkUpdateTaxServiceDialog } from "@/components/price-list/BulkUpdateTaxServiceDialog";
 
 export default function PriceListEditPage() {
     const params = useParams();
+    const router = useRouter();
     const priceListId = params.id as string;
     const [priceList, setPriceList] = useState<PriceList | null>(null);
     const [loading, setLoading] = useState(true);
-    const [itemFormOpen, setItemFormOpen] = useState(false);
-    const [editingItem, setEditingItem] = useState<PriceListItem | undefined>(undefined);
     const [isInfoCardOpen, setIsInfoCardOpen] = useState(false);
     const [viewDialogOpen, setViewDialogOpen] = useState(false);
+    const [bulkAdjustDialogOpen, setBulkAdjustDialogOpen] = useState(false);
+    const [bulkUpdateTaxServiceDialogOpen, setBulkUpdateTaxServiceDialogOpen] = useState(false);
+    const [selectedItems, setSelectedItems] = useState<number[]>([]);
 
     const fetchPriceList = useCallback(async () => {
         if (!priceListId) return;
@@ -66,20 +69,13 @@ export default function PriceListEditPage() {
     };
 
     const handleAddItem = () => {
-        setEditingItem(undefined);
-        setItemFormOpen(true);
+        router.push(`/dashboard/price-list/${priceListId}/items/create`);
     };
 
     const handleEditItem = (item: PriceListItem) => {
-        setEditingItem(item);
-        setItemFormOpen(true);
+        router.push(`/dashboard/price-list/${priceListId}/items/${item.id}/edit`);
     };
 
-    const handleItemFormSuccess = () => {
-        setItemFormOpen(false);
-        setEditingItem(undefined);
-        fetchPriceList();
-    };
 
     if (loading) {
         return (
@@ -128,7 +124,7 @@ export default function PriceListEditPage() {
                     </div>
                 </div>
 
-                <div className="mx-auto max-w-6xl space-y-6">
+                <div className="mx-auto max-w-[1400px] space-y-6">
                     <Card>
                         <Collapsible open={isInfoCardOpen} onOpenChange={setIsInfoCardOpen}>
                             <CollapsibleTrigger asChild>
@@ -184,9 +180,24 @@ export default function PriceListEditPage() {
                                         Manage services and their prices in your base currency.
                                     </CardDescription>
                                 </div>
-                                <Button onClick={handleAddItem}>
-                                    <Plus className="mr-2 h-4 w-4" /> Add Item
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                    {selectedItems.length > 0 && (
+                                        <Button 
+                                            variant="outline" 
+                                            onClick={() => setBulkUpdateTaxServiceDialogOpen(true)}
+                                            className="bg-blue-50 hover:bg-blue-100 dark:bg-blue-950 dark:hover:bg-blue-900"
+                                        >
+                                            <Receipt className="mr-2 h-4 w-4" /> 
+                                            Update Tax & Service Charge ({selectedItems.length})
+                                        </Button>
+                                    )}
+                                    <Button variant="outline" onClick={() => setBulkAdjustDialogOpen(true)}>
+                                        <Calculator className="mr-2 h-4 w-4" /> Bulk Adjust Prices
+                                    </Button>
+                                    <Button onClick={handleAddItem}>
+                                        <Plus className="mr-2 h-4 w-4" /> Add Item
+                                    </Button>
+                                </div>
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -196,19 +207,14 @@ export default function PriceListEditPage() {
                                     baseCurrency={priceList.base_currency || "USD"}
                                     onItemUpdated={handlePriceListUpdate}
                                     onEditItem={handleEditItem}
+                                    selectedItems={selectedItems}
+                                    onSelectionChange={setSelectedItems}
                                 />
                             )}
                         </CardContent>
                     </Card>
                 </div>
 
-                <PriceListItemForm
-                    open={itemFormOpen}
-                    onOpenChange={setItemFormOpen}
-                    initialData={editingItem}
-                    baseCurrency={priceList?.base_currency || "USD"}
-                    onSuccess={handleItemFormSuccess}
-                />
 
                 <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
                     <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -276,6 +282,28 @@ export default function PriceListEditPage() {
                         )}
                     </DialogContent>
                 </Dialog>
+
+                <BulkPriceAdjustDialog
+                    open={bulkAdjustDialogOpen}
+                    onOpenChange={setBulkAdjustDialogOpen}
+                    priceList={priceList}
+                    selectedItemIds={selectedItems}
+                    onSuccess={() => {
+                        setSelectedItems([]);
+                        handlePriceListUpdate();
+                    }}
+                />
+
+                <BulkUpdateTaxServiceDialog
+                    open={bulkUpdateTaxServiceDialogOpen}
+                    onOpenChange={setBulkUpdateTaxServiceDialogOpen}
+                    priceListId={priceListId}
+                    selectedItemIds={selectedItems}
+                    onSuccess={() => {
+                        setSelectedItems([]);
+                        handlePriceListUpdate();
+                    }}
+                />
             </div>
         </div>
     );

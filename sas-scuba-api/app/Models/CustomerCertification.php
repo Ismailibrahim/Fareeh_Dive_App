@@ -11,7 +11,8 @@ class CustomerCertification extends Model
         'certification_name',
         'certification_no',
         'certification_date',
-        'expiry_date',
+        'last_dive_date',
+        'no_of_dives',
         'agency',
         'instructor',
         'file_url',
@@ -20,7 +21,7 @@ class CustomerCertification extends Model
 
     protected $casts = [
         'certification_date' => 'date',
-        'expiry_date' => 'date',
+        'last_dive_date' => 'date',
         'license_status' => 'boolean',
     ];
 

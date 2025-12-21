@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,40 +20,20 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Building2, ChevronDown, Plus, Edit, Trash2, Phone, MapPin, Home, Key } from "lucide-react";
-import { CustomerAccommodation, customerAccommodationService } from "@/lib/api/services/customer-accommodation.service";
+import { CustomerAccommodation } from "@/lib/api/services/customer-accommodation.service";
+import { useCustomerAccommodations, useDeleteCustomerAccommodation } from "@/lib/hooks/use-customer-accommodations";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 interface CustomerAccommodationSectionProps {
     customerId: number | string;
 }
 
 export function CustomerAccommodationSection({ customerId }: CustomerAccommodationSectionProps) {
-    const router = useRouter();
-    const [accommodation, setAccommodation] = useState<CustomerAccommodation | null>(null);
-    const [loading, setLoading] = useState(true);
     const [isOpen, setIsOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-    useEffect(() => {
-        const fetchAccommodation = async () => {
-            setLoading(true);
-            try {
-                const data = await customerAccommodationService.getAll(Number(customerId));
-                const accommodations = Array.isArray(data) ? data : [];
-                // Since it's one-to-one, get the first (and should be only) accommodation
-                setAccommodation(accommodations.length > 0 ? accommodations[0] : null);
-            } catch (error) {
-                console.error("Failed to fetch accommodation", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        if (customerId) {
-            fetchAccommodation();
-        }
-    }, [customerId]);
+    const { data: accommodation, isLoading } = useCustomerAccommodations(customerId);
+    const deleteMutation = useDeleteCustomerAccommodation();
 
     const handleDeleteClick = () => {
         setDeleteDialogOpen(true);
@@ -62,13 +42,10 @@ export function CustomerAccommodationSection({ customerId }: CustomerAccommodati
     const confirmDelete = async () => {
         if (!accommodation) return;
         try {
-            await customerAccommodationService.delete(accommodation.id);
-            setAccommodation(null);
-            router.refresh();
+            await deleteMutation.mutateAsync(accommodation.id);
+            setDeleteDialogOpen(false);
         } catch (error) {
             console.error("Failed to delete accommodation", error);
-        } finally {
-            setDeleteDialogOpen(false);
         }
     };
 
@@ -92,7 +69,7 @@ export function CustomerAccommodationSection({ customerId }: CustomerAccommodati
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                         <CardContent className="space-y-4">
-                            {loading ? (
+                            {isLoading ? (
                                 <div className="flex items-center justify-center py-8">
                                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                                 </div>

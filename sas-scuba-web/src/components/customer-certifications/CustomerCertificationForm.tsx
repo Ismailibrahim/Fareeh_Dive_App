@@ -16,7 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CustomerCertificationFormData, customerCertificationService } from "@/lib/api/services/customer-certification.service";
+import { CustomerCertificationFormData } from "@/lib/api/services/customer-certification.service";
+import { useCreateCustomerCertification, useUpdateCustomerCertification } from "@/lib/hooks/use-customer-certifications";
 import { customerService, Customer } from "@/lib/api/services/customer.service";
 import { agencyService, Agency } from "@/lib/api/services/agency.service";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +33,8 @@ const certificationSchema = z.object({
     certification_name: z.string().min(2, "Certification name is required"),
     certification_no: z.string().optional(),
     certification_date: z.date({ required_error: "Date is required" }),
-    expiry_date: z.date().optional(),
+    last_dive_date: z.date().optional(),
+    no_of_dives: z.number().int().min(0).optional(),
     agency: z.string().optional(),
     instructor: z.string().optional(),
     file_url: z.string().optional(),
@@ -50,11 +52,14 @@ interface CustomerCertificationFormProps {
 
 export function CustomerCertificationForm({ initialData, certificationId, disableCustomerSelect = false, redirectToCustomer = false }: CustomerCertificationFormProps) {
     const router = useRouter();
-    const [loading, setLoading] = useState(false);
+    const createMutation = useCreateCustomerCertification();
+    const updateMutation = useUpdateCustomerCertification();
     const [uploading, setUploading] = useState(false);
     const [uploadedFile, setUploadedFile] = useState<{ name: string; url: string } | null>(null);
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [agencies, setAgencies] = useState<Agency[]>([]);
+    
+    const loading = createMutation.isPending || updateMutation.isPending;
 
     useEffect(() => {
         const fetchCustomers = async () => {
@@ -88,7 +93,8 @@ export function CustomerCertificationForm({ initialData, certificationId, disabl
             certification_name: initialData?.certification_name || "",
             certification_no: initialData?.certification_no || "",
             certification_date: initialData?.certification_date ? new Date(initialData.certification_date) : undefined,
-            expiry_date: initialData?.expiry_date ? new Date(initialData.expiry_date) : undefined,
+            last_dive_date: initialData?.last_dive_date ? new Date(initialData.last_dive_date) : undefined,
+            no_of_dives: initialData?.no_of_dives ?? undefined,
             agency: initialData?.agency || "",
             instructor: initialData?.instructor || "",
             file_url: initialData?.file_url || "",
@@ -148,14 +154,14 @@ export function CustomerCertificationForm({ initialData, certificationId, disabl
     };
 
     async function onSubmit(data: CertificationFormValues) {
-        setLoading(true);
         try {
             const payload: CustomerCertificationFormData = {
                 customer_id: parseInt(data.customer_id),
                 certification_name: data.certification_name,
                 certification_no: data.certification_no && data.certification_no.trim() !== '' ? data.certification_no.trim() : undefined,
                 certification_date: format(data.certification_date, "yyyy-MM-dd"),
-                expiry_date: data.expiry_date ? format(data.expiry_date, "yyyy-MM-dd") : undefined,
+                last_dive_date: data.last_dive_date ? format(data.last_dive_date, "yyyy-MM-dd") : undefined,
+                no_of_dives: data.no_of_dives !== undefined ? data.no_of_dives : undefined,
                 agency: data.agency && data.agency.trim() !== '' ? data.agency.trim() : undefined,
                 instructor: data.instructor && data.instructor.trim() !== '' ? data.instructor.trim() : undefined,
                 file_url: data.file_url && data.file_url.trim() !== '' ? data.file_url.trim() : undefined,
@@ -166,11 +172,10 @@ export function CustomerCertificationForm({ initialData, certificationId, disabl
 
             let customerId: number | null = null;
             if (certificationId) {
-                await customerCertificationService.update(certificationId, payload);
-                // Get customer_id from initialData if available
-                customerId = initialData?.customer_id || payload.customer_id;
+                const result = await updateMutation.mutateAsync({ id: certificationId, data: payload });
+                customerId = result.customer_id;
             } else {
-                const newCert = await customerCertificationService.create(payload);
+                const newCert = await createMutation.mutateAsync(payload);
                 customerId = newCert.customer_id;
             }
             
@@ -186,8 +191,6 @@ export function CustomerCertificationForm({ initialData, certificationId, disabl
             console.error("Error response:", error?.response?.data);
             const errorMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || "Failed to save certification. Please try again.";
             alert(errorMessage);
-        } finally {
-            setLoading(false);
         }
     }
 
@@ -336,34 +339,61 @@ export function CustomerCertificationForm({ initialData, certificationId, disabl
                             />
                         </div>
 
-                        <FormField
-                            control={form.control}
-                            name="expiry_date"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-col">
-                                    <FormLabel>Expiry Date (Optional)</FormLabel>
-                                    <FormControl>
-                                        <div className="relative">
-                                            <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-                                            <DatePicker
-                                                selected={field.value}
-                                                onChange={(date) => field.onChange(date)}
-                                                dateFormat="PPP"
-                                                placeholderText="Pick a date (optional)"
-                                                wrapperClassName="w-full"
-                                                minDate={new Date("1900-01-01")}
-                                                isClearable
-                                                className={cn(
-                                                    "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] pl-9",
-                                                    !field.value && "text-muted-foreground"
-                                                )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="last_dive_date"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-col">
+                                        <FormLabel>Last Dive Date (Optional)</FormLabel>
+                                        <FormControl>
+                                            <div className="relative">
+                                                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                                                <DatePicker
+                                                    selected={field.value}
+                                                    onChange={(date) => field.onChange(date)}
+                                                    dateFormat="PPP"
+                                                    placeholderText="Pick a date (optional)"
+                                                    wrapperClassName="w-full"
+                                                    maxDate={new Date()}
+                                                    minDate={new Date("1900-01-01")}
+                                                    isClearable
+                                                    className={cn(
+                                                        "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] pl-9",
+                                                        !field.value && "text-muted-foreground"
+                                                    )}
+                                                />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="no_of_dives"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Number of Dives (Optional)</FormLabel>
+                                        <FormControl>
+                                            <Input 
+                                                type="number" 
+                                                placeholder="e.g. 50" 
+                                                min="0"
+                                                {...field}
+                                                onChange={(e) => {
+                                                    const value = e.target.value === '' ? undefined : parseInt(e.target.value, 10);
+                                                    field.onChange(value);
+                                                }}
+                                                value={field.value ?? ''}
                                             />
-                                        </div>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
 
                         <FormField
                             control={form.control}

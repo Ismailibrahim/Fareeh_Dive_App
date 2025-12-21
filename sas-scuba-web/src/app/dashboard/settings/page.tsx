@@ -6,6 +6,9 @@ import { cn } from "@/lib/utils";
 import { CompanyForm } from "@/components/settings/CompanyForm";
 import { PaymentMethodsList } from "@/components/settings/PaymentMethodsList";
 import { NationalitiesList } from "@/components/settings/NationalitiesList";
+import { UnitsList } from "@/components/settings/UnitsList";
+import { IslandsList } from "@/components/settings/IslandsList";
+import { CountriesList } from "@/components/settings/CountriesList";
 import { RelationshipsList } from "@/components/settings/RelationshipsList";
 import { AgenciesList } from "@/components/settings/AgenciesList";
 import { LocationsList } from "@/components/settings/LocationsList";
@@ -158,6 +161,18 @@ export default function SettingsPage() {
                                     <div>
                                         <h3 className="text-lg font-semibold mb-4">Nationalities</h3>
                                         <NationalitiesList />
+                                    </div>
+                                    <div className="border-t pt-8">
+                                        <h3 className="text-lg font-semibold mb-4">Units</h3>
+                                        <UnitsList />
+                                    </div>
+                                    <div className="border-t pt-8">
+                                        <h3 className="text-lg font-semibold mb-4">Islands</h3>
+                                        <IslandsList />
+                                    </div>
+                                    <div className="border-t pt-8">
+                                        <h3 className="text-lg font-semibold mb-4">Countries</h3>
+                                        <CountriesList />
                                     </div>
                                     <div className="border-t pt-8">
                                         <h3 className="text-lg font-semibold mb-4">Relationships</h3>

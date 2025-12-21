@@ -114,6 +114,7 @@ class PriceListController extends Controller
     public function show(Request $request, $id)
     {
         try {
+            $user = $request->user();
             $priceList = PriceList::findOrFail($id);
             
             // Verify price list belongs to user's dive center
@@ -181,6 +182,73 @@ class PriceListController extends Controller
             return response()->json(['message' => 'Price list deleted successfully'], 200);
         } catch (\Exception $e) {
             \Log::error('PriceListController::destroy error: ' . $e->getMessage());
+            return response()->json(['message' => 'An error occurred: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Duplicate a price list with all its items.
+     */
+    public function duplicate(Request $request, $id)
+    {
+        try {
+            $user = $request->user();
+            $diveCenterId = $user->dive_center_id;
+            
+            if (!$diveCenterId) {
+                return response()->json(['message' => 'Dive center not found'], 404);
+            }
+
+            $sourcePriceList = PriceList::findOrFail($id);
+            
+            // Verify source price list belongs to user's dive center
+            $this->authorizeDiveCenterAccess($sourcePriceList, 'Unauthorized access to this price list');
+
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+            ]);
+
+            // Use database transaction to ensure data consistency
+            return \DB::transaction(function () use ($sourcePriceList, $validated, $diveCenterId, $user) {
+                // Create new price list
+                $newPriceList = PriceList::create([
+                    'dive_center_id' => $diveCenterId,
+                    'name' => $validated['name'],
+                    'notes' => $sourcePriceList->notes,
+                ]);
+
+                // Copy all items from source price list
+                foreach ($sourcePriceList->items as $item) {
+                    \App\Models\PriceListItem::create([
+                        'price_list_id' => $newPriceList->id,
+                        'service_type' => $item->service_type,
+                        'equipment_item_id' => $item->equipment_item_id,
+                        'name' => $item->name,
+                        'description' => $item->description,
+                        'price' => $item->price,
+                        'unit' => $item->unit,
+                        'tax_percentage' => $item->tax_percentage,
+                        'tax_inclusive' => $item->tax_inclusive,
+                        'service_charge_inclusive' => $item->service_charge_inclusive,
+                        'sort_order' => $item->sort_order,
+                        'is_active' => $item->is_active,
+                    ]);
+                }
+
+                // Load items and add base currency
+                $newPriceList->load('items');
+                $diveCenter = $user->diveCenter;
+                $newPriceList->base_currency = $diveCenter?->currency ?? 'USD';
+
+                return response()->json($newPriceList, 201);
+            });
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('PriceListController::duplicate error: ' . $e->getMessage());
             return response()->json(['message' => 'An error occurred: ' . $e->getMessage()], 500);
         }
     }

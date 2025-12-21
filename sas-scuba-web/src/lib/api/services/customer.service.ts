@@ -7,10 +7,17 @@ export interface Customer {
     full_name: string;
     email?: string;
     phone?: string;
+    address?: string;
+    city?: string;
+    zip_code?: string;
+    country?: string;
     passport_no?: string;
     nationality?: string;
     gender?: string;
     date_of_birth?: string;
+    departure_date?: string;
+    departure_flight?: string;
+    departure_to?: string;
     emergency_contacts?: EmergencyContact[];
     created_at: string;
 }
@@ -19,10 +26,17 @@ export interface CustomerFormData {
     full_name: string;
     email?: string;
     phone?: string;
+    address?: string;
+    city?: string;
+    zip_code?: string;
+    country?: string;
     passport_no?: string;
     nationality?: string;
     gender?: string;
     date_of_birth?: string;
+    departure_date?: string;
+    departure_flight?: string;
+    departure_to?: string;
 }
 
 export interface PaginationParams {

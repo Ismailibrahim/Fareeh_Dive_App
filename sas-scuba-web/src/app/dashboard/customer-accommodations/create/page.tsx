@@ -8,48 +8,17 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ArrowLeft, User, Mail, Phone, FileText, Globe, Calendar, UserCircle, Building2, Key } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
-import { customerService, Customer } from "@/lib/api/services/customer.service";
-import { CustomerAccommodation, customerAccommodationService } from "@/lib/api/services/customer-accommodation.service";
+import { Suspense } from "react";
+import { useCustomer } from "@/lib/hooks/use-customers";
+import { useCustomerAccommodations } from "@/lib/hooks/use-customer-accommodations";
 
 function CreateCustomerAccommodationContent() {
     const searchParams = useSearchParams();
     const customerId = searchParams.get('customer_id');
-    const [customer, setCustomer] = useState<Customer | null>(null);
-    const [loadingCustomer, setLoadingCustomer] = useState(false);
-    const [existingAccommodation, setExistingAccommodation] = useState<CustomerAccommodation | null>(null);
-    const [loadingAccommodation, setLoadingAccommodation] = useState(false);
-
-    useEffect(() => {
-        if (customerId) {
-            // Fetch customer details
-            setLoadingCustomer(true);
-            customerService.getById(customerId)
-                .then((data) => {
-                    setCustomer(data);
-                })
-                .catch((error) => {
-                    console.error("Failed to fetch customer", error);
-                })
-                .finally(() => {
-                    setLoadingCustomer(false);
-                });
-
-            // Fetch existing accommodation for this customer (one-to-one relationship)
-            setLoadingAccommodation(true);
-            customerAccommodationService.getAll(parseInt(customerId))
-                .then((data) => {
-                    const accommodations = Array.isArray(data) ? data : [];
-                    setExistingAccommodation(accommodations.length > 0 ? accommodations[0] : null);
-                })
-                .catch((error) => {
-                    console.error("Failed to fetch accommodation", error);
-                })
-                .finally(() => {
-                    setLoadingAccommodation(false);
-                });
-        }
-    }, [customerId]);
+    
+    // Use React Query hooks for instant cached data
+    const { data: customer, isLoading: loadingCustomer } = useCustomer(customerId);
+    const { data: existingAccommodation, isLoading: loadingAccommodation } = useCustomerAccommodations(customerId);
 
     const handleSave = () => {
         // Redirect back to customer page

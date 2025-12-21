@@ -16,7 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CustomerInsuranceFormData, customerInsuranceService } from "@/lib/api/services/customer-insurance.service";
+import { CustomerInsuranceFormData } from "@/lib/api/services/customer-insurance.service";
+import { useCreateCustomerInsurance, useUpdateCustomerInsurance } from "@/lib/hooks/use-customer-insurances";
 import { customerService, Customer } from "@/lib/api/services/customer.service";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarIcon, Shield, User, Phone, FileText, Upload, X, CheckCircle2 } from "lucide-react";
@@ -47,8 +48,11 @@ interface CustomerInsuranceFormProps {
 
 export function CustomerInsuranceForm({ initialData, insuranceId, disableCustomerSelect = false, redirectToCustomer = false }: CustomerInsuranceFormProps) {
     const router = useRouter();
-    const [loading, setLoading] = useState(false);
+    const createMutation = useCreateCustomerInsurance();
+    const updateMutation = useUpdateCustomerInsurance();
     const [uploading, setUploading] = useState(false);
+    
+    const loading = createMutation.isPending || updateMutation.isPending;
     const [uploadedFile, setUploadedFile] = useState<{ name: string; url: string } | null>(null);
     const [customers, setCustomers] = useState<Customer[]>([]);
 
@@ -130,7 +134,6 @@ export function CustomerInsuranceForm({ initialData, insuranceId, disableCustome
     };
 
     async function onSubmit(data: InsuranceFormValues) {
-        setLoading(true);
         try {
             const payload: CustomerInsuranceFormData = {
                 customer_id: parseInt(data.customer_id),
@@ -146,11 +149,10 @@ export function CustomerInsuranceForm({ initialData, insuranceId, disableCustome
 
             let customerId: number | null = null;
             if (insuranceId) {
-                await customerInsuranceService.update(insuranceId, payload);
-                // Get customer_id from initialData if available
-                customerId = initialData?.customer_id || payload.customer_id;
+                const result = await updateMutation.mutateAsync({ id: insuranceId, data: payload });
+                customerId = result.customer_id;
             } else {
-                const newInsurance = await customerInsuranceService.create(payload);
+                const newInsurance = await createMutation.mutateAsync(payload);
                 customerId = newInsurance.customer_id;
             }
             
@@ -166,8 +168,6 @@ export function CustomerInsuranceForm({ initialData, insuranceId, disableCustome
             console.error("Error response:", error?.response?.data);
             const errorMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || "Failed to save insurance. Please try again.";
             alert(errorMessage);
-        } finally {
-            setLoading(false);
         }
     }
 

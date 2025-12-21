@@ -8,48 +8,18 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ArrowLeft, User, Mail, Phone, FileText, Globe, Calendar, UserCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
-import { customerService, Customer } from "@/lib/api/services/customer.service";
-import { emergencyContactService, EmergencyContact } from "@/lib/api/services/emergency-contact.service";
+import { Suspense } from "react";
+import { useCustomer } from "@/lib/hooks/use-customers";
+import { useEmergencyContacts } from "@/lib/hooks/use-emergency-contacts";
 
 function CreateEmergencyContactContent() {
     const searchParams = useSearchParams();
     const customerId = searchParams.get('customer_id');
-    const [customer, setCustomer] = useState<Customer | null>(null);
-    const [loadingCustomer, setLoadingCustomer] = useState(false);
-    const [existingContacts, setExistingContacts] = useState<EmergencyContact[]>([]);
-    const [loadingContacts, setLoadingContacts] = useState(false);
-
-    useEffect(() => {
-        if (customerId) {
-            // Fetch customer details
-            setLoadingCustomer(true);
-            customerService.getById(customerId)
-                .then((data) => {
-                    setCustomer(data);
-                })
-                .catch((error) => {
-                    console.error("Failed to fetch customer", error);
-                })
-                .finally(() => {
-                    setLoadingCustomer(false);
-                });
-
-            // Fetch existing emergency contacts for this customer
-            setLoadingContacts(true);
-            emergencyContactService.getAll(parseInt(customerId))
-                .then((data) => {
-                    const contacts = Array.isArray(data) ? data : [];
-                    setExistingContacts(contacts);
-                })
-                .catch((error) => {
-                    console.error("Failed to fetch emergency contacts", error);
-                })
-                .finally(() => {
-                    setLoadingContacts(false);
-                });
-        }
-    }, [customerId]);
+    
+    // Use React Query hooks for instant cached data
+    const { data: customer, isLoading: loadingCustomer } = useCustomer(customerId);
+    const { data: contactsData, isLoading: loadingContacts } = useEmergencyContacts(customerId);
+    const existingContacts = Array.isArray(contactsData) ? contactsData : [];
 
     const handleSave = () => {
         // Redirect back to customer page or emergency contacts list
@@ -152,10 +122,12 @@ function CreateEmergencyContactContent() {
                         </Card>
                     )}
 
-                    {customerId && loadingCustomer && (
+                    {customerId && loadingCustomer && !customer && (
                         <Card>
                             <CardContent className="py-6">
-                                <div className="animate-pulse text-center text-muted-foreground">Loading customer details...</div>
+                                <div className="flex items-center justify-center">
+                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                                </div>
                             </CardContent>
                         </Card>
                     )}
@@ -215,10 +187,12 @@ function CreateEmergencyContactContent() {
                         </Card>
                     )}
 
-                    {customerId && loadingContacts && (
+                    {customerId && loadingContacts && existingContacts.length === 0 && (
                         <Card>
                             <CardContent className="py-6">
-                                <div className="animate-pulse text-center text-muted-foreground">Loading existing contacts...</div>
+                                <div className="flex items-center justify-center">
+                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                                </div>
                             </CardContent>
                         </Card>
                     )}

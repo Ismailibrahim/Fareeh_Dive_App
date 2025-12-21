@@ -16,23 +16,29 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { customerService, CustomerFormData, Customer } from "@/lib/api/services/customer.service";
 import { nationalityService, Nationality } from "@/lib/api/services/nationality.service";
+import { countryService, Country } from "@/lib/api/services/country.service";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { User, Mail, Phone, CreditCard, Flag, Calendar } from "lucide-react";
-import DatePicker from "react-datepicker";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { User, Mail, Phone, CreditCard, Flag, MapPin, Globe, Plane } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
 
 const customerSchema = z.object({
     full_name: z.string().min(2, "Name must be at least 2 characters."),
     email: z.string().email().or(z.literal("")),
     phone: z.string().optional(),
+    address: z.string().optional(),
+    city: z.string().optional(),
+    zip_code: z.string().optional(),
+    country: z.string().optional(),
     passport_no: z.string().optional(),
     nationality: z.string().optional(),
     gender: z.string().optional(),
     date_of_birth: z.string().optional(),
+    departure_date: z.string().optional(),
+    departure_flight: z.string().optional(),
+    departure_to: z.string().optional(),
 });
 
 interface CustomerFormProps {
@@ -45,6 +51,8 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
     const [loading, setLoading] = useState(false);
     const [nationalities, setNationalities] = useState<Nationality[]>([]);
     const [loadingNationalities, setLoadingNationalities] = useState(true);
+    const [countries, setCountries] = useState<Country[]>([]);
+    const [loadingCountries, setLoadingCountries] = useState(true);
 
     useEffect(() => {
         const fetchNationalities = async () => {
@@ -60,16 +68,37 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
         fetchNationalities();
     }, []);
 
+    useEffect(() => {
+        const fetchCountries = async () => {
+            try {
+                const data = await countryService.getAll();
+                setCountries(data);
+            } catch (error) {
+                console.error("Failed to fetch countries", error);
+            } finally {
+                setLoadingCountries(false);
+            }
+        };
+        fetchCountries();
+    }, []);
+
     const form = useForm<CustomerFormData>({
         resolver: zodResolver(customerSchema),
         defaultValues: {
             full_name: initialData?.full_name || "",
             email: initialData?.email || "",
             phone: initialData?.phone || "",
+            address: initialData?.address || "",
+            city: initialData?.city || "",
+            zip_code: initialData?.zip_code || "",
+            country: initialData?.country || "",
             passport_no: initialData?.passport_no || "",
             nationality: initialData?.nationality || "",
             gender: initialData?.gender || "",
             date_of_birth: initialData?.date_of_birth || "",
+            departure_date: initialData?.departure_date || "",
+            departure_flight: initialData?.departure_flight || "",
+            departure_to: initialData?.departure_to || "",
         },
     });
 
@@ -154,32 +183,13 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
                                     <FormItem className="flex flex-col">
                                         <FormLabel>Date of Birth</FormLabel>
                                         <FormControl>
-                                            <div className="relative">
-                                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-                                                <DatePicker
-                                                    selected={field.value ? new Date(field.value) : null}
-                                                    onChange={(date) => {
-                                                        if (date) {
-                                                            // Convert Date to YYYY-MM-DD format string
-                                                            const year = date.getFullYear();
-                                                            const month = String(date.getMonth() + 1).padStart(2, '0');
-                                                            const day = String(date.getDate()).padStart(2, '0');
-                                                            field.onChange(`${year}-${month}-${day}`);
-                                                        } else {
-                                                            field.onChange("");
-                                                        }
-                                                    }}
-                                                    dateFormat="PPP"
-                                                    placeholderText="Pick a date"
-                                                    wrapperClassName="w-full"
-                                                    maxDate={new Date()}
-                                                    minDate={new Date("1900-01-01")}
-                                                    className={cn(
-                                                        "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] pl-9",
-                                                        !field.value && "text-muted-foreground"
-                                                    )}
-                                                />
-                                            </div>
+                                            <DatePicker
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                                placeholder="Pick a date"
+                                                maxDate={new Date().toISOString().split('T')[0]}
+                                                minDate="1900-01-01"
+                                            />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -229,6 +239,104 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
                                             <Input placeholder="+1 (555) 000-0000" className="pl-9" {...field} />
                                         </div>
                                     </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </CardContent>
+                </Card>
+
+                {/* Address Information */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-xl flex items-center gap-2">
+                            <MapPin className="h-5 w-5 text-primary" />
+                            Address Information
+                        </CardTitle>
+                        <CardDescription>
+                            Customer's residential or mailing address.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-6">
+                        <FormField
+                            control={form.control}
+                            name="address"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Address</FormLabel>
+                                    <FormControl>
+                                        <div className="relative">
+                                            <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                            <Input placeholder="123 Main Street" className="pl-9" {...field} />
+                                        </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="city"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>City</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="New York" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="zip_code"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Zip Code</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="10001" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                        <FormField
+                            control={form.control}
+                            name="country"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Country</FormLabel>
+                                    <Select 
+                                        onValueChange={field.onChange} 
+                                        value={field.value}
+                                        disabled={loadingCountries || countries.length === 0}
+                                    >
+                                        <FormControl>
+                                            <div className="relative">
+                                                <Globe className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                                                <SelectTrigger className="pl-9">
+                                                    <SelectValue placeholder={
+                                                        loadingCountries 
+                                                            ? "Loading..." 
+                                                            : countries.length === 0 
+                                                            ? "No countries available" 
+                                                            : "Select country"
+                                                    } />
+                                                </SelectTrigger>
+                                            </div>
+                                        </FormControl>
+                                        {countries.length > 0 && (
+                                            <SelectContent>
+                                                {countries.map((country) => (
+                                                    <SelectItem key={country.id} value={country.name}>
+                                                        {country.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        )}
+                                    </Select>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -294,6 +402,94 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
                                                 {nationalities.map((nationality) => (
                                                     <SelectItem key={nationality.id} value={nationality.name}>
                                                         {nationality.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        )}
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </CardContent>
+                </Card>
+
+                {/* Departure Information */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-xl flex items-center gap-2">
+                            <Plane className="h-5 w-5 text-primary" />
+                            Departure Information
+                        </CardTitle>
+                        <CardDescription>
+                            Customer's departure details for travel planning.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-6">
+                        <FormField
+                            control={form.control}
+                            name="departure_date"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                    <FormLabel>Departure Date</FormLabel>
+                                    <FormControl>
+                                        <DatePicker
+                                            value={field.value}
+                                            onChange={field.onChange}
+                                            placeholder="Pick a date"
+                                            minDate={new Date().toISOString().split('T')[0]}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="departure_flight"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Departure Flight</FormLabel>
+                                    <FormControl>
+                                        <div className="relative">
+                                            <Plane className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                            <Input placeholder="e.g., AA123" className="pl-9" {...field} />
+                                        </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="departure_to"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Departure To</FormLabel>
+                                    <Select 
+                                        onValueChange={field.onChange} 
+                                        value={field.value}
+                                        disabled={loadingCountries || countries.length === 0}
+                                    >
+                                        <FormControl>
+                                            <div className="relative">
+                                                <Globe className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                                                <SelectTrigger className="pl-9">
+                                                    <SelectValue placeholder={
+                                                        loadingCountries 
+                                                            ? "Loading..." 
+                                                            : countries.length === 0 
+                                                            ? "No countries available" 
+                                                            : "Select country"
+                                                    } />
+                                                </SelectTrigger>
+                                            </div>
+                                        </FormControl>
+                                        {countries.length > 0 && (
+                                            <SelectContent>
+                                                {countries.map((country) => (
+                                                    <SelectItem key={country.id} value={country.name}>
+                                                        {country.name}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>

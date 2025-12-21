@@ -51,6 +51,8 @@ const basketSchema = z.object({
     notes: z.string().optional(),
 });
 
+type BasketFormValues = z.infer<typeof basketSchema>;
+
 interface EquipmentItemToAdd {
     id: string; // temporary ID for list
     equipment_source: 'Center' | 'Customer Own';
@@ -103,7 +105,7 @@ export default function CreateBasketPage() {
                 const bookingList = Array.isArray(bookingData) ? bookingData : (bookingData as any).data || [];
                 setBookings(bookingList);
 
-                const equipmentData = await equipmentItemService.getAll(1, undefined, 'Available');
+                const equipmentData = await equipmentItemService.getAll({ page: 1, status: 'Available' });
                 const equipmentList = Array.isArray(equipmentData) ? equipmentData : (equipmentData as any).data || [];
                 setEquipmentItems(equipmentList);
             } catch (error) {
@@ -113,7 +115,7 @@ export default function CreateBasketPage() {
         fetchData();
     }, []);
 
-    const form = useForm<CreateBasketRequest>({
+    const form = useForm<BasketFormValues>({
         resolver: zodResolver(basketSchema),
         defaultValues: {
             customer_id: "",
@@ -254,7 +256,13 @@ export default function CreateBasketPage() {
                 // Equipment is not available, show modal
                 setAvailabilityError({
                     equipmentName: `${selectedEquipment.equipment?.name || 'Equipment'}${selectedEquipment.size ? ` (Size: ${selectedEquipment.size})` : ''}`,
-                    conflicts: availability.conflicting_assignments,
+                    conflicts: availability.conflicting_assignments?.map(conflict => ({
+                        customer_name: conflict.customer_name,
+                        basket_no: undefined,
+                        checkout_date: conflict.checkout_date,
+                        return_date: conflict.return_date,
+                        assignment_status: 'Active',
+                    })),
                     checkoutDate: formatDateToString(checkoutDate),
                     returnDate: formatDateToString(returnDate),
                 });
@@ -280,7 +288,7 @@ export default function CreateBasketPage() {
         }
     };
 
-    async function onSubmit(data: z.infer<typeof basketSchema>) {
+    async function onSubmit(data: BasketFormValues) {
         setLoading(true);
         try {
             // Validate equipment items if any are added

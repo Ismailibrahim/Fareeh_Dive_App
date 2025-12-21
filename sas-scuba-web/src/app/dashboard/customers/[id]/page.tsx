@@ -4,12 +4,11 @@ import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, User, Mail, Phone, FileText, Globe, Calendar, UserCircle, Edit } from "lucide-react";
+import { ArrowLeft, User, Mail, Phone, FileText, Globe, Calendar, UserCircle, Edit, MapPin, Plane } from "lucide-react";
 import { EmergencyContactsSection } from "@/components/customers/EmergencyContactsSection";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import { customerService, Customer } from "@/lib/api/services/customer.service";
+import { useCustomer } from "@/lib/hooks/use-customers";
 import { CustomerCertificationsSection } from "@/components/customers/CustomerCertificationsSection";
 import { CustomerInsuranceSection } from "@/components/customers/CustomerInsuranceSection";
 import { CustomerAccommodationSection } from "@/components/customers/CustomerAccommodationSection";
@@ -17,25 +16,9 @@ import { CustomerAccommodationSection } from "@/components/customers/CustomerAcc
 export default function CustomerDetailPage() {
     const params = useParams();
     const id = params.id as string;
-    const [customer, setCustomer] = useState<Customer | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { data: customer, isLoading, error } = useCustomer(id);
 
-    useEffect(() => {
-        if (!id) return;
-        const fetchCustomer = async () => {
-            try {
-                const data = await customerService.getById(id);
-                setCustomer(data);
-            } catch (error) {
-                console.error("Failed to fetch customer", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchCustomer();
-    }, [id]);
-
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="flex flex-col min-h-screen bg-slate-50/50 dark:bg-slate-900/50">
                 <Header title="Customer Details" />
@@ -46,7 +29,7 @@ export default function CustomerDetailPage() {
         );
     }
 
-    if (!customer) {
+    if (error || !customer) {
         return (
             <div className="flex flex-col min-h-screen bg-slate-50/50 dark:bg-slate-900/50">
                 <Header title="Customer Details" />
@@ -108,66 +91,188 @@ export default function CustomerDetailPage() {
                                         {customer.full_name.substring(0, 2).toUpperCase()}
                                     </AvatarFallback>
                                 </Avatar>
-                                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2 text-sm font-medium">
-                                            <UserCircle className="h-4 w-4 text-muted-foreground" />
-                                            Full Name
+                                <div className="flex-1 space-y-6">
+                                    {/* Personal Information Section */}
+                                    <div>
+                                        <div className="flex items-center gap-2 text-sm font-semibold text-primary mb-3">
+                                            <UserCircle className="h-4 w-4" />
+                                            Personal Information
                                         </div>
-                                        <p className="text-sm">{customer.full_name}</p>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-2 text-sm font-medium">
+                                                    <UserCircle className="h-4 w-4 text-muted-foreground" />
+                                                    Full Name
+                                                </div>
+                                                <p className="text-sm">{customer.full_name}</p>
+                                            </div>
+                                            {customer.gender && (
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center gap-2 text-sm font-medium">
+                                                        <UserCircle className="h-4 w-4 text-muted-foreground" />
+                                                        Gender
+                                                    </div>
+                                                    <p className="text-sm">{customer.gender}</p>
+                                                </div>
+                                            )}
+                                            {customer.date_of_birth && (
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center gap-2 text-sm font-medium">
+                                                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                                                        Date of Birth
+                                                    </div>
+                                                    <p className="text-sm">{customer.date_of_birth}</p>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                    {customer.email && (
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2 text-sm font-medium">
-                                                <Mail className="h-4 w-4 text-muted-foreground" />
-                                                Email
+
+                                    {/* Contact Information Section */}
+                                    {(customer.email || customer.phone) && (
+                                        <div className="pt-4 border-t">
+                                            <div className="flex items-center gap-2 text-sm font-semibold text-primary mb-3">
+                                                <Mail className="h-4 w-4" />
+                                                Contact Information
                                             </div>
-                                            <p className="text-sm">{customer.email}</p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {customer.email && (
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2 text-sm font-medium">
+                                                            <Mail className="h-4 w-4 text-muted-foreground" />
+                                                            Email
+                                                        </div>
+                                                        <p className="text-sm">{customer.email}</p>
+                                                    </div>
+                                                )}
+                                                {customer.phone && (
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2 text-sm font-medium">
+                                                            <Phone className="h-4 w-4 text-muted-foreground" />
+                                                            Phone
+                                                        </div>
+                                                        <p className="text-sm">{customer.phone}</p>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
-                                    {customer.phone && (
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2 text-sm font-medium">
-                                                <Phone className="h-4 w-4 text-muted-foreground" />
-                                                Phone
+
+                                    {/* Address Information Section */}
+                                    {(customer.address || customer.city || customer.zip_code || customer.country) && (
+                                        <div className="pt-4 border-t">
+                                            <div className="flex items-center gap-2 text-sm font-semibold text-primary mb-3">
+                                                <MapPin className="h-4 w-4" />
+                                                Address Information
                                             </div>
-                                            <p className="text-sm">{customer.phone}</p>
+                                            <div className="space-y-4">
+                                                {customer.address && (
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2 text-sm font-medium">
+                                                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                                                            Address
+                                                        </div>
+                                                        <p className="text-sm">{customer.address}</p>
+                                                    </div>
+                                                )}
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                    {customer.city && (
+                                                        <div className="space-y-1">
+                                                            <div className="flex items-center gap-2 text-sm font-medium">
+                                                                <MapPin className="h-4 w-4 text-muted-foreground" />
+                                                                City
+                                                            </div>
+                                                            <p className="text-sm">{customer.city}</p>
+                                                        </div>
+                                                    )}
+                                                    {customer.zip_code && (
+                                                        <div className="space-y-1">
+                                                            <div className="flex items-center gap-2 text-sm font-medium">
+                                                                <MapPin className="h-4 w-4 text-muted-foreground" />
+                                                                Zip Code
+                                                            </div>
+                                                            <p className="text-sm">{customer.zip_code}</p>
+                                                        </div>
+                                                    )}
+                                                    {customer.country && (
+                                                        <div className="space-y-1">
+                                                            <div className="flex items-center gap-2 text-sm font-medium">
+                                                                <Globe className="h-4 w-4 text-muted-foreground" />
+                                                                Country
+                                                            </div>
+                                                            <p className="text-sm">{customer.country}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
-                                    {customer.passport_no && (
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2 text-sm font-medium">
-                                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                                Passport No
+
+                                    {/* Travel Documents Section */}
+                                    {(customer.passport_no || customer.nationality) && (
+                                        <div className="pt-4 border-t">
+                                            <div className="flex items-center gap-2 text-sm font-semibold text-primary mb-3">
+                                                <FileText className="h-4 w-4" />
+                                                Travel Documents
                                             </div>
-                                            <p className="text-sm">{customer.passport_no}</p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {customer.passport_no && (
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2 text-sm font-medium">
+                                                            <FileText className="h-4 w-4 text-muted-foreground" />
+                                                            Passport No
+                                                        </div>
+                                                        <p className="text-sm">{customer.passport_no}</p>
+                                                    </div>
+                                                )}
+                                                {customer.nationality && (
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2 text-sm font-medium">
+                                                            <Globe className="h-4 w-4 text-muted-foreground" />
+                                                            Nationality
+                                                        </div>
+                                                        <p className="text-sm">{customer.nationality}</p>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
-                                    {customer.nationality && (
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2 text-sm font-medium">
-                                                <Globe className="h-4 w-4 text-muted-foreground" />
-                                                Nationality
+
+                                    {/* Departure Information Section */}
+                                    {(customer.departure_date || customer.departure_flight || customer.departure_to) && (
+                                        <div className="pt-4 border-t">
+                                            <div className="flex items-center gap-2 text-sm font-semibold text-primary mb-3">
+                                                <Plane className="h-4 w-4" />
+                                                Departure Information
                                             </div>
-                                            <p className="text-sm">{customer.nationality}</p>
-                                        </div>
-                                    )}
-                                    {customer.date_of_birth && (
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2 text-sm font-medium">
-                                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                Date of Birth
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                {customer.departure_date && (
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2 text-sm font-medium">
+                                                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                                                            Departure Date
+                                                        </div>
+                                                        <p className="text-sm">{customer.departure_date}</p>
+                                                    </div>
+                                                )}
+                                                {customer.departure_flight && (
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2 text-sm font-medium">
+                                                            <Plane className="h-4 w-4 text-muted-foreground" />
+                                                            Departure Flight
+                                                        </div>
+                                                        <p className="text-sm">{customer.departure_flight}</p>
+                                                    </div>
+                                                )}
+                                                {customer.departure_to && (
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2 text-sm font-medium">
+                                                            <Globe className="h-4 w-4 text-muted-foreground" />
+                                                            Departure To
+                                                        </div>
+                                                        <p className="text-sm">{customer.departure_to}</p>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <p className="text-sm">{customer.date_of_birth}</p>
-                                        </div>
-                                    )}
-                                    {customer.gender && (
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2 text-sm font-medium">
-                                                <UserCircle className="h-4 w-4 text-muted-foreground" />
-                                                Gender
-                                            </div>
-                                            <p className="text-sm">{customer.gender}</p>
                                         </div>
                                     )}
                                 </div>

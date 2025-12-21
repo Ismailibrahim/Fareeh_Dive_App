@@ -29,6 +29,7 @@ import { PriceListItem, PriceListItemFormData } from "@/lib/api/services/price-l
 import { priceListItemService } from "@/lib/api/services/price-list-item.service";
 import { serviceTypeService, ServiceType } from "@/lib/api/services/service-type.service";
 import { equipmentItemService, EquipmentItem } from "@/lib/api/services/equipment-item.service";
+import { unitService, Unit } from "@/lib/api/services/unit.service";
 import { Tag, DollarSign, Package, Info } from "lucide-react";
 
 const priceListItemSchema = z.object({
@@ -49,15 +50,18 @@ interface PriceListItemFormProps {
     onOpenChange: (open: boolean) => void;
     initialData?: PriceListItem;
     baseCurrency?: string;
+    priceListId?: string | number;
     onSuccess: () => void;
 }
 
-export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrency, onSuccess }: PriceListItemFormProps) {
+export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrency, priceListId, onSuccess }: PriceListItemFormProps) {
     const [loading, setLoading] = useState(false);
     const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
     const [loadingServiceTypes, setLoadingServiceTypes] = useState(false);
     const [equipmentItems, setEquipmentItems] = useState<EquipmentItem[]>([]);
     const [loadingEquipmentItems, setLoadingEquipmentItems] = useState(false);
+    const [units, setUnits] = useState<Unit[]>([]);
+    const [loadingUnits, setLoadingUnits] = useState(false);
 
     const form = useForm<PriceListItemFormData>({
         resolver: zodResolver(priceListItemSchema),
@@ -68,7 +72,7 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
             name: initialData?.name || "",
             description: initialData?.description || "",
             price: initialData?.price || 0,
-            unit: initialData?.unit || "",
+            unit: initialData?.unit || undefined,
             tax_percentage: initialData?.tax_percentage || undefined,
             sort_order: initialData?.sort_order || 0,
             is_active: initialData?.is_active ?? true,
@@ -80,7 +84,7 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
             name: initialData?.name || "",
             description: initialData?.description || "",
             price: initialData?.price || 0,
-            unit: initialData?.unit || "",
+            unit: initialData?.unit || undefined,
             tax_percentage: initialData?.tax_percentage || undefined,
             sort_order: initialData?.sort_order || 0,
             is_active: initialData?.is_active ?? true,
@@ -105,6 +109,22 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
         };
         fetchServiceTypes();
     }, []);
+
+    useEffect(() => {
+        const fetchUnits = async () => {
+            if (!open) return;
+            try {
+                setLoadingUnits(true);
+                const data = await unitService.getAll();
+                setUnits(data);
+            } catch (error) {
+                console.error("Failed to load units", error);
+            } finally {
+                setLoadingUnits(false);
+            }
+        };
+        fetchUnits();
+    }, [open]);
 
     // Set service type when checkbox is checked or when service types load
     useEffect(() => {
@@ -183,7 +203,7 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
                 name: initialData?.name || "",
                 description: initialData?.description || "",
                 price: initialData?.price || 0,
-                unit: initialData?.unit || "",
+                unit: initialData?.unit || undefined,
                 tax_percentage: initialData?.tax_percentage || undefined,
                 sort_order: initialData?.sort_order || 0,
                 is_active: initialData?.is_active ?? true,
@@ -192,6 +212,21 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
+
+    // Ensure unit value is set after units are loaded (this ensures Select component recognizes the value)
+    useEffect(() => {
+        if (open && initialData?.unit && units.length > 0 && !loadingUnits) {
+            // Verify that the stored unit exists in the units list
+            const unitValue = initialData.unit;
+            const unitExists = units.some(u => u.name === unitValue);
+            if (unitExists) {
+                // Always set the value to ensure Select component recognizes it
+                // This is needed because the form might have been reset before units loaded
+                form.setValue('unit', unitValue, { shouldValidate: false });
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, units.length, loadingUnits, initialData]);
 
     async function onSubmit(data: PriceListItemFormData) {
         setLoading(true);
@@ -233,6 +268,11 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
                     cleanedData[key] = value;
                 }
             });
+            
+            // Include price_list_id when creating a new item
+            if (!initialData?.id && priceListId) {
+                cleanedData.price_list_id = typeof priceListId === 'string' ? parseInt(priceListId, 10) : priceListId;
+            }
             
             if (initialData?.id) {
                 await priceListItemService.update(initialData.id, cleanedData);
@@ -433,18 +473,37 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
                             <FormField
                                 control={form.control}
                                 name="unit"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Unit</FormLabel>
-                                        <FormControl>
-                                            <div className="relative">
-                                                <Package className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                                <Input placeholder="e.g. per person" className="pl-9" {...field} />
-                                            </div>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
+                                render={({ field }) => {
+                                    // Ensure value is a string if it exists, or undefined if not
+                                    const selectValue = field.value && typeof field.value === 'string' ? field.value : undefined;
+                                    return (
+                                        <FormItem>
+                                            <FormLabel>Unit</FormLabel>
+                                            <Select 
+                                                onValueChange={(value) => field.onChange(value || undefined)} 
+                                                value={selectValue}
+                                                disabled={loadingUnits}
+                                            >
+                                                <FormControl>
+                                                    <div className="relative">
+                                                        <Package className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                                                        <SelectTrigger className="pl-9">
+                                                            <SelectValue placeholder={loadingUnits ? "Loading..." : "Select unit"} />
+                                                        </SelectTrigger>
+                                                    </div>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {units.map((unit) => (
+                                                        <SelectItem key={unit.id} value={unit.name}>
+                                                            {unit.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    );
+                                }}
                             />
                         </div>
                         <FormField

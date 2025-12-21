@@ -17,8 +17,9 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { emergencyContactService, EmergencyContactFormData, EmergencyContact } from "@/lib/api/services/emergency-contact.service";
+import { EmergencyContactFormData, EmergencyContact } from "@/lib/api/services/emergency-contact.service";
 import { relationshipService, Relationship } from "@/lib/api/services/relationship.service";
+import { useCreateEmergencyContact, useUpdateEmergencyContact } from "@/lib/hooks/use-emergency-contacts";
 import { useState, useEffect } from "react";
 import { AlertCircle, User, Mail, Phone, MapPin, Users } from "lucide-react";
 
@@ -41,9 +42,12 @@ interface EmergencyContactFormProps {
 }
 
 export function EmergencyContactForm({ customerId, initialData, onSave, onCancel }: EmergencyContactFormProps) {
-    const [loading, setLoading] = useState(false);
+    const createMutation = useCreateEmergencyContact();
+    const updateMutation = useUpdateEmergencyContact();
     const [relationships, setRelationships] = useState<Relationship[]>([]);
     const [loadingRelationships, setLoadingRelationships] = useState(true);
+    
+    const loading = createMutation.isPending || updateMutation.isPending;
 
     useEffect(() => {
         const fetchRelationships = async () => {
@@ -75,7 +79,6 @@ export function EmergencyContactForm({ customerId, initialData, onSave, onCancel
     });
 
     async function onSubmit(data: EmergencyContactFormData) {
-        setLoading(true);
         try {
             // Convert empty strings to undefined
             const payload: EmergencyContactFormData = {
@@ -90,15 +93,13 @@ export function EmergencyContactForm({ customerId, initialData, onSave, onCancel
             };
 
             if (initialData?.id) {
-                await emergencyContactService.update(customerId, initialData.id, payload);
+                await updateMutation.mutateAsync({ customerId, id: initialData.id, data: payload });
             } else {
-                await emergencyContactService.create(customerId, payload);
+                await createMutation.mutateAsync({ customerId, data: payload });
             }
             onSave();
         } catch (error) {
             console.error("Failed to save emergency contact", error);
-        } finally {
-            setLoading(false);
         }
     }
 

@@ -9,49 +9,22 @@ import { ArrowLeft, User, Mail, Phone, FileText, Globe, Calendar, UserCircle, Sh
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { customerService, Customer } from "@/lib/api/services/customer.service";
-import { customerInsuranceService, CustomerInsurance } from "@/lib/api/services/customer-insurance.service";
+import { useCustomer } from "@/lib/hooks/use-customers";
+import { useCustomerInsurances } from "@/lib/hooks/use-customer-insurances";
 import { format } from "date-fns";
 
 function CreateCustomerInsuranceContent() {
     const searchParams = useSearchParams();
     const customerId = searchParams.get('customer_id');
     const [initialData, setInitialData] = useState<any>(null);
-    const [customer, setCustomer] = useState<Customer | null>(null);
-    const [loadingCustomer, setLoadingCustomer] = useState(false);
-    const [existingInsurance, setExistingInsurance] = useState<CustomerInsurance | null>(null);
-    const [loadingInsurance, setLoadingInsurance] = useState(false);
+    
+    // Use React Query hooks for instant cached data
+    const { data: customer, isLoading: loadingCustomer } = useCustomer(customerId);
+    const { data: existingInsurance, isLoading: loadingInsurance } = useCustomerInsurances(customerId);
 
     useEffect(() => {
         if (customerId) {
             setInitialData({ customer_id: parseInt(customerId) });
-            
-            // Fetch customer details
-            setLoadingCustomer(true);
-            customerService.getById(customerId)
-                .then((data) => {
-                    setCustomer(data);
-                })
-                .catch((error) => {
-                    console.error("Failed to fetch customer", error);
-                })
-                .finally(() => {
-                    setLoadingCustomer(false);
-                });
-
-            // Fetch existing insurance for this customer (one-to-one relationship)
-            setLoadingInsurance(true);
-            customerInsuranceService.getAll(parseInt(customerId))
-                .then((data) => {
-                    const insurances = Array.isArray(data) ? data : [];
-                    setExistingInsurance(insurances.length > 0 ? insurances[0] : null);
-                })
-                .catch((error) => {
-                    console.error("Failed to fetch insurance", error);
-                })
-                .finally(() => {
-                    setLoadingInsurance(false);
-                });
         }
     }, [customerId]);
 

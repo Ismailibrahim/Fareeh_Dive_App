@@ -208,7 +208,7 @@ export default function CreateFeaturePage() {
 
 ### 4.3 Date Picker Pattern
 
-**Pattern:** Date fields use Calendar component with Popover.
+**Pattern:** Date fields use the DatePicker component from Untitled UI, which integrates with React Hook Form and follows the design system.
 
 ```tsx
 <FormField
@@ -217,39 +217,28 @@ export default function CreateFeaturePage() {
     render={({ field }) => (
         <FormItem className="flex flex-col">
             <FormLabel>Date Label</FormLabel>
-            <Popover>
-                <PopoverTrigger asChild>
-                    <FormControl>
-                        <Button
-                            variant={"outline"}
-                            className={cn(
-                                "w-full pl-9 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                            )}
-                        >
-                            <CalendarIcon className="absolute left-3 h-4 w-4 text-muted-foreground" />
-                            {field.value ? (
-                                format(field.value, "PPP")
-                            ) : (
-                                <span>Pick a date</span>
-                            )}
-                        </Button>
-                    </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        initialFocus
-                    />
-                </PopoverContent>
-            </Popover>
+            <FormControl>
+                <DatePicker
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Pick a date"
+                    minDate="2024-01-01" // Optional: YYYY-MM-DD format
+                    maxDate="2024-12-31" // Optional: YYYY-MM-DD format
+                />
+            </FormControl>
             <FormMessage />
         </FormItem>
     )}
 />
 ```
+
+**Key Elements:**
+- Uses `DatePicker` component from `@/components/ui/date-picker`
+- Automatically handles icon-on-left pattern (Calendar icon included)
+- Form values remain as strings (YYYY-MM-DD format) for API compatibility
+- Supports optional `minDate` and `maxDate` props (string format: YYYY-MM-DD)
+- Styled with shadcn/ui Button and Popover components
+- Built on React Aria for accessibility
 
 ---
 

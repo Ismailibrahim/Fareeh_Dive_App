@@ -125,6 +125,7 @@ export default function BoatsPage() {
                             <TableRow>
                                 <TableHead>Name</TableHead>
                                 <TableHead>Capacity</TableHead>
+                                <TableHead>Ownership Type</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
@@ -132,13 +133,13 @@ export default function BoatsPage() {
                         <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="h-24 text-center">
+                                    <TableCell colSpan={5} className="h-24 text-center">
                                         Loading...
                                     </TableCell>
                                 </TableRow>
                             ) : filteredBoats.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="h-24 text-center">
+                                    <TableCell colSpan={5} className="h-24 text-center">
                                         No boats found.
                                     </TableCell>
                                 </TableRow>
@@ -153,6 +154,11 @@ export default function BoatsPage() {
                                         </TableCell>
                                         <TableCell>
                                             {boat.capacity ? `${boat.capacity} divers` : "-"}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant={boat.is_owned ? "default" : "outline"}>
+                                                {boat.is_owned ? "Owned" : "Rented"}
+                                            </Badge>
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant={boat.active ? "default" : "secondary"}>
@@ -218,6 +224,12 @@ export default function BoatsPage() {
                                     <div>
                                         <span className="text-muted-foreground block text-xs">Capacity</span>
                                         <span>{boat.capacity ? `${boat.capacity} divers` : "-"}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground block text-xs">Ownership Type</span>
+                                        <Badge variant={boat.is_owned ? "default" : "outline"}>
+                                            {boat.is_owned ? "Owned" : "Rented"}
+                                        </Badge>
                                     </div>
                                     <div>
                                         <span className="text-muted-foreground block text-xs">Status</span>

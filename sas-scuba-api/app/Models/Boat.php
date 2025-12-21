@@ -11,11 +11,13 @@ class Boat extends Model
         'name',
         'capacity',
         'active',
+        'is_owned',
     ];
 
     protected $casts = [
         'active' => 'boolean',
         'capacity' => 'integer',
+        'is_owned' => 'boolean',
     ];
 
     public function diveCenter()

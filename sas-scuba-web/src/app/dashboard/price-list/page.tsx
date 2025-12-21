@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, List, Edit, Trash2, Eye } from "lucide-react";
+import { Plus, List, Edit, Trash2, Eye, Copy } from "lucide-react";
 import { priceListService, PriceList, PaginatedResponse } from "@/lib/api/services/price-list.service";
 import Link from "next/link";
 import {
@@ -19,12 +19,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
+import { CopyPriceListDialog } from "@/components/price-list/CopyPriceListDialog";
 
 export default function PriceListsPage() {
     const [priceLists, setPriceLists] = useState<PriceList[]>([]);
     const [loading, setLoading] = useState(true);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [priceListToDelete, setPriceListToDelete] = useState<PriceList | null>(null);
+    const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+    const [priceListToCopy, setPriceListToCopy] = useState<PriceList | null>(null);
     const router = useRouter();
 
     const fetchPriceLists = async () => {
@@ -59,6 +62,19 @@ export default function PriceListsPage() {
         } catch (error) {
             console.error("Failed to delete price list", error);
         }
+    };
+
+    const handleCopyClick = (priceList: PriceList) => {
+        setPriceListToCopy(priceList);
+        setCopyDialogOpen(true);
+    };
+
+    const handleCopySuccess = (newPriceList: PriceList) => {
+        setCopyDialogOpen(false);
+        setPriceListToCopy(null);
+        fetchPriceLists();
+        // Redirect to the new price list edit page
+        router.push(`/dashboard/price-list/${newPriceList.id}/edit`);
     };
 
     if (loading) {
@@ -146,6 +162,14 @@ export default function PriceListsPage() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
+                                                onClick={() => handleCopyClick(priceList)}
+                                                title="Copy price list"
+                                            >
+                                                <Copy className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
                                                 onClick={() => handleDeleteClick(priceList)}
                                                 className="text-destructive hover:text-destructive"
                                             >
@@ -179,6 +203,13 @@ export default function PriceListsPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <CopyPriceListDialog
+                open={copyDialogOpen}
+                onOpenChange={setCopyDialogOpen}
+                priceList={priceListToCopy}
+                onSuccess={handleCopySuccess}
+            />
         </div>
     );
 }

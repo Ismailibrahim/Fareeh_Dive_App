@@ -13,11 +13,12 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { boatService, BoatFormData, Boat } from "@/lib/api/services/boat.service";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Ship, Users } from "lucide-react";
+import { Ship, Users, Key } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const boatSchema = z.object({
@@ -28,6 +29,7 @@ const boatSchema = z.object({
         return isNaN(parsed) ? undefined : parsed;
     }),
     active: z.boolean().optional(),
+    is_owned: z.boolean().optional(),
 });
 
 interface BoatFormProps {
@@ -45,6 +47,7 @@ export function BoatForm({ initialData, boatId }: BoatFormProps) {
             name: initialData?.name || "",
             capacity: initialData?.capacity ? String(initialData.capacity) : "",
             active: initialData?.active ?? true,
+            is_owned: initialData?.is_owned ?? true,
         },
     });
 
@@ -55,6 +58,7 @@ export function BoatForm({ initialData, boatId }: BoatFormProps) {
                 name: data.name,
                 capacity: data.capacity,
                 active: data.active ?? true,
+                is_owned: data.is_owned ?? true,
             };
 
             if (boatId) {
@@ -150,6 +154,37 @@ export function BoatForm({ initialData, boatId }: BoatFormProps) {
                                 )}
                             />
                         </div>
+
+                        <FormField
+                            control={form.control}
+                            name="is_owned"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Ownership Type</FormLabel>
+                                    <FormControl>
+                                        <div className="relative">
+                                            <Key className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                                            <Select
+                                                value={field.value ? "owned" : "rented"}
+                                                onValueChange={(value) => field.onChange(value === "owned")}
+                                            >
+                                                <SelectTrigger className="pl-9">
+                                                    <SelectValue placeholder="Select ownership type" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="owned">Owned</SelectItem>
+                                                    <SelectItem value="rented">Rented</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </FormControl>
+                                    <p className="text-sm text-muted-foreground">
+                                        Select whether this boat is owned by your dive center or rented from another party
+                                    </p>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                     </CardContent>
                 </Card>
 

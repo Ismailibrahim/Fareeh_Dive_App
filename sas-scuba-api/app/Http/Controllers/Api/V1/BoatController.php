@@ -41,6 +41,7 @@ class BoatController extends Controller
             'name' => 'required|string|max:255',
             'capacity' => 'nullable|integer|min:1',
             'active' => 'boolean',
+            'is_owned' => 'boolean',
             'dive_center_id' => 'required|exists:dive_centers,id',
         ]);
 
@@ -71,6 +72,7 @@ class BoatController extends Controller
             'name' => 'sometimes|string|max:255',
             'capacity' => 'nullable|integer|min:1',
             'active' => 'boolean',
+            'is_owned' => 'boolean',
         ]);
 
         $boat->update($validated);

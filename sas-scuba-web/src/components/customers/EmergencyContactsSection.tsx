@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,40 +20,23 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AlertCircle, ChevronDown, Plus, Edit, Trash2, Phone, Mail, MapPin, Users, Star } from "lucide-react";
-import { emergencyContactService, EmergencyContact } from "@/lib/api/services/emergency-contact.service";
+import { EmergencyContact } from "@/lib/api/services/emergency-contact.service";
+import { useEmergencyContacts, useDeleteEmergencyContact } from "@/lib/hooks/use-emergency-contacts";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 interface EmergencyContactsSectionProps {
     customerId: string | number;
 }
 
 export function EmergencyContactsSection({ customerId }: EmergencyContactsSectionProps) {
-    const router = useRouter();
-    const [contacts, setContacts] = useState<EmergencyContact[]>([]);
-    const [loading, setLoading] = useState(true);
     const [isOpen, setIsOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [contactToDelete, setContactToDelete] = useState<EmergencyContact | null>(null);
 
-    useEffect(() => {
-        const fetchContacts = async () => {
-            setLoading(true);
-            try {
-                const data = await emergencyContactService.getAll(customerId);
-                const contactsList = Array.isArray(data) ? data : [];
-                setContacts(contactsList);
-            } catch (error) {
-                console.error("Failed to fetch emergency contacts", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+    const { data: contactsData, isLoading } = useEmergencyContacts(customerId);
+    const deleteMutation = useDeleteEmergencyContact();
 
-        if (customerId) {
-            fetchContacts();
-        }
-    }, [customerId]);
+    const contacts = Array.isArray(contactsData) ? contactsData : [];
 
     const handleDeleteClick = (contact: EmergencyContact) => {
         setContactToDelete(contact);
@@ -63,17 +46,11 @@ export function EmergencyContactsSection({ customerId }: EmergencyContactsSectio
     const confirmDelete = async () => {
         if (!contactToDelete) return;
         try {
-            await emergencyContactService.delete(customerId, contactToDelete.id);
-            // Refresh contacts list
-            const data = await emergencyContactService.getAll(customerId);
-            const contactsList = Array.isArray(data) ? data : [];
-            setContacts(contactsList);
-            router.refresh();
-        } catch (error) {
-            console.error("Failed to delete emergency contact", error);
-        } finally {
+            await deleteMutation.mutateAsync({ customerId, id: contactToDelete.id });
             setDeleteDialogOpen(false);
             setContactToDelete(null);
+        } catch (error) {
+            console.error("Failed to delete emergency contact", error);
         }
     };
 
@@ -98,7 +75,7 @@ export function EmergencyContactsSection({ customerId }: EmergencyContactsSectio
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                         <CardContent className="space-y-4">
-                            {loading ? (
+                            {isLoading ? (
                                 <div className="flex items-center justify-center py-8">
                                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                                 </div>

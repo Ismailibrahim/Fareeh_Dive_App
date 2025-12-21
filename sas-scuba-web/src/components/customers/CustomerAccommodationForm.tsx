@@ -13,9 +13,12 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CustomerAccommodation, CustomerAccommodationFormData, customerAccommodationService } from "@/lib/api/services/customer-accommodation.service";
-import { useState } from "react";
+import { CustomerAccommodation, CustomerAccommodationFormData } from "@/lib/api/services/customer-accommodation.service";
+import { useCreateCustomerAccommodation, useUpdateCustomerAccommodation } from "@/lib/hooks/use-customer-accommodations";
+import { islandService, Island } from "@/lib/api/services/island.service";
+import { useState, useEffect } from "react";
 import { Building2, Phone, MapPin, Home, Key } from "lucide-react";
 
 const accommodationSchema = z.object({
@@ -34,7 +37,26 @@ interface CustomerAccommodationFormProps {
 }
 
 export function CustomerAccommodationForm({ customerId, initialData, onSave, onCancel }: CustomerAccommodationFormProps) {
-    const [loading, setLoading] = useState(false);
+    const createMutation = useCreateCustomerAccommodation();
+    const updateMutation = useUpdateCustomerAccommodation();
+    
+    const loading = createMutation.isPending || updateMutation.isPending;
+    const [islands, setIslands] = useState<Island[]>([]);
+    const [loadingIslands, setLoadingIslands] = useState(true);
+
+    useEffect(() => {
+        const fetchIslands = async () => {
+            try {
+                const data = await islandService.getAll();
+                setIslands(data);
+            } catch (error) {
+                console.error("Failed to fetch islands", error);
+            } finally {
+                setLoadingIslands(false);
+            }
+        };
+        fetchIslands();
+    }, []);
 
     const form = useForm<CustomerAccommodationFormData>({
         resolver: zodResolver(accommodationSchema),
@@ -49,7 +71,6 @@ export function CustomerAccommodationForm({ customerId, initialData, onSave, onC
     });
 
     async function onSubmit(data: CustomerAccommodationFormData) {
-        setLoading(true);
         try {
             // Convert empty strings to undefined
             const payload: CustomerAccommodationFormData = {
@@ -62,15 +83,13 @@ export function CustomerAccommodationForm({ customerId, initialData, onSave, onC
             };
 
             if (initialData?.id) {
-                await customerAccommodationService.update(initialData.id, payload);
+                await updateMutation.mutateAsync({ id: initialData.id, data: payload });
             } else {
-                await customerAccommodationService.create(payload);
+                await createMutation.mutateAsync(payload);
             }
             onSave();
         } catch (error) {
             console.error("Failed to save accommodation", error);
-        } finally {
-            setLoading(false);
         }
     }
 
@@ -143,12 +162,35 @@ export function CustomerAccommodationForm({ customerId, initialData, onSave, onC
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Island</FormLabel>
-                                        <FormControl>
-                                            <div className="relative">
-                                                <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                                <Input placeholder="Island Name" className="pl-9" {...field} />
-                                            </div>
-                                        </FormControl>
+                                        <Select 
+                                            onValueChange={field.onChange} 
+                                            value={field.value}
+                                            disabled={loadingIslands || islands.length === 0}
+                                        >
+                                            <FormControl>
+                                                <div className="relative">
+                                                    <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                                                    <SelectTrigger className="pl-9">
+                                                        <SelectValue placeholder={
+                                                            loadingIslands 
+                                                                ? "Loading..." 
+                                                                : islands.length === 0 
+                                                                ? "No islands available" 
+                                                                : "Select island"
+                                                        } />
+                                                    </SelectTrigger>
+                                                </div>
+                                            </FormControl>
+                                            {islands.length > 0 && (
+                                                <SelectContent>
+                                                    {islands.map((island) => (
+                                                        <SelectItem key={island.id} value={island.name}>
+                                                            {island.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            )}
+                                        </Select>
                                         <FormMessage />
                                     </FormItem>
                                 )}

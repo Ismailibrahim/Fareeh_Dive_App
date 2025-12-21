@@ -9,49 +9,22 @@ import { ArrowLeft, User, Mail, Phone, FileText, Globe, Calendar, UserCircle, Aw
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { customerService, Customer } from "@/lib/api/services/customer.service";
-import { customerCertificationService, CustomerCertification } from "@/lib/api/services/customer-certification.service";
+import { useCustomer } from "@/lib/hooks/use-customers";
+import { useCustomerCertifications } from "@/lib/hooks/use-customer-certifications";
 import { format } from "date-fns";
 
 function CreateCustomerCertificationContent() {
     const searchParams = useSearchParams();
     const customerId = searchParams.get('customer_id');
     const [initialData, setInitialData] = useState<any>(null);
-    const [customer, setCustomer] = useState<Customer | null>(null);
-    const [loadingCustomer, setLoadingCustomer] = useState(false);
-    const [existingCertifications, setExistingCertifications] = useState<CustomerCertification[]>([]);
-    const [loadingCertifications, setLoadingCertifications] = useState(false);
+    
+    // Use React Query hooks for instant cached data
+    const { data: customer, isLoading: loadingCustomer } = useCustomer(customerId);
+    const { data: existingCertification, isLoading: loadingCertifications } = useCustomerCertifications(customerId);
 
     useEffect(() => {
         if (customerId) {
             setInitialData({ customer_id: parseInt(customerId) });
-            
-            // Fetch customer details
-            setLoadingCustomer(true);
-            customerService.getById(customerId)
-                .then((data) => {
-                    setCustomer(data);
-                })
-                .catch((error) => {
-                    console.error("Failed to fetch customer", error);
-                })
-                .finally(() => {
-                    setLoadingCustomer(false);
-                });
-
-            // Fetch existing certifications for this customer
-            setLoadingCertifications(true);
-            customerCertificationService.getAll(parseInt(customerId))
-                .then((data) => {
-                    const certs = Array.isArray(data) ? data : [];
-                    setExistingCertifications(certs);
-                })
-                .catch((error) => {
-                    console.error("Failed to fetch certifications", error);
-                })
-                .finally(() => {
-                    setLoadingCertifications(false);
-                });
         }
     }, [customerId]);
 
@@ -170,59 +143,52 @@ function CreateCustomerCertificationContent() {
                         </Card>
                     )}
 
-                    {/* Existing Certifications */}
-                    {customerId && existingCertifications.length > 0 && (
-                        <Card>
+                    {/* Existing Certification Warning */}
+                    {customerId && existingCertification && (
+                        <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
                             <CardHeader>
                                 <CardTitle className="text-xl flex items-center gap-2">
-                                    <Award className="h-5 w-5 text-primary" />
-                                    Existing Certifications
+                                    <Award className="h-5 w-5 text-yellow-600" />
+                                    Existing Certification Found
                                 </CardTitle>
                                 <CardDescription>
-                                    This customer already has {existingCertifications.length} certification{existingCertifications.length !== 1 ? 's' : ''} registered.
+                                    This customer already has a certification record. You can edit it instead.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div className="space-y-3">
-                                    {existingCertifications.map((cert) => (
-                                        <div 
-                                            key={cert.id} 
-                                            className="flex items-start justify-between p-4 rounded-lg border bg-muted/50 hover:bg-muted transition-colors"
-                                        >
-                                            <div className="flex-1 space-y-2">
-                                                <div className="flex items-center gap-2">
-                                                    <Award className="h-4 w-4 text-primary" />
-                                                    <h4 className="font-semibold text-sm">{cert.certification_name}</h4>
-                                                </div>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-muted-foreground">
-                                                    {cert.certification_date && (
-                                                        <div className="flex items-center gap-1">
-                                                            <Calendar className="h-3 w-3" />
-                                                            <span>{format(new Date(cert.certification_date), "MMM dd, yyyy")}</span>
-                                                        </div>
-                                                    )}
-                                                    {cert.agency && (
-                                                        <div className="flex items-center gap-1">
-                                                            <Building className="h-3 w-3" />
-                                                            <span>{cert.agency}</span>
-                                                        </div>
-                                                    )}
-                                                    {cert.instructor && (
-                                                        <div className="flex items-center gap-1">
-                                                            <UserCircle className="h-3 w-3" />
-                                                            <span>{cert.instructor}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <Link href={`/dashboard/customer-certifications/${cert.id}/edit`}>
-                                                <Button variant="ghost" size="sm" className="h-8">
-                                                    <ExternalLink className="h-3 w-3 mr-1" />
-                                                    Edit
-                                                </Button>
-                                            </Link>
+                                <div className="flex items-start justify-between p-4 rounded-lg border bg-white dark:bg-gray-800">
+                                    <div className="flex-1 space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <Award className="h-4 w-4 text-primary" />
+                                            <h4 className="font-semibold text-sm">{existingCertification.certification_name}</h4>
                                         </div>
-                                    ))}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                            {existingCertification.certification_date && (
+                                                <div className="flex items-center gap-1">
+                                                    <Calendar className="h-3 w-3" />
+                                                    <span>{format(new Date(existingCertification.certification_date), "MMM dd, yyyy")}</span>
+                                                </div>
+                                            )}
+                                            {existingCertification.agency && (
+                                                <div className="flex items-center gap-1">
+                                                    <Building className="h-3 w-3" />
+                                                    <span>{existingCertification.agency}</span>
+                                                </div>
+                                            )}
+                                            {existingCertification.instructor && (
+                                                <div className="flex items-center gap-1">
+                                                    <UserCircle className="h-3 w-3" />
+                                                    <span>{existingCertification.instructor}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <Link href={`/dashboard/customer-certifications/${existingCertification.id}/edit?customer_id=${customerId}`}>
+                                        <Button variant="outline" size="sm" className="h-8">
+                                            <ExternalLink className="h-3 w-3 mr-1" />
+                                            Edit
+                                        </Button>
+                                    </Link>
                                 </div>
                             </CardContent>
                         </Card>

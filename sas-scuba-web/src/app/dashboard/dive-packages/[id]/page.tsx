@@ -191,7 +191,7 @@ export default function DivePackageDetailPage() {
                                                 Booking #{booking.id}
                                             </Link>
                                             <p className="text-sm text-muted-foreground">
-                                                Day {booking.package_day_number} • {booking.booking_date ? format(new Date(booking.booking_date), "MMM d, yyyy") : 'N/A'}
+                                                {(booking as any).package_day_number ? `Day ${(booking as any).package_day_number} • ` : ''}{booking.booking_date ? format(new Date(booking.booking_date), "MMM d, yyyy") : 'N/A'}
                                             </p>
                                         </div>
                                         <span className="text-sm">{booking.status}</span>

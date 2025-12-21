@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { PriceListItem } from "@/lib/api/services/price-list.service";
 import {
     Table,
@@ -18,6 +18,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { formatPrice } from "@/lib/utils/currency";
 import {
@@ -37,12 +38,47 @@ interface PriceListItemTableProps {
     baseCurrency?: string;
     onItemUpdated: () => void;
     onEditItem: (item: PriceListItem) => void;
+    selectedItems?: number[];
+    onSelectionChange?: (selectedIds: number[]) => void;
 }
 
-export function PriceListItemTable({ items, baseCurrency = "USD", onItemUpdated, onEditItem }: PriceListItemTableProps) {
+export function PriceListItemTable({ 
+    items, 
+    baseCurrency = "USD", 
+    onItemUpdated, 
+    onEditItem,
+    selectedItems = [],
+    onSelectionChange
+}: PriceListItemTableProps) {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<PriceListItem | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const [internalSelectedItems, setInternalSelectedItems] = useState<number[]>(selectedItems);
+
+    // Sync internal state with prop
+    useEffect(() => {
+        setInternalSelectedItems(selectedItems);
+    }, [selectedItems]);
+
+    const handleSelectItem = (itemId: number, checked: boolean) => {
+        let newSelection: number[];
+        if (checked) {
+            newSelection = [...internalSelectedItems, itemId];
+        } else {
+            newSelection = internalSelectedItems.filter(id => id !== itemId);
+        }
+        setInternalSelectedItems(newSelection);
+        onSelectionChange?.(newSelection);
+    };
+
+    const handleSelectAll = (checked: boolean) => {
+        const newSelection = checked ? items.map(item => item.id) : [];
+        setInternalSelectedItems(newSelection);
+        onSelectionChange?.(newSelection);
+    };
+
+    const allSelected = items.length > 0 && internalSelectedItems.length === items.length;
+    const someSelected = internalSelectedItems.length > 0 && internalSelectedItems.length < items.length;
 
     const handleDeleteClick = (item: PriceListItem) => {
         setItemToDelete(item);
@@ -72,12 +108,21 @@ export function PriceListItemTable({ items, baseCurrency = "USD", onItemUpdated,
                 <Table>
                     <TableHeader>
                         <TableRow>
+                            <TableHead className="w-12">
+                                <Checkbox
+                                    checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                                    onCheckedChange={(checked) => handleSelectAll(checked === true)}
+                                    aria-label="Select all items"
+                                />
+                            </TableHead>
                             <TableHead>Service Type</TableHead>
                             <TableHead>Name</TableHead>
                             <TableHead>Description</TableHead>
                             <TableHead>Price</TableHead>
                             <TableHead>Unit</TableHead>
                             <TableHead>Tax %</TableHead>
+                            <TableHead>Tax Inc.</TableHead>
+                            <TableHead>Svc Chg Inc.</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -85,13 +130,20 @@ export function PriceListItemTable({ items, baseCurrency = "USD", onItemUpdated,
                     <TableBody>
                         {items.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                                <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                                     No items in price list. Click "Add Item" to get started.
                                 </TableCell>
                             </TableRow>
                         ) : (
                             items.map((item) => (
                                 <TableRow key={item.id}>
+                                    <TableCell>
+                                        <Checkbox
+                                            checked={internalSelectedItems.includes(item.id)}
+                                            onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
+                                            aria-label={`Select ${item.name}`}
+                                        />
+                                    </TableCell>
                                     <TableCell className="font-medium">{item.service_type}</TableCell>
                                     <TableCell className="font-medium">{item.name}</TableCell>
                                     <TableCell className="max-w-[300px] truncate">
@@ -100,6 +152,16 @@ export function PriceListItemTable({ items, baseCurrency = "USD", onItemUpdated,
                                     <TableCell>{formatPrice(item.price, baseCurrency)}</TableCell>
                                     <TableCell>{item.unit || "-"}</TableCell>
                                     <TableCell>{item.tax_percentage ? `${item.tax_percentage}%` : "-"}</TableCell>
+                                    <TableCell>
+                                        <Badge variant={item.tax_inclusive ? "default" : "outline"}>
+                                            {item.tax_inclusive ? "Yes" : "No"}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant={item.service_charge_inclusive ? "default" : "outline"}>
+                                            {item.service_charge_inclusive ? "Yes" : "No"}
+                                        </Badge>
+                                    </TableCell>
                                     <TableCell>
                                         <Badge variant={item.is_active ? "default" : "secondary"}>
                                             {item.is_active ? "Active" : "Inactive"}

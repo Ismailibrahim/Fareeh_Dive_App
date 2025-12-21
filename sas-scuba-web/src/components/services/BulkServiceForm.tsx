@@ -19,7 +19,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EquipmentItem, equipmentItemService } from "@/lib/api/services/equipment-item.service";
 import { equipmentServiceHistoryService, BulkServiceFormData } from "@/lib/api/services/equipment-service-history.service";
 import { useState, useEffect } from "react";
-import { Calendar, Wrench, User, Building, DollarSign, Package, Calculator } from "lucide-react";
+import { Wrench, User, Building, DollarSign, Package, Calculator } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
 import { format } from "date-fns";
 import {
     Table,
@@ -349,13 +350,14 @@ export function BulkServiceForm({ onSuccess }: BulkServiceFormProps) {
                                 control={form.control}
                                 name="service_date"
                                 render={({ field }) => (
-                                    <FormItem>
+                                    <FormItem className="flex flex-col">
                                         <FormLabel>Service Date *</FormLabel>
                                         <FormControl>
-                                            <div className="relative">
-                                                <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                                <Input type="date" className="pl-9" {...field} />
-                                            </div>
+                                            <DatePicker
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                                placeholder="Pick a service date"
+                                            />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -438,13 +440,15 @@ export function BulkServiceForm({ onSuccess }: BulkServiceFormProps) {
                                 control={form.control}
                                 name="next_service_due_date"
                                 render={({ field }) => (
-                                    <FormItem>
+                                    <FormItem className="flex flex-col">
                                         <FormLabel>Next Service Due Date</FormLabel>
                                         <FormControl>
-                                            <div className="relative">
-                                                <Calculator className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                                <Input type="date" className="pl-9" {...field} />
-                                            </div>
+                                            <DatePicker
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                                placeholder="Pick a date"
+                                                minDate={form.watch('service_date')}
+                                            />
                                         </FormControl>
                                         <p className="text-sm text-muted-foreground">
                                             Leave empty to auto-calculate based on each item's service interval.

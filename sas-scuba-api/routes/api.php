@@ -80,6 +80,9 @@ Route::prefix('v1')->group(function () {
         Route::get('equipment-items/{equipmentItem}/service-history', [\App\Http\Controllers\Api\V1\EquipmentServiceHistoryController::class, 'index']);
         Route::post('equipment-items/bulk-service', [\App\Http\Controllers\Api\V1\EquipmentServiceHistoryController::class, 'bulkStore']);
         Route::apiResource('nationalities', \App\Http\Controllers\Api\V1\NationalityController::class);
+        Route::apiResource('units', \App\Http\Controllers\Api\V1\UnitController::class);
+        Route::apiResource('islands', \App\Http\Controllers\Api\V1\IslandController::class);
+        Route::apiResource('countries', \App\Http\Controllers\Api\V1\CountryController::class);
         Route::apiResource('relationships', \App\Http\Controllers\Api\V1\RelationshipController::class);
         Route::apiResource('agencies', \App\Http\Controllers\Api\V1\AgencyController::class);
         Route::apiResource('service-providers', \App\Http\Controllers\Api\V1\ServiceProviderController::class);
@@ -112,10 +115,13 @@ Route::prefix('v1')->group(function () {
         Route::put('/price-lists/{id}', [\App\Http\Controllers\Api\V1\PriceListController::class, 'update']);
         Route::patch('/price-lists/{id}', [\App\Http\Controllers\Api\V1\PriceListController::class, 'update']);
         Route::delete('/price-lists/{id}', [\App\Http\Controllers\Api\V1\PriceListController::class, 'destroy']);
+        Route::post('/price-lists/{id}/duplicate', [\App\Http\Controllers\Api\V1\PriceListController::class, 'duplicate']);
         
         // Price list items routes
         Route::apiResource('price-list-items', \App\Http\Controllers\Api\V1\PriceListItemController::class);
         Route::post('/price-list-items/bulk', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'bulkUpdate']);
+        Route::post('/price-lists/{priceListId}/items/bulk-adjust-prices', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'bulkAdjustPrices']);
+        Route::post('/price-lists/{priceListId}/items/bulk-update-tax-service', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'bulkUpdateTaxService']);
         Route::apiResource('dive-packages', \App\Http\Controllers\Api\V1\DivePackageController::class);
         Route::get('dive-packages/{divePackage}/status', [\App\Http\Controllers\Api\V1\DivePackageController::class, 'status']);
         Route::apiResource('invoices', \App\Http\Controllers\Api\V1\InvoiceController::class);

@@ -26,6 +26,8 @@ export interface PriceListItem {
     price: number;
     unit?: string;
     tax_percentage?: number;
+    tax_inclusive?: boolean;
+    service_charge_inclusive?: boolean;
     sort_order: number;
     is_active: boolean;
     created_at: string;
@@ -33,6 +35,7 @@ export interface PriceListItem {
 }
 
 export interface PriceListItemFormData {
+    price_list_id?: number;
     service_type: string;
     is_equipment_rental?: boolean;
     equipment_item_id?: number;
@@ -41,6 +44,8 @@ export interface PriceListItemFormData {
     price: number;
     unit?: string;
     tax_percentage?: number;
+    tax_inclusive?: boolean;
+    service_charge_inclusive?: boolean;
     sort_order?: number;
     is_active?: boolean;
 }
@@ -89,6 +94,53 @@ export const priceListService = {
         }
         // Create default if none exists
         return await priceListService.create({ name: "Default Price List" });
+    },
+
+    duplicate: async (id: number | string, name: string) => {
+        const response = await apiClient.post<PriceList>(`/api/v1/price-lists/${id}/duplicate`, { name });
+        return response.data;
+    },
+
+    bulkAdjustPrices: async (
+        id: number | string,
+        adjustmentType: 'percentage' | 'multiplier',
+        adjustmentValue: number,
+        roundingType?: 'nearest_10' | 'whole_number',
+        itemIds?: number[]
+    ) => {
+        const response = await apiClient.post<{
+            message: string;
+            updated_count: number;
+            sample_items: Array<{
+                id: number;
+                name: string;
+                old_price: number;
+                new_price: number;
+            }>;
+        }>(`/api/v1/price-lists/${id}/items/bulk-adjust-prices`, {
+            adjustment_type: adjustmentType,
+            adjustment_value: adjustmentValue,
+            rounding_type: roundingType || null,
+            item_ids: itemIds || null,
+        });
+        return response.data;
+    },
+
+    bulkUpdateTaxService: async (
+        id: number | string,
+        itemIds: number[],
+        taxInclusive?: boolean,
+        serviceChargeInclusive?: boolean
+    ) => {
+        const response = await apiClient.post<{
+            message: string;
+            updated_count: number;
+        }>(`/api/v1/price-lists/${id}/items/bulk-update-tax-service`, {
+            item_ids: itemIds,
+            tax_inclusive: taxInclusive !== undefined ? taxInclusive : null,
+            service_charge_inclusive: serviceChargeInclusive !== undefined ? serviceChargeInclusive : null,
+        });
+        return response.data;
     },
 };
 

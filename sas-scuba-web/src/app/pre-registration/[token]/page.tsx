@@ -63,7 +63,8 @@ const preRegistrationSchema = z.object({
         certification_name: z.string().min(1, "Certification name is required"),
         certification_no: z.string().optional(),
         certification_date: z.string().min(1, "Certification date is required"),
-        expiry_date: z.string().optional(),
+        last_dive_date: z.string().optional(),
+        no_of_dives: z.number().int().min(0).optional(),
         agency: z.string().optional(),
         instructor: z.string().optional(),
         file_url: z.string().optional(),
@@ -690,10 +691,10 @@ export default function PreRegistrationPage() {
                                                 />
                                                 <FormField
                                                     control={form.control}
-                                                    name={`certifications.${index}.expiry_date`}
+                                                    name={`certifications.${index}.last_dive_date`}
                                                     render={({ field }) => (
                                                         <FormItem>
-                                                            <FormLabel>Expiry Date</FormLabel>
+                                                            <FormLabel>Last Dive Date</FormLabel>
                                                             <FormControl>
                                                                 <DatePicker
                                                                     selected={field.value ? new Date(field.value) : null}
@@ -710,6 +711,30 @@ export default function PreRegistrationPage() {
                                                                     dateFormat="PPP"
                                                                     placeholderText="Pick a date"
                                                                     className="w-full"
+                                                                    maxDate={new Date()}
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name={`certifications.${index}.no_of_dives`}
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>Number of Dives</FormLabel>
+                                                            <FormControl>
+                                                                <Input
+                                                                    type="number"
+                                                                    placeholder="e.g. 50"
+                                                                    min="0"
+                                                                    {...field}
+                                                                    onChange={(e) => {
+                                                                        const value = e.target.value === '' ? undefined : parseInt(e.target.value, 10);
+                                                                        field.onChange(value);
+                                                                    }}
+                                                                    value={field.value ?? ''}
                                                                 />
                                                             </FormControl>
                                                             <FormMessage />

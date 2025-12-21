@@ -15,6 +15,8 @@ class PriceListItem extends Model
         'price',
         'unit',
         'tax_percentage',
+        'tax_inclusive',
+        'service_charge_inclusive',
         'sort_order',
         'is_active',
     ];
@@ -22,6 +24,8 @@ class PriceListItem extends Model
     protected $casts = [
         'price' => 'decimal:2',
         'tax_percentage' => 'decimal:2',
+        'tax_inclusive' => 'boolean',
+        'service_charge_inclusive' => 'boolean',
         'is_active' => 'boolean',
         'sort_order' => 'integer',
     ];
