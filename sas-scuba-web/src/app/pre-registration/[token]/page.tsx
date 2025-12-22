@@ -19,9 +19,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { User, Mail, Phone, CreditCard, Flag, Calendar, AlertCircle, Award, Building, MapPin, Plus, X, CheckCircle2 } from "lucide-react";
-import DatePicker from "react-datepicker";
-import { format } from "date-fns";
+import { User, Mail, Phone, CreditCard, Flag, Calendar, AlertCircle, Award, Building, MapPin, Plus, X, CheckCircle2, Plane } from "lucide-react";
+import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
+import { safeFormatDate, safeParseDate } from "@/lib/utils/date-format";
 import { cn } from "@/lib/utils";
 import { preRegistrationService, PreRegistrationFormData } from "@/lib/api/services/pre-registration.service";
 import { nationalityService, Nationality } from "@/lib/api/services/nationality.service";
@@ -48,6 +48,9 @@ const preRegistrationSchema = z.object({
         nationality: z.string().optional(),
         gender: z.string().optional(),
         date_of_birth: z.string().optional(),
+        departure_date: z.string().optional(),
+        departure_flight: z.string().optional(),
+        departure_to: z.string().optional(),
     }),
     emergency_contacts: z.array(z.object({
         name: z.string().optional(),
@@ -104,6 +107,7 @@ export default function PreRegistrationPage() {
     const [expiresAt, setExpiresAt] = useState<string>("");
     const [loadingData, setLoadingData] = useState(true);
 
+
     const form = useForm<PreRegistrationFormValues>({
         resolver: zodResolver(preRegistrationSchema),
         defaultValues: {
@@ -115,11 +119,46 @@ export default function PreRegistrationPage() {
                 nationality: "",
                 gender: "",
                 date_of_birth: "",
+                departure_date: "",
+                departure_flight: "",
+                departure_to: "",
             },
-            emergency_contacts: [],
-            certifications: [],
-            insurance: {},
-            accommodation: {},
+            emergency_contacts: [{
+                name: "",
+                email: "",
+                phone_1: "",
+                phone_2: "",
+                phone_3: "",
+                address: "",
+                relationship: "",
+                is_primary: false,
+            }], // Start with 1 emergency contact
+            certifications: [{
+                certification_name: "",
+                certification_no: "",
+                certification_date: "",
+                last_dive_date: "",
+                no_of_dives: undefined,
+                agency: "",
+                instructor: "",
+                file_url: "",
+                license_status: false,
+            }], // Start with 1 certification
+            insurance: {
+                insurance_provider: "",
+                insurance_no: "",
+                insurance_hotline_no: "",
+                file_url: "",
+                expiry_date: "",
+                status: false,
+            },
+            accommodation: {
+                name: "",
+                address: "",
+                contact_no: "",
+                island: "",
+                room_no: "",
+            },
         },
     });
 
@@ -282,7 +321,7 @@ export default function PreRegistrationPage() {
                     </p>
                     {expiresAt && (
                         <p className="text-sm text-muted-foreground mt-2">
-                            This form expires on {format(new Date(expiresAt), "PPP")}
+                            This form expires on {safeFormatDate(expiresAt, "PPP", "an unknown date")}
                         </p>
                     )}
                 </div>
@@ -324,7 +363,7 @@ export default function PreRegistrationPage() {
                                         render={({ field }) => (
                                             <FormItem>
                                                 <FormLabel>Gender</FormLabel>
-                                                <Select onValueChange={field.onChange} value={field.value}>
+                                                <Select onValueChange={field.onChange} value={field.value ?? ""}>
                                                     <FormControl>
                                                         <SelectTrigger>
                                                             <SelectValue placeholder="Select gender" />
@@ -350,7 +389,7 @@ export default function PreRegistrationPage() {
                                                     <div className="relative">
                                                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
                                                         <DatePicker
-                                                            selected={field.value ? new Date(field.value) : null}
+                                                            selected={field.value ? (safeParseDate(field.value) ?? null) : null}
                                                             onChange={(date) => {
                                                                 if (date) {
                                                                     const year = date.getFullYear();
@@ -434,7 +473,7 @@ export default function PreRegistrationPage() {
                                         render={({ field }) => (
                                             <FormItem>
                                                 <FormLabel>Nationality</FormLabel>
-                                                <Select onValueChange={field.onChange} value={field.value}>
+                                                <Select onValueChange={field.onChange} value={field.value ?? ""}>
                                                     <FormControl>
                                                         <div className="relative">
                                                             <Flag className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
@@ -456,6 +495,84 @@ export default function PreRegistrationPage() {
                                         )}
                                     />
                                 </div>
+                                
+                                {/* Departure Information */}
+                                <Separator />
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                                        <Plane className="h-5 w-5 text-primary" />
+                                        Departure Information
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <FormField
+                                            control={form.control}
+                                            name="customer.departure_date"
+                                            render={({ field }) => (
+                                                <FormItem className="flex flex-col">
+                                                    <FormLabel>Departure Date</FormLabel>
+                                                    <FormControl>
+                                                        <div className="relative">
+                                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                                                            <DatePicker
+                                                                selected={field.value ? (safeParseDate(field.value) ?? null) : null}
+                                                                onChange={(date) => {
+                                                                    if (date) {
+                                                                        const year = date.getFullYear();
+                                                                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                                                                        const day = String(date.getDate()).padStart(2, '0');
+                                                                        field.onChange(`${year}-${month}-${day}`);
+                                                                    } else {
+                                                                        field.onChange("");
+                                                                    }
+                                                                }}
+                                                                dateFormat="PPP"
+                                                                placeholderText="Pick a date"
+                                                                wrapperClassName="w-full"
+                                                                className={cn(
+                                                                    "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] pl-9",
+                                                                    !field.value && "text-muted-foreground"
+                                                                )}
+                                                            />
+                                                        </div>
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="customer.departure_flight"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Departure Flight</FormLabel>
+                                                    <FormControl>
+                                                        <div className="relative">
+                                                            <Plane className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                                            <Input placeholder="e.g. EK123" className="pl-9" {...field} value={field.value ?? ""} />
+                                                        </div>
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="customer.departure_to"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Departure To</FormLabel>
+                                                    <FormControl>
+                                                        <div className="relative">
+                                                            <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                                            <Input placeholder="e.g. Dubai, UAE" className="pl-9" {...field} value={field.value ?? ""} />
+                                                        </div>
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                </div>
                             </CardContent>
                         </Card>
 
@@ -475,14 +592,16 @@ export default function PreRegistrationPage() {
                                     <Card key={field.id} className="p-4">
                                         <div className="flex justify-between items-start mb-4">
                                             <h4 className="font-medium">Emergency Contact {index + 1}</h4>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => removeEmergencyContact(index)}
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </Button>
+                                            {emergencyContactFields.length > 1 && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => removeEmergencyContact(index)}
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                         <div className="grid gap-4">
                                             <FormField
@@ -492,7 +611,7 @@ export default function PreRegistrationPage() {
                                                     <FormItem>
                                                         <FormLabel>Name</FormLabel>
                                                         <FormControl>
-                                                            <Input {...field} />
+                                                            <Input {...field} value={field.value ?? ""} />
                                                         </FormControl>
                                                         <FormMessage />
                                                     </FormItem>
@@ -506,7 +625,7 @@ export default function PreRegistrationPage() {
                                                         <FormItem>
                                                             <FormLabel>Email</FormLabel>
                                                             <FormControl>
-                                                                <Input type="email" {...field} />
+                                                                <Input type="email" {...field} value={field.value ?? ""} />
                                                             </FormControl>
                                                             <FormMessage />
                                                         </FormItem>
@@ -518,7 +637,7 @@ export default function PreRegistrationPage() {
                                                     render={({ field }) => (
                                                         <FormItem>
                                                             <FormLabel>Relationship</FormLabel>
-                                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                            <Select onValueChange={field.onChange} value={field.value ?? ""}>
                                                                 <FormControl>
                                                                     <SelectTrigger>
                                                                         <SelectValue placeholder="Select relationship" />
@@ -545,7 +664,7 @@ export default function PreRegistrationPage() {
                                                         <FormItem>
                                                             <FormLabel>Phone 1</FormLabel>
                                                             <FormControl>
-                                                                <Input {...field} />
+                                                                <Input {...field} value={field.value ?? ""} />
                                                             </FormControl>
                                                             <FormMessage />
                                                         </FormItem>
@@ -558,7 +677,7 @@ export default function PreRegistrationPage() {
                                                         <FormItem>
                                                             <FormLabel>Phone 2</FormLabel>
                                                             <FormControl>
-                                                                <Input {...field} />
+                                                                <Input {...field} value={field.value ?? ""} />
                                                             </FormControl>
                                                             <FormMessage />
                                                         </FormItem>
@@ -571,7 +690,7 @@ export default function PreRegistrationPage() {
                                                         <FormItem>
                                                             <FormLabel>Phone 3</FormLabel>
                                                             <FormControl>
-                                                                <Input {...field} />
+                                                                <Input {...field} value={field.value ?? ""} />
                                                             </FormControl>
                                                             <FormMessage />
                                                         </FormItem>
@@ -585,7 +704,7 @@ export default function PreRegistrationPage() {
                                                     <FormItem>
                                                         <FormLabel>Address</FormLabel>
                                                         <FormControl>
-                                                            <Input {...field} />
+                                                            <Input {...field} value={field.value ?? ""} />
                                                         </FormControl>
                                                         <FormMessage />
                                                     </FormItem>
@@ -594,14 +713,6 @@ export default function PreRegistrationPage() {
                                         </div>
                                     </Card>
                                 ))}
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => appendEmergencyContact({})}
-                                >
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    Add Emergency Contact
-                                </Button>
                             </CardContent>
                         </Card>
 
@@ -621,14 +732,16 @@ export default function PreRegistrationPage() {
                                     <Card key={field.id} className="p-4">
                                         <div className="flex justify-between items-start mb-4">
                                             <h4 className="font-medium">Certification {index + 1}</h4>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => removeCertification(index)}
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </Button>
+                                            {certificationFields.length > 1 && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => removeCertification(index)}
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                         <div className="grid gap-4">
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -639,7 +752,7 @@ export default function PreRegistrationPage() {
                                                         <FormItem>
                                                             <FormLabel>Certification Name *</FormLabel>
                                                             <FormControl>
-                                                                <Input {...field} />
+                                                                <Input {...field} value={field.value ?? ""} />
                                                             </FormControl>
                                                             <FormMessage />
                                                         </FormItem>
@@ -652,7 +765,7 @@ export default function PreRegistrationPage() {
                                                         <FormItem>
                                                             <FormLabel>Certification Number</FormLabel>
                                                             <FormControl>
-                                                                <Input {...field} />
+                                                                <Input {...field} value={field.value ?? ""} />
                                                             </FormControl>
                                                             <FormMessage />
                                                         </FormItem>
@@ -664,26 +777,33 @@ export default function PreRegistrationPage() {
                                                     control={form.control}
                                                     name={`certifications.${index}.certification_date`}
                                                     render={({ field }) => (
-                                                        <FormItem>
+                                                        <FormItem className="flex flex-col">
                                                             <FormLabel>Certification Date *</FormLabel>
                                                             <FormControl>
-                                                                <DatePicker
-                                                                    selected={field.value ? new Date(field.value) : null}
-                                                                    onChange={(date) => {
-                                                                        if (date) {
-                                                                            const year = date.getFullYear();
-                                                                            const month = String(date.getMonth() + 1).padStart(2, '0');
-                                                                            const day = String(date.getDate()).padStart(2, '0');
-                                                                            field.onChange(`${year}-${month}-${day}`);
-                                                                        } else {
-                                                                            field.onChange("");
-                                                                        }
-                                                                    }}
-                                                                    dateFormat="PPP"
-                                                                    placeholderText="Pick a date"
-                                                                    className="w-full"
-                                                                    maxDate={new Date()}
-                                                                />
+                                                                <div className="relative">
+                                                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                                                                    <DatePicker
+                                                                        selected={field.value ? (safeParseDate(field.value) ?? null) : null}
+                                                                        onChange={(date) => {
+                                                                            if (date) {
+                                                                                const year = date.getFullYear();
+                                                                                const month = String(date.getMonth() + 1).padStart(2, '0');
+                                                                                const day = String(date.getDate()).padStart(2, '0');
+                                                                                field.onChange(`${year}-${month}-${day}`);
+                                                                            } else {
+                                                                                field.onChange("");
+                                                                            }
+                                                                        }}
+                                                                        dateFormat="PPP"
+                                                                        placeholderText="Pick a date"
+                                                                        wrapperClassName="w-full"
+                                                                        maxDate={new Date()}
+                                                                        className={cn(
+                                                                            "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] pl-9",
+                                                                            !field.value && "text-muted-foreground"
+                                                                        )}
+                                                                    />
+                                                                </div>
                                                             </FormControl>
                                                             <FormMessage />
                                                         </FormItem>
@@ -693,26 +813,33 @@ export default function PreRegistrationPage() {
                                                     control={form.control}
                                                     name={`certifications.${index}.last_dive_date`}
                                                     render={({ field }) => (
-                                                        <FormItem>
+                                                        <FormItem className="flex flex-col">
                                                             <FormLabel>Last Dive Date</FormLabel>
                                                             <FormControl>
-                                                                <DatePicker
-                                                                    selected={field.value ? new Date(field.value) : null}
-                                                                    onChange={(date) => {
-                                                                        if (date) {
-                                                                            const year = date.getFullYear();
-                                                                            const month = String(date.getMonth() + 1).padStart(2, '0');
-                                                                            const day = String(date.getDate()).padStart(2, '0');
-                                                                            field.onChange(`${year}-${month}-${day}`);
-                                                                        } else {
-                                                                            field.onChange("");
-                                                                        }
-                                                                    }}
-                                                                    dateFormat="PPP"
-                                                                    placeholderText="Pick a date"
-                                                                    className="w-full"
-                                                                    maxDate={new Date()}
-                                                                />
+                                                                <div className="relative">
+                                                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                                                                    <DatePicker
+                                                                        selected={field.value ? (safeParseDate(field.value) ?? null) : null}
+                                                                        onChange={(date) => {
+                                                                            if (date) {
+                                                                                const year = date.getFullYear();
+                                                                                const month = String(date.getMonth() + 1).padStart(2, '0');
+                                                                                const day = String(date.getDate()).padStart(2, '0');
+                                                                                field.onChange(`${year}-${month}-${day}`);
+                                                                            } else {
+                                                                                field.onChange("");
+                                                                            }
+                                                                        }}
+                                                                        dateFormat="PPP"
+                                                                        placeholderText="Pick a date"
+                                                                        wrapperClassName="w-full"
+                                                                        maxDate={new Date()}
+                                                                        className={cn(
+                                                                            "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] pl-9",
+                                                                            !field.value && "text-muted-foreground"
+                                                                        )}
+                                                                    />
+                                                                </div>
                                                             </FormControl>
                                                             <FormMessage />
                                                         </FormItem>
@@ -749,7 +876,7 @@ export default function PreRegistrationPage() {
                                                     render={({ field }) => (
                                                         <FormItem>
                                                             <FormLabel>Agency</FormLabel>
-                                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                            <Select onValueChange={field.onChange} value={field.value ?? ""}>
                                                                 <FormControl>
                                                                     <SelectTrigger>
                                                                         <SelectValue placeholder="Select agency" />
@@ -774,7 +901,7 @@ export default function PreRegistrationPage() {
                                                         <FormItem>
                                                             <FormLabel>Instructor</FormLabel>
                                                             <FormControl>
-                                                                <Input {...field} />
+                                                                <Input {...field} value={field.value ?? ""} />
                                                             </FormControl>
                                                             <FormMessage />
                                                         </FormItem>
@@ -784,17 +911,6 @@ export default function PreRegistrationPage() {
                                         </div>
                                     </Card>
                                 ))}
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => appendCertification({
-                                        certification_name: "",
-                                        certification_date: "",
-                                    })}
-                                >
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    Add Certification
-                                </Button>
                             </CardContent>
                         </Card>
 
@@ -818,7 +934,7 @@ export default function PreRegistrationPage() {
                                             <FormItem>
                                                 <FormLabel>Insurance Provider</FormLabel>
                                                 <FormControl>
-                                                    <Input {...field} />
+                                                    <Input {...field} value={field.value ?? ""} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -831,7 +947,7 @@ export default function PreRegistrationPage() {
                                             <FormItem>
                                                 <FormLabel>Insurance Number</FormLabel>
                                                 <FormControl>
-                                                    <Input {...field} />
+                                                    <Input {...field} value={field.value ?? ""} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -845,7 +961,7 @@ export default function PreRegistrationPage() {
                                         <FormItem>
                                             <FormLabel>Insurance Hotline Number</FormLabel>
                                             <FormControl>
-                                                <Input {...field} />
+                                                <Input {...field} value={field.value ?? ""} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -855,25 +971,32 @@ export default function PreRegistrationPage() {
                                     control={form.control}
                                     name="insurance.expiry_date"
                                     render={({ field }) => (
-                                        <FormItem>
+                                        <FormItem className="flex flex-col">
                                             <FormLabel>Expiry Date</FormLabel>
                                             <FormControl>
-                                                <DatePicker
-                                                    selected={field.value ? new Date(field.value) : null}
-                                                    onChange={(date) => {
-                                                        if (date) {
-                                                            const year = date.getFullYear();
-                                                            const month = String(date.getMonth() + 1).padStart(2, '0');
-                                                            const day = String(date.getDate()).padStart(2, '0');
-                                                            field.onChange(`${year}-${month}-${day}`);
-                                                        } else {
-                                                            field.onChange("");
-                                                        }
-                                                    }}
-                                                    dateFormat="PPP"
-                                                    placeholderText="Pick a date"
-                                                    className="w-full"
-                                                />
+                                                <div className="relative">
+                                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                                                    <DatePicker
+                                                        selected={field.value ? (safeParseDate(field.value) ?? null) : null}
+                                                        onChange={(date) => {
+                                                            if (date) {
+                                                                const year = date.getFullYear();
+                                                                const month = String(date.getMonth() + 1).padStart(2, '0');
+                                                                const day = String(date.getDate()).padStart(2, '0');
+                                                                field.onChange(`${year}-${month}-${day}`);
+                                                            } else {
+                                                                field.onChange("");
+                                                            }
+                                                        }}
+                                                        dateFormat="PPP"
+                                                        placeholderText="Pick a date"
+                                                        wrapperClassName="w-full"
+                                                        className={cn(
+                                                            "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] pl-9",
+                                                            !field.value && "text-muted-foreground"
+                                                        )}
+                                                    />
+                                                </div>
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -901,7 +1024,7 @@ export default function PreRegistrationPage() {
                                         <FormItem>
                                             <FormLabel>Accommodation Name</FormLabel>
                                             <FormControl>
-                                                <Input {...field} />
+                                                <Input {...field} value={field.value ?? ""} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -914,7 +1037,7 @@ export default function PreRegistrationPage() {
                                         <FormItem>
                                             <FormLabel>Address</FormLabel>
                                             <FormControl>
-                                                <Input {...field} />
+                                                <Input {...field} value={field.value ?? ""} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -928,7 +1051,7 @@ export default function PreRegistrationPage() {
                                             <FormItem>
                                                 <FormLabel>Contact Number</FormLabel>
                                                 <FormControl>
-                                                    <Input {...field} />
+                                                    <Input {...field} value={field.value ?? ""} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -941,7 +1064,7 @@ export default function PreRegistrationPage() {
                                             <FormItem>
                                                 <FormLabel>Island</FormLabel>
                                                 <FormControl>
-                                                    <Input {...field} />
+                                                    <Input {...field} value={field.value ?? ""} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -954,7 +1077,7 @@ export default function PreRegistrationPage() {
                                             <FormItem>
                                                 <FormLabel>Room Number</FormLabel>
                                                 <FormControl>
-                                                    <Input {...field} />
+                                                    <Input {...field} value={field.value ?? ""} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>

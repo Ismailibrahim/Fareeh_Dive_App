@@ -33,7 +33,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { CustomerInsurance, customerInsuranceService } from "@/lib/api/services/customer-insurance.service";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 import { Badge } from "@/components/ui/badge";
 
 export default function CustomerInsurancesPage() {
@@ -155,7 +155,7 @@ export default function CustomerInsurancesPage() {
                                             {insurance.insurance_hotline_no || "-"}
                                         </TableCell>
                                         <TableCell>
-                                            {insurance.expiry_date ? format(new Date(insurance.expiry_date), "MMM d, yyyy") : "-"}
+                                            {safeFormatDate(insurance.expiry_date, "MMM d, yyyy", "-")}
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant={insurance.status ? "default" : "secondary"}>

@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, MoreHorizontal, Package, Plus, Calendar, AlertTriangle, Layers } from "lucide-react";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -233,24 +233,30 @@ export default function EquipmentItemsPage() {
                                             {item.brand || "-"}
                                         </TableCell>
                                         <TableCell>
-                                            {item.purchase_date ? format(new Date(item.purchase_date), "MMM d, yyyy") : "-"}
+                                            {safeFormatDate(item.purchase_date, "MMM d, yyyy", "-")}
                                         </TableCell>
                                         <TableCell>
-                                            {item.last_service_date ? format(new Date(item.last_service_date), "MMM d, yyyy") : "-"}
+                                            {safeFormatDate(item.last_service_date, "MMM d, yyyy", "-")}
                                         </TableCell>
                                         <TableCell>
-                                            {item.next_service_date ? (
-                                                <div className="flex items-center gap-2">
-                                                    {new Date(item.next_service_date) <= new Date() && item.requires_service ? (
-                                                        <AlertTriangle className="h-4 w-4 text-destructive" />
-                                                    ) : (
-                                                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                    )}
-                                                    <span className={new Date(item.next_service_date) <= new Date() && item.requires_service ? "text-destructive font-medium" : ""}>
-                                                        {format(new Date(item.next_service_date), "MMM d, yyyy")}
-                                                    </span>
-                                                </div>
-                                            ) : item.requires_service ? (
+                                            {item.next_service_date ? (() => {
+                                                const nextDate = new Date(item.next_service_date);
+                                                const isValid = !isNaN(nextDate.getTime());
+                                                if (!isValid) return <span className="text-muted-foreground">Invalid date</span>;
+                                                const isOverdue = nextDate <= new Date() && item.requires_service;
+                                                return (
+                                                    <div className="flex items-center gap-2">
+                                                        {isOverdue ? (
+                                                            <AlertTriangle className="h-4 w-4 text-destructive" />
+                                                        ) : (
+                                                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                                                        )}
+                                                        <span className={isOverdue ? "text-destructive font-medium" : ""}>
+                                                            {safeFormatDate(item.next_service_date, "MMM d, yyyy", "-")}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })() : item.requires_service ? (
                                                 <span className="text-muted-foreground">Not set</span>
                                             ) : (
                                                 "-"
@@ -374,19 +380,25 @@ export default function EquipmentItemsPage() {
                                     </div>
                                     <div>
                                         <span className="text-muted-foreground block text-xs">Purchase Date</span>
-                                        <span>{item.purchase_date ? format(new Date(item.purchase_date), "MMM d, yyyy") : "-"}</span>
+                                        <span>{safeFormatDate(item.purchase_date, "MMM d, yyyy", "-")}</span>
                                     </div>
                                     <div>
                                         <span className="text-muted-foreground block text-xs">Last Service</span>
-                                        <span>{item.last_service_date ? format(new Date(item.last_service_date), "MMM d, yyyy") : "-"}</span>
+                                        <span>{safeFormatDate(item.last_service_date, "MMM d, yyyy", "-")}</span>
                                     </div>
                                     <div>
                                         <span className="text-muted-foreground block text-xs">Next Service Due</span>
-                                        {item.next_service_date ? (
-                                            <span className={new Date(item.next_service_date) <= new Date() && item.requires_service ? "text-destructive font-medium" : ""}>
-                                                {format(new Date(item.next_service_date), "MMM d, yyyy")}
-                                            </span>
-                                        ) : item.requires_service ? (
+                                        {item.next_service_date ? (() => {
+                                            const nextDate = new Date(item.next_service_date);
+                                            const isValid = !isNaN(nextDate.getTime());
+                                            if (!isValid) return <span className="text-muted-foreground">Invalid date</span>;
+                                            const isOverdue = nextDate <= new Date() && item.requires_service;
+                                            return (
+                                                <span className={isOverdue ? "text-destructive font-medium" : ""}>
+                                                    {safeFormatDate(item.next_service_date, "MMM d, yyyy", "-")}
+                                                </span>
+                                            );
+                                        })() : item.requires_service ? (
                                             <span className="text-muted-foreground">Not set</span>
                                         ) : (
                                             <span>-</span>

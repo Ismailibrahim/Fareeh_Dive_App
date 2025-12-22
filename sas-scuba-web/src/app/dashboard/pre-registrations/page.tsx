@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import {
     Table,
     TableBody,
@@ -32,9 +33,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Eye, Check, X, Copy, ExternalLink, AlertCircle, User, Mail, Phone, Calendar, Award, Building, MapPin } from "lucide-react";
+import { Plus, Eye, Check, X, Copy, ExternalLink, AlertCircle, User, Mail, Phone, Calendar, Award, Building, MapPin, Download, QrCode } from "lucide-react";
 import { preRegistrationService, PreRegistrationSubmission, PreRegistrationSubmissionDetail } from "@/lib/api/services/pre-registration.service";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
+import QRCode from "react-qr-code";
 
 export default function PreRegistrationsPage() {
     const router = useRouter();
@@ -52,6 +54,7 @@ export default function PreRegistrationsPage() {
     const [expiresInDays, setExpiresInDays] = useState("30");
     const [newLink, setNewLink] = useState<{ url: string; expires_at: string } | null>(null);
     const [showLinkDialog, setShowLinkDialog] = useState(false);
+    const qrCodeRef = useRef<HTMLDivElement>(null);
     const [pagination, setPagination] = useState({
         current_page: 1,
         last_page: 1,
@@ -106,6 +109,65 @@ export default function PreRegistrationsPage() {
     const copyLink = (url: string) => {
         navigator.clipboard.writeText(url);
         alert("Link copied to clipboard!");
+    };
+
+    const downloadQRCode = () => {
+        if (!qrCodeRef.current || !newLink) return;
+
+        const svg = qrCodeRef.current.querySelector('svg');
+        if (!svg) return;
+
+        try {
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(svgBlob);
+            
+            const img = new Image();
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            
+            if (!ctx) {
+                URL.revokeObjectURL(url);
+                return;
+            }
+
+            canvas.width = 512;
+            canvas.height = 512;
+
+            img.onload = () => {
+                try {
+                    ctx.drawImage(img, 0, 0, 512, 512);
+                    canvas.toBlob((blob) => {
+                        if (!blob) {
+                            URL.revokeObjectURL(url);
+                            return;
+                        }
+                        const downloadUrl = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.href = downloadUrl;
+                        link.download = `registration-qr-code-${Date.now()}.png`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(downloadUrl);
+                        URL.revokeObjectURL(url);
+                    }, 'image/png');
+                } catch (error) {
+                    console.error('Error drawing image to canvas:', error);
+                    URL.revokeObjectURL(url);
+                }
+            };
+
+            img.onerror = () => {
+                console.error('Error loading image');
+                URL.revokeObjectURL(url);
+            };
+
+            img.src = url;
+        } catch (error) {
+            console.error('Error downloading QR code:', error);
+            alert('Failed to download QR code. Please try again.');
+        }
     };
 
     const viewSubmission = async (id: number) => {
@@ -214,15 +276,15 @@ export default function PreRegistrationsPage() {
                                 }}
                                 className="flex-1"
                             />
-                            <Select value={statusFilter} onValueChange={(value) => {
-                                setStatusFilter(value);
+                            <Select value={statusFilter || "all"} onValueChange={(value) => {
+                                setStatusFilter(value === "all" ? "" : value);
                                 setPagination({ ...pagination, current_page: 1 });
                             }}>
                                 <SelectTrigger className="w-40">
                                     <SelectValue placeholder="All Status" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">All Status</SelectItem>
+                                    <SelectItem value="all">All Status</SelectItem>
                                     <SelectItem value="pending">Pending</SelectItem>
                                     <SelectItem value="approved">Approved</SelectItem>
                                     <SelectItem value="rejected">Rejected</SelectItem>
@@ -266,7 +328,7 @@ export default function PreRegistrationsPage() {
                                                     </TableCell>
                                                     <TableCell>{submission.customer_email || "N/A"}</TableCell>
                                                     <TableCell>
-                                                        {format(new Date(submission.submitted_at), "PPp")}
+                                                        {safeFormatDate(submission.submitted_at, "PPp")}
                                                     </TableCell>
                                                     <TableCell>{getStatusBadge(submission.status)}</TableCell>
                                                     <TableCell>
@@ -302,7 +364,7 @@ export default function PreRegistrationsPage() {
                                                 <div className="space-y-2 text-sm">
                                                     <div>
                                                         <span className="font-medium">Submitted: </span>
-                                                        {format(new Date(submission.submitted_at), "PPp")}
+                                                        {safeFormatDate(submission.submitted_at, "PPp")}
                                                     </div>
                                                     <Button
                                                         variant="outline"
@@ -374,8 +436,47 @@ export default function PreRegistrationsPage() {
                                 </div>
                             </div>
                             <div className="text-sm text-muted-foreground">
-                                Expires on: {format(new Date(newLink.expires_at), "PPp")}
+                                Expires on: {safeFormatDate(newLink.expires_at, "PPp")}
                             </div>
+
+                            {/* QR Code Section */}
+                            <div className="border rounded-lg p-4 bg-white">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <QrCode className="h-5 w-5 text-primary" />
+                                    <Label className="text-base font-semibold">QR Code</Label>
+                                </div>
+                                <div className="flex flex-col items-center gap-4">
+                                    <div 
+                                        ref={qrCodeRef}
+                                        className="p-4 bg-white rounded-lg border-2 border-gray-200"
+                                        style={{ 
+                                            display: 'flex', 
+                                            justifyContent: 'center', 
+                                            alignItems: 'center',
+                                            minHeight: '256px',
+                                            minWidth: '256px'
+                                        }}
+                                    >
+                                        <QRCode
+                                            value={newLink.url}
+                                            size={256}
+                                            level="H"
+                                            style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                                        />
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        onClick={downloadQRCode}
+                                        className="w-full"
+                                    >
+                                        <Download className="h-4 w-4 mr-2" />
+                                        Download QR Code
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <Separator />
+
                             <div className="flex gap-2">
                                 <Button
                                     variant="outline"
@@ -460,7 +561,7 @@ export default function PreRegistrationsPage() {
                                     {selectedSubmission.customer_data.date_of_birth && (
                                         <div>
                                             <Label className="text-muted-foreground">Date of Birth</Label>
-                                            <p>{format(new Date(selectedSubmission.customer_data.date_of_birth), "PPP")}</p>
+                                            <p>{safeFormatDate(selectedSubmission.customer_data.date_of_birth, "PPP")}</p>
                                         </div>
                                     )}
                                 </CardContent>
@@ -536,7 +637,7 @@ export default function PreRegistrationsPage() {
                                                     {cert.certification_date && (
                                                         <div>
                                                             <Label className="text-muted-foreground">Date</Label>
-                                                            <p>{format(new Date(cert.certification_date), "PPP")}</p>
+                                                            <p>{safeFormatDate(cert.certification_date, "PPP")}</p>
                                                         </div>
                                                     )}
                                                     {cert.agency && (

@@ -11,13 +11,8 @@ Route::prefix('v1')->group(function () {
         Route::post('/login', [AuthController::class, 'login']);
     });
 
-    // Public pre-registration routes (no authentication required)
-    Route::prefix('pre-registration')->group(function () {
-        Route::get('/{token}', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'getByToken']);
-        Route::post('/{token}/submit', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'submit']);
-    });
-
     // Authenticated routes with standard rate limiting (60 requests per minute)
+    // IMPORTANT: Authenticated routes must come BEFORE public catch-all routes
     Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/user', [AuthController::class, 'user']);
@@ -28,6 +23,13 @@ Route::prefix('v1')->group(function () {
     Route::put('/dive-center/currency-rates', [App\Http\Controllers\Api\V1\DiveCenterController::class, 'updateCurrencyRates']);
     Route::get('/dive-center/available-currencies', [App\Http\Controllers\Api\V1\DiveCenterController::class, 'getAvailableCurrencies']);
 
+        // Pre-registration management routes (staff only) - MUST come before public routes to avoid route conflicts
+        Route::post('/pre-registration/links', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'generateLink']);
+        Route::get('/pre-registration/submissions', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'index']);
+        Route::get('/pre-registration/submissions/{id}', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'show']);
+        Route::post('/pre-registration/submissions/{id}/approve', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'approve']);
+        Route::post('/pre-registration/submissions/{id}/reject', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'reject']);
+
         Route::apiResource('customers', \App\Http\Controllers\Api\V1\CustomerController::class);
         Route::apiResource('customers.emergency-contacts', \App\Http\Controllers\Api\V1\EmergencyContactController::class)->except(['index']);
         Route::get('customers/{customer}/emergency-contacts', [\App\Http\Controllers\Api\V1\EmergencyContactController::class, 'index']);
@@ -35,15 +37,6 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('customer-certifications', \App\Http\Controllers\Api\V1\CustomerCertificationController::class);
         Route::apiResource('customer-insurances', \App\Http\Controllers\Api\V1\CustomerInsuranceController::class);
         Route::apiResource('customer-accommodations', \App\Http\Controllers\Api\V1\CustomerAccommodationController::class);
-        
-        // Pre-registration management routes (staff only)
-        Route::prefix('pre-registration')->group(function () {
-            Route::post('/links', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'generateLink']);
-            Route::get('/submissions', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'index']);
-            Route::get('/submissions/{id}', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'show']);
-            Route::post('/submissions/{id}/approve', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'approve']);
-            Route::post('/submissions/{id}/reject', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'reject']);
-        });
         
         // File management routes
         Route::prefix('files')->group(function () {
@@ -76,6 +69,8 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('equipment-items', \App\Http\Controllers\Api\V1\EquipmentItemController::class);
         Route::apiResource('boats', \App\Http\Controllers\Api\V1\BoatController::class);
         Route::apiResource('dive-sites', \App\Http\Controllers\Api\V1\DiveSiteController::class);
+        Route::apiResource('dive-logs', \App\Http\Controllers\Api\V1\DiveLogController::class);
+        Route::get('customers/{customer}/dive-logs', [\App\Http\Controllers\Api\V1\DiveLogController::class, 'indexByCustomer']);
         Route::apiResource('equipment-items.service-history', \App\Http\Controllers\Api\V1\EquipmentServiceHistoryController::class)->except(['index']);
         Route::get('equipment-items/{equipmentItem}/service-history', [\App\Http\Controllers\Api\V1\EquipmentServiceHistoryController::class, 'index']);
         Route::post('equipment-items/bulk-service', [\App\Http\Controllers\Api\V1\EquipmentServiceHistoryController::class, 'bulkStore']);
@@ -127,8 +122,17 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('invoices', \App\Http\Controllers\Api\V1\InvoiceController::class);
         Route::post('invoices/generate-from-booking', [\App\Http\Controllers\Api\V1\InvoiceController::class, 'generateFromBooking']);
         Route::post('invoices/{invoice}/add-damage-charge', [\App\Http\Controllers\Api\V1\InvoiceController::class, 'addDamageCharge']);
+        Route::post('invoices/{invoice}/add-item', [\App\Http\Controllers\Api\V1\InvoiceController::class, 'addItem']);
+        Route::delete('invoices/{invoice}/items/{invoiceItem}', [\App\Http\Controllers\Api\V1\InvoiceController::class, 'deleteItem']);
         Route::apiResource('payments', \App\Http\Controllers\Api\V1\PaymentController::class);
         Route::apiResource('equipment-baskets', \App\Http\Controllers\Api\V1\EquipmentBasketController::class);
         Route::put('equipment-baskets/{equipmentBasket}/return', [\App\Http\Controllers\Api\V1\EquipmentBasketController::class, 'returnBasket']);
+    });
+
+    // Public pre-registration routes (no authentication required)
+    // Note: These catch-all routes come AFTER authenticated routes to avoid conflicts
+    Route::prefix('pre-registration')->group(function () {
+        Route::get('/{token}', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'getByToken'])->where('token', '[a-zA-Z0-9\-]+');
+        Route::post('/{token}/submit', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'submit'])->where('token', '[a-zA-Z0-9\-]+');
     });
 });

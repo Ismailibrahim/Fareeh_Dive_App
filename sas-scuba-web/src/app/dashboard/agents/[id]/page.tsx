@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { agentService, Agent } from "@/lib/api/services/agent.service";
 import { Badge } from "@/components/ui/badge";
 import { agentReportService } from "@/lib/api/services/agent-report.service";
+import { safeFormatDate } from "@/lib/utils/date-format";
 
 export default function AgentDetailPage() {
     const params = useParams();
@@ -222,7 +223,7 @@ export default function AgentDetailPage() {
                                 {performance.last_booking_date && (
                                     <div>
                                         <p className="text-sm text-muted-foreground">Last Booking</p>
-                                        <p className="font-medium">{new Date(performance.last_booking_date).toLocaleDateString()}</p>
+                                        <p className="font-medium">{safeFormatDate(performance.last_booking_date, "MMM d, yyyy", "N/A")}</p>
                                     </div>
                                 )}
                                 <div className="grid grid-cols-2 gap-4 pt-2 border-t">
@@ -289,13 +290,13 @@ export default function AgentDetailPage() {
                                 {agent.contract.contract_start_date && (
                                     <div>
                                         <p className="text-sm text-muted-foreground">Start Date</p>
-                                        <p className="font-medium">{new Date(agent.contract.contract_start_date).toLocaleDateString()}</p>
+                                        <p className="font-medium">{safeFormatDate(agent.contract.contract_start_date, "MMM d, yyyy", "N/A")}</p>
                                     </div>
                                 )}
                                 {agent.contract.contract_end_date && (
                                     <div>
                                         <p className="text-sm text-muted-foreground">End Date</p>
-                                        <p className="font-medium">{new Date(agent.contract.contract_end_date).toLocaleDateString()}</p>
+                                        <p className="font-medium">{safeFormatDate(agent.contract.contract_end_date, "MMM d, yyyy", "N/A")}</p>
                                     </div>
                                 )}
                                 {agent.contract.signed_agreement_url && (

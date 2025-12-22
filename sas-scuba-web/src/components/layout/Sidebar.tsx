@@ -23,7 +23,8 @@ import {
     MapPin,
     Wrench,
     ShoppingBasket,
-    Building2
+    Building2,
+    ClipboardCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authService } from "@/lib/api/services/auth.service";
@@ -44,6 +45,11 @@ const navItems = [
         title: "Booking Dives",
         href: "/dashboard/booking-dives",
         icon: Waves,
+    },
+    {
+        title: "Dive Logs",
+        href: "/dashboard/dive-logs",
+        icon: FileText,
     },
     {
         title: "Dive Packages",
@@ -69,6 +75,11 @@ const navItems = [
         title: "Customers",
         href: "/dashboard/customers",
         icon: Users,
+    },
+    {
+        title: "Pre-Registrations",
+        href: "/dashboard/pre-registrations",
+        icon: ClipboardCheck,
     },
     {
         title: "Agents",

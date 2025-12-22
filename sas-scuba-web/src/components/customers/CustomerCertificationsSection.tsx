@@ -22,7 +22,7 @@ import {
 import { Award, ChevronDown, Plus, Edit, Trash2, Calendar, Building, UserCircle, FileText } from "lucide-react";
 import { CustomerCertification } from "@/lib/api/services/customer-certification.service";
 import { useCustomerCertifications, useDeleteCustomerCertification } from "@/lib/hooks/use-customer-certifications";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
 
 interface CustomerCertificationsSectionProps {
@@ -110,13 +110,13 @@ export function CustomerCertificationsSection({ customerId }: CustomerCertificat
                                                         {certification.certification_date && (
                                                             <div className="flex items-center gap-1">
                                                                 <Calendar className="h-3 w-3" />
-                                                                <span>Certified: {format(new Date(certification.certification_date), "MMM dd, yyyy")}</span>
+                                                                <span>Certified: {safeFormatDate(certification.certification_date, "MMM dd, yyyy", "N/A")}</span>
                                                             </div>
                                                         )}
                                                         {certification.last_dive_date && (
                                                             <div className="flex items-center gap-1">
                                                                 <Calendar className="h-3 w-3" />
-                                                                <span>Last Dive: {format(new Date(certification.last_dive_date), "MMM dd, yyyy")}</span>
+                                                                <span>Last Dive: {safeFormatDate(certification.last_dive_date, "MMM dd, yyyy", "N/A")}</span>
                                                             </div>
                                                         )}
                                                         {certification.no_of_dives !== undefined && certification.no_of_dives !== null && (

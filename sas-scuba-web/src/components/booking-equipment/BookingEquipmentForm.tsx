@@ -26,9 +26,10 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, Package, DollarSign, ShoppingBasket, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
-import DatePicker from "react-datepicker";
+import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
 import "react-datepicker/dist/react-datepicker.css";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { safeFormatDate, safeParseDate } from "@/lib/utils/date-format";
 
 const bookingEquipmentSchema = z.object({
     booking_id: z.string().optional(),
@@ -391,7 +392,7 @@ export function BookingEquipmentForm({
                                                 <SelectContent>
                                                     {bookings.map((booking) => (
                                                         <SelectItem key={booking.id} value={String(booking.id)}>
-                                                            {booking.customer?.full_name || `Booking #${booking.id}`} - {booking.booking_date ? new Date(booking.booking_date).toLocaleDateString() : booking.start_date ? new Date(booking.start_date).toLocaleDateString() : "No date"}
+                                                            {booking.customer?.full_name || `Booking #${booking.id}`} - {safeFormatDate(booking.booking_date || booking.start_date, "MMM d, yyyy", "No date")}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>
@@ -739,7 +740,7 @@ export function BookingEquipmentForm({
                                     <FormLabel>Checkout Date</FormLabel>
                                     <FormControl>
                                         <DatePicker
-                                            selected={field.value ? new Date(field.value) : null}
+                                            selected={field.value ? (safeParseDate(field.value) ?? null) : null}
                                             onChange={(date) => {
                                                 if (date) {
                                                     const year = date.getFullYear();
@@ -768,7 +769,7 @@ export function BookingEquipmentForm({
                                     <FormLabel>Return Date</FormLabel>
                                     <FormControl>
                                         <DatePicker
-                                            selected={field.value ? new Date(field.value) : null}
+                                            selected={field.value ? (safeParseDate(field.value) ?? null) : null}
                                             onChange={(date) => {
                                                 if (date) {
                                                     const year = date.getFullYear();
@@ -835,7 +836,7 @@ export function BookingEquipmentForm({
                                                             <ul className="list-disc list-inside text-sm space-y-1">
                                                                 {availabilityCheck.conflicting_assignments.map((conflict, idx) => (
                                                                     <li key={idx}>
-                                                                        {conflict.customer_name} ({new Date(conflict.checkout_date).toLocaleDateString()} - {new Date(conflict.return_date).toLocaleDateString()})
+                                                                        {conflict.customer_name} ({safeFormatDate(conflict.checkout_date, "MMM d, yyyy", "N/A")} - {safeFormatDate(conflict.return_date, "MMM d, yyyy", "N/A")})
                                                                     </li>
                                                                 ))}
                                                             </ul>

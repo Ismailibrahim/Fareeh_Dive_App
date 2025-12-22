@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/lib/providers/query-provider";
 import { ErrorBoundary } from "@/components/error-boundary";
+// Note: date-protection.ts is removed as it was causing issues
+// All date handling is now done through safe date utilities
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

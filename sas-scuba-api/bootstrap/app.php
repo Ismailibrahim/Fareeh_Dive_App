@@ -13,6 +13,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        
+        // Exclude public pre-registration submit routes from CSRF verification
+        $middleware->validateCsrfTokens(except: [
+            'api/v1/pre-registration/*/submit',
+        ]);
+        
         // Add security headers to all API responses
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         // Add error handling middleware

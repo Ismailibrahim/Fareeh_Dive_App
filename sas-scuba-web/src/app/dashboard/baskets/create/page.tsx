@@ -27,7 +27,7 @@ import { Header } from "@/components/layout/Header";
 import { ShoppingBasket, User, Calendar, ArrowLeft, Plus, X, Package, Search, Check, ChevronsUpDown, AlertCircle } from "lucide-react";
 import DatePicker from "react-datepicker";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -563,7 +563,7 @@ export default function CreateBasketPage() {
                                                 <SelectItem value="none">None</SelectItem>
                                                 {bookings.map((booking) => (
                                                     <SelectItem key={booking.id} value={String(booking.id)}>
-                                                        {booking.customer?.full_name || `Booking #${booking.id}`} - {booking.booking_date ? format(new Date(booking.booking_date), "MMM d, yyyy") : "No date"}
+                                                        {booking.customer?.full_name || `Booking #${booking.id}`} - {safeFormatDate(booking.booking_date, "MMM d, yyyy", "No date")}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -922,7 +922,7 @@ export default function CreateBasketPage() {
                                     Requested Dates:
                                 </div>
                                 <div className="text-sm">
-                                    {format(new Date(availabilityError.checkoutDate), "PPP")} to {format(new Date(availabilityError.returnDate), "PPP")}
+                                    {safeFormatDate(availabilityError.checkoutDate, "PPP", "Invalid date")} to {safeFormatDate(availabilityError.returnDate, "PPP", "Invalid date")}
                                 </div>
                             </div>
 
@@ -937,7 +937,7 @@ export default function CreateBasketPage() {
                                                     <div className="text-muted-foreground">Basket: {conflict.basket_no}</div>
                                                 )}
                                                 <div className="text-muted-foreground">
-                                                    Dates: {format(new Date(conflict.checkout_date), "PPP")} to {format(new Date(conflict.return_date), "PPP")}
+                                                    Dates: {safeFormatDate(conflict.checkout_date, "PPP", "Invalid date")} to {safeFormatDate(conflict.return_date, "PPP", "Invalid date")}
                                                 </div>
                                                 <div className="text-muted-foreground">Status: {conflict.assignment_status}</div>
                                             </div>

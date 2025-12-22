@@ -24,8 +24,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CalendarIcon, User, FileText, CheckCircle, Users, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
-import DatePicker from "react-datepicker";
+import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
 import { cn } from "@/lib/utils";
+import { safeParseDate } from "@/lib/utils/date-format";
 
 const bookingSchema = z.object({
     customer_id: z.string().min(1, "Customer is required"),
@@ -80,9 +81,9 @@ export function BookingForm({ initialData, bookingId }: BookingFormProps) {
         defaultValues: {
             customer_id: initialData?.customer_id ? String(initialData.customer_id) : "",
             start_date: initialData?.start_date 
-                ? new Date(initialData.start_date) 
+                ? (safeParseDate(initialData.start_date) ?? undefined)
                 : initialData?.booking_date 
-                    ? new Date(initialData.booking_date) 
+                    ? (safeParseDate(initialData.booking_date) ?? undefined)
                     : undefined,
             number_of_divers: initialData?.number_of_divers ? String(initialData.number_of_divers) : "",
             dive_site_id: initialData?.dive_site_id ? String(initialData.dive_site_id) : "",

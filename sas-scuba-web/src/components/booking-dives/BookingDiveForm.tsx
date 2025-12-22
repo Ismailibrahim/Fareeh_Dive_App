@@ -27,9 +27,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, MapPin, Ship, Clock, CalendarIcon, DollarSign, User, FileText } from "lucide-react";
-import DatePicker from "react-datepicker";
+import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 
 const bookingDiveSchema = z.object({
     booking_id: z.string().optional(),
@@ -289,7 +289,7 @@ export function BookingDiveForm({ initialData, bookingDiveId }: BookingDiveFormP
                                             <SelectContent>
                                                 {bookings.map((booking) => (
                                                     <SelectItem key={booking.id} value={String(booking.id)}>
-                                                        {booking.customer?.full_name || `Booking #${booking.id}`} - {booking.booking_date ? format(new Date(booking.booking_date), "MMM d, yyyy") : "No date"}
+                                                        {booking.customer?.full_name || `Booking #${booking.id}`} - {safeFormatDate(booking.booking_date, "MMM d, yyyy", "No date")}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -617,7 +617,7 @@ export function BookingDiveForm({ initialData, bookingDiveId }: BookingDiveFormP
                                     </div>
                                     <div>
                                         <label className="text-sm font-medium text-muted-foreground">Date</label>
-                                        <p className="text-sm">{initialData.dive_date ? format(new Date(initialData.dive_date), "MMM d, yyyy") : 'N/A'}</p>
+                                        <p className="text-sm">{safeFormatDate(initialData.dive_date, "MMM d, yyyy", "N/A")}</p>
                                     </div>
                                     {initialData.instructors && initialData.instructors.length > 0 && (
                                         <div className="md:col-span-2">

@@ -27,6 +27,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
     componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
         console.error("ErrorBoundary caught an error:", error, errorInfo);
+        
+        // Log more details about date-related errors
+        if (error.message.includes("Invalid time value") || error.name === "RangeError") {
+            console.error("Date-related error detected. Stack:", error.stack);
+            console.error("Component stack:", errorInfo.componentStack);
+        }
     }
 
     resetError = () => {

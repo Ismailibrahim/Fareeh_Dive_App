@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Wrench, Calendar, Edit, Trash2 } from "lucide-react";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 import { ServiceHistoryForm } from "./ServiceHistoryForm";
 import {
     AlertDialog,
@@ -183,7 +183,7 @@ export function ServiceHistorySection({ equipmentItemId, equipmentItem, onEquipm
                                     {serviceHistory.map((record) => (
                                         <TableRow key={record.id}>
                                             <TableCell>
-                                                {record.service_date ? format(new Date(record.service_date), "MMM d, yyyy") : "-"}
+                                                {safeFormatDate(record.service_date, "MMM d, yyyy", "-")}
                                             </TableCell>
                                             <TableCell>
                                                 {record.service_type || "-"}
@@ -198,7 +198,7 @@ export function ServiceHistorySection({ equipmentItemId, equipmentItem, onEquipm
                                                 {record.next_service_due_date ? (
                                                     <div className="flex items-center gap-2">
                                                         <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                        {format(new Date(record.next_service_due_date), "MMM d, yyyy")}
+                                                        {safeFormatDate(record.next_service_due_date, "MMM d, yyyy", "-")}
                                                     </div>
                                                 ) : "-"}
                                             </TableCell>
@@ -236,7 +236,7 @@ export function ServiceHistorySection({ equipmentItemId, equipmentItem, onEquipm
                         <AlertDialogDescription>
                             This action cannot be undone. This will permanently delete this service record
                             {recordToDelete?.service_date && (
-                                <> from <strong>{format(new Date(recordToDelete.service_date), "MMM d, yyyy")}</strong></>
+                                <> from <strong>{safeFormatDate(recordToDelete.service_date, "MMM d, yyyy", "unknown date")}</strong></>
                             )}
                             .
                         </AlertDialogDescription>

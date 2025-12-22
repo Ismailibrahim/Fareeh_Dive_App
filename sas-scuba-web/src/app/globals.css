@@ -125,3 +125,179 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Print Styles */
+@media print {
+  /* Hide non-essential elements */
+  header,
+  .no-print,
+  button,
+  nav,
+  a[href] {
+    display: none !important;
+  }
+
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 1.5cm;
+  }
+
+  /* Reset body and container for print */
+  body {
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 10px !important;
+  }
+
+  /* Main container adjustments */
+  .flex.flex-col.min-h-screen {
+    background: white !important;
+    padding: 0 !important;
+  }
+
+  .flex-1.space-y-6 {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Print-friendly invoice container */
+  .invoice-print-container {
+    page-break-inside: avoid;
+    background: white !important;
+    padding: 20px !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Ensure proper page breaks */
+  .invoice-items-table {
+    page-break-inside: avoid;
+  }
+
+  .print-section {
+    margin-bottom: 20px !important;
+    padding-bottom: 15px !important;
+    page-break-inside: avoid;
+  }
+
+  /* Add spacing between major sections */
+  .invoice-print-container > .print-section:not(:last-child) {
+    margin-bottom: 25px !important;
+    padding-bottom: 20px !important;
+  }
+
+  /* Spacing for grid sections */
+  .grid {
+    margin-bottom: 20px !important;
+  }
+
+  /* Card content spacing */
+  .print-card {
+    margin-bottom: 20px !important;
+  }
+
+  /* Card styling for print */
+  .print-card {
+    border: none !important;
+    background: white !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    page-break-inside: avoid;
+  }
+
+  /* Table styling */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 15px 0 !important;
+  }
+
+  th,
+  td {
+    border: 1px solid #e5e7eb !important;
+    padding: 8px 6px !important;
+  }
+
+  th {
+    background-color: #f9fafb !important;
+    font-weight: 600 !important;
+    color: black !important;
+  }
+
+  td {
+    color: black !important;
+    background: white !important;
+  }
+
+  /* Ensure text is readable */
+  h1, h2, h3, h4, h5, h6,
+  p, span, div, td, th {
+    color: black !important;
+  }
+
+  /* Font size adjustments for print */
+  h1 {
+    font-size: 18px !important;
+  }
+
+  h2 {
+    font-size: 14px !important;
+  }
+
+  h3 {
+    font-size: 12px !important;
+  }
+
+  p, span, div, td, th, label {
+    font-size: 10px !important;
+  }
+
+  .text-sm {
+    font-size: 9px !important;
+  }
+
+  .text-xs {
+    font-size: 8px !important;
+  }
+
+  .text-lg {
+    font-size: 12px !important;
+  }
+
+  .text-xl {
+    font-size: 14px !important;
+  }
+
+  .text-2xl {
+    font-size: 16px !important;
+  }
+
+  .text-3xl {
+    font-size: 20px !important;
+  }
+
+  /* Remove background colors that don't print well */
+  .bg-gray-50 {
+    background-color: #f9fafb !important;
+  }
+
+  .text-green-600,
+  .text-orange-600 {
+    color: black !important;
+  }
+
+  /* Hide scrollbars and other UI elements */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Ensure links don't show URLs */
+  a[href]:after {
+    content: none !important;
+  }
+}

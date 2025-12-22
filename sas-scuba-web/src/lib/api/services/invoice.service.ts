@@ -13,6 +13,7 @@ export interface InvoiceItem {
     description?: string;
     quantity: number;
     unit_price: number;
+    discount?: number;
     total: number;
     booking_dive?: BookingDive;
     booking_equipment?: any;
@@ -22,13 +23,17 @@ export interface InvoiceItem {
 export interface Invoice {
     id: number;
     dive_center_id: number;
-    booking_id: number;
+    booking_id?: number;
+    customer_id?: number;
     booking?: Booking;
+    customer?: any;
     invoice_no?: string;
     invoice_date?: string;
-    subtotal: number;
-    tax: number;
-    total: number;
+    subtotal?: number;
+    tax?: number;
+    service_charge?: number;
+    discount?: number;
+    total?: number;
     currency?: string;
     status: 'Draft' | 'Paid' | 'Partially Paid' | 'Refunded';
     invoice_type?: 'Advance' | 'Final' | 'Full';
@@ -54,6 +59,16 @@ export interface InvoiceFilters {
     invoice_type?: string;
 }
 
+export interface AddInvoiceItemRequest {
+    description: string;
+    quantity: number;
+    unit_price: number;
+    discount?: number;
+    price_list_item_id?: number;
+    booking_dive_id?: number;
+    booking_equipment_id?: number;
+}
+
 export const invoiceService = {
     getAll: async (filters?: InvoiceFilters, page = 1) => {
         const params = new URLSearchParams();
@@ -73,7 +88,7 @@ export const invoiceService = {
         return response.data;
     },
 
-    create: async (data: { booking_id: number; invoice_type?: string; invoice_date?: string; tax_percentage?: number }) => {
+    create: async (data: { booking_id?: number; customer_id?: number; invoice_type?: string; invoice_date?: string; tax_percentage?: number }) => {
         const response = await apiClient.post<Invoice>("/api/v1/invoices", data);
         return response.data;
     },
@@ -95,6 +110,16 @@ export const invoiceService = {
 
     delete: async (id: number) => {
         await apiClient.delete(`/api/v1/invoices/${id}`);
+    },
+
+    addItem: async (invoiceId: number, data: AddInvoiceItemRequest) => {
+        const response = await apiClient.post<Invoice>(`/api/v1/invoices/${invoiceId}/add-item`, data);
+        return response.data;
+    },
+
+    deleteItem: async (invoiceId: number, itemId: number) => {
+        const response = await apiClient.delete<Invoice>(`/api/v1/invoices/${invoiceId}/items/${itemId}`);
+        return response.data;
     },
 };
 

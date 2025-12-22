@@ -181,7 +181,7 @@ export function FileList({
                                 </TableCell>
                                 <TableCell>{formatFileSize(file.fileSize)}</TableCell>
                                 <TableCell>
-                                    {new Date(file.createdAt).toLocaleDateString()}
+                                    {safeFormatDate(file.createdAt, "MMM d, yyyy", "N/A")}
                                 </TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex justify-end gap-2">

@@ -26,7 +26,7 @@ import { equipmentBasketService, EquipmentBasket } from "@/lib/api/services/equi
 import { useRouter } from "next/navigation";
 import { Plus, ShoppingBasket, Search, MoreHorizontal, Eye, Calendar, Package } from "lucide-react";
 import Link from "next/link";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 
 export default function BasketsPage() {
     const router = useRouter();
@@ -180,7 +180,7 @@ export default function BasketsPage() {
                                             {basket.checkout_date ? (
                                                 <div className="flex items-center gap-2">
                                                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                    {format(new Date(basket.checkout_date), "MMM d, yyyy")}
+                                                    {safeFormatDate(basket.checkout_date, "MMM d, yyyy", "-")}
                                                 </div>
                                             ) : (
                                                 <span className="text-muted-foreground">-</span>
@@ -188,7 +188,7 @@ export default function BasketsPage() {
                                         </TableCell>
                                         <TableCell>
                                             {basket.expected_return_date ? (
-                                                format(new Date(basket.expected_return_date), "MMM d, yyyy")
+                                                safeFormatDate(basket.expected_return_date, "MMM d, yyyy", "-")
                                             ) : (
                                                 <span className="text-muted-foreground">-</span>
                                             )}
@@ -197,7 +197,7 @@ export default function BasketsPage() {
                                             {basket.actual_return_date ? (
                                                 <div className="flex items-center gap-2">
                                                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                    {format(new Date(basket.actual_return_date), "MMM d, yyyy")}
+                                                    {safeFormatDate(basket.actual_return_date, "MMM d, yyyy", "-")}
                                                 </div>
                                             ) : (
                                                 <span className="text-muted-foreground">-</span>
@@ -292,7 +292,7 @@ export default function BasketsPage() {
                                             <div>
                                                 <CardDescription className="mb-1">Checkout</CardDescription>
                                                 <p className="text-sm">
-                                                    {format(new Date(basket.checkout_date), "MMM d, yyyy")}
+                                                    {safeFormatDate(basket.checkout_date, "MMM d, yyyy", "-")}
                                                 </p>
                                             </div>
                                         )}
@@ -300,7 +300,7 @@ export default function BasketsPage() {
                                             <div>
                                                 <CardDescription className="mb-1">Expected Return</CardDescription>
                                                 <p className="text-sm">
-                                                    {format(new Date(basket.expected_return_date), "MMM d, yyyy")}
+                                                    {safeFormatDate(basket.expected_return_date, "MMM d, yyyy", "-")}
                                                 </p>
                                             </div>
                                         )}
@@ -309,7 +309,7 @@ export default function BasketsPage() {
                                         <div>
                                             <CardDescription className="mb-1">Actual Return</CardDescription>
                                             <p className="text-sm font-medium">
-                                                {format(new Date(basket.actual_return_date), "MMM d, yyyy")}
+                                                {safeFormatDate(basket.actual_return_date, "MMM d, yyyy", "-")}
                                             </p>
                                         </div>
                                     )}

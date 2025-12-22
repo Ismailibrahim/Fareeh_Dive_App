@@ -38,12 +38,17 @@ class CustomerPreRegistrationController extends Controller
             'token' => CustomerPreRegistration::generateToken(),
             'expires_at' => $expiresAt,
             'status' => 'pending',
+            'customer_data' => [], // Initialize as empty array
+            'emergency_contacts_data' => [], // Initialize as empty array
+            'certifications_data' => [], // Initialize as empty array
         ]);
 
+        $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
+        
         return response()->json([
             'id' => $preRegistration->id,
             'token' => $preRegistration->token,
-            'url' => url("/pre-registration/{$preRegistration->token}"),
+            'url' => rtrim($frontendUrl, '/') . "/pre-registration/{$preRegistration->token}",
             'expires_at' => $preRegistration->expires_at->toIso8601String(),
             'created_at' => $preRegistration->created_at->toIso8601String(),
         ], 201);
@@ -112,6 +117,9 @@ class CustomerPreRegistrationController extends Controller
             'customer.date_of_birth' => 'nullable|date',
             'customer.gender' => 'nullable|string',
             'customer.nationality' => 'nullable|string',
+            'customer.departure_date' => 'nullable|date',
+            'customer.departure_flight' => 'nullable|string|max:100',
+            'customer.departure_to' => 'nullable|string|max:255',
             
             'emergency_contacts' => 'nullable|array',
             'emergency_contacts.*.name' => 'nullable|string|max:255',
@@ -279,6 +287,9 @@ class CustomerPreRegistrationController extends Controller
                 'date_of_birth' => $submission->customer_data['date_of_birth'] ?? null,
                 'gender' => $submission->customer_data['gender'] ?? null,
                 'nationality' => $submission->customer_data['nationality'] ?? null,
+                'departure_date' => $submission->customer_data['departure_date'] ?? null,
+                'departure_flight' => $submission->customer_data['departure_flight'] ?? null,
+                'departure_to' => $submission->customer_data['departure_to'] ?? null,
             ]);
 
             // Create emergency contacts

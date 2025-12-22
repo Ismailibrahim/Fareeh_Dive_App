@@ -21,7 +21,7 @@ import { equipmentServiceHistoryService, BulkServiceFormData } from "@/lib/api/s
 import { useState, useEffect } from "react";
 import { Wrench, User, Building, DollarSign, Package, Calculator } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
-import { format } from "date-fns";
+import { safeFormatDate, safeCompareDates } from "@/lib/utils/date-format";
 import {
     Table,
     TableBody,
@@ -299,20 +299,29 @@ export function BulkServiceForm({ onSuccess }: BulkServiceFormProps) {
                                                     {item.serial_no || "-"}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {item.last_service_date ? format(new Date(item.last_service_date), "MMM d, yyyy") : "-"}
+                                                    {safeFormatDate(item.last_service_date, "MMM d, yyyy", "-")}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {item.next_service_date ? (
-                                                        <div className="flex items-center gap-2">
-                                                            {new Date(item.next_service_date) <= new Date() && item.requires_service ? (
-                                                                <AlertTriangle className="h-4 w-4 text-destructive" />
-                                                            ) : (
-                                                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                            )}
-                                                            <span className={new Date(item.next_service_date) <= new Date() && item.requires_service ? "text-destructive font-medium" : ""}>
-                                                                {format(new Date(item.next_service_date), "MMM d, yyyy")}
-                                                            </span>
-                                                        </div>
+                                                    {item.next_service_date ? (() => {
+                                                        const comparison = safeCompareDates(item.next_service_date);
+                                                        const isOverdue = comparison !== null && comparison <= 0 && item.requires_service;
+                                                        return (
+                                                            <div className="flex items-center gap-2">
+                                                                {isOverdue ? (
+                                                                    <AlertTriangle className="h-4 w-4 text-destructive" />
+                                                                ) : (
+                                                                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                                                                )}
+                                                                <span className={isOverdue ? "text-destructive font-medium" : ""}>
+                                                                    {safeFormatDate(item.next_service_date, "MMM d, yyyy", "-")}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })() : item.requires_service ? (
+                                                        <span className="text-muted-foreground">Not set</span>
+                                                    ) : (
+                                                        "-"
+                                                    )}
                                                     ) : item.requires_service ? (
                                                         <span className="text-muted-foreground">Not set</span>
                                                     ) : (

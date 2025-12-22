@@ -21,7 +21,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, Calendar } from "lucide-react";
-import DatePicker from "react-datepicker";
+import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -46,8 +46,8 @@ export function PaymentForm({ invoice, onSuccess }: PaymentFormProps) {
 
     useEffect(() => {
         if (invoice) {
-            const totalPaid = invoice.payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
-            setRemainingBalance(invoice.total - totalPaid);
+            const totalPaid = invoice.payments?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0;
+            setRemainingBalance(Number(invoice.total || 0) - totalPaid);
         }
     }, [invoice]);
 
@@ -114,7 +114,7 @@ export function PaymentForm({ invoice, onSuccess }: PaymentFormProps) {
                         <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
                             <div>
                                 <label className="text-sm font-medium text-muted-foreground">Invoice Total</label>
-                                <p className="text-lg font-semibold">${invoice.total.toFixed(2)}</p>
+                                <p className="text-lg font-semibold">${Number(invoice.total || 0).toFixed(2)}</p>
                             </div>
                             <div>
                                 <label className="text-sm font-medium text-muted-foreground">Remaining Balance</label>

@@ -11,7 +11,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useCustomer } from "@/lib/hooks/use-customers";
 import { useCustomerInsurances } from "@/lib/hooks/use-customer-insurances";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 
 function CreateCustomerInsuranceContent() {
     const searchParams = useSearchParams();
@@ -172,7 +172,7 @@ function CreateCustomerInsuranceContent() {
                                             {existingInsurance.expiry_date && (
                                                 <div className="flex items-center gap-1">
                                                     <Calendar className="h-3 w-3" />
-                                                    <span>Expires: {format(new Date(existingInsurance.expiry_date), "MMM dd, yyyy")}</span>
+                                                    <span>Expires: {safeFormatDate(existingInsurance.expiry_date, "MMM dd, yyyy", "N/A")}</span>
                                                 </div>
                                             )}
                                         </div>

@@ -11,7 +11,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useCustomer } from "@/lib/hooks/use-customers";
 import { useCustomerCertifications } from "@/lib/hooks/use-customer-certifications";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 
 function CreateCustomerCertificationContent() {
     const searchParams = useSearchParams();
@@ -166,7 +166,7 @@ function CreateCustomerCertificationContent() {
                                             {existingCertification.certification_date && (
                                                 <div className="flex items-center gap-1">
                                                     <Calendar className="h-3 w-3" />
-                                                    <span>{format(new Date(existingCertification.certification_date), "MMM dd, yyyy")}</span>
+                                                    <span>{safeFormatDate(existingCertification.certification_date, "MMM dd, yyyy", "N/A")}</span>
                                                 </div>
                                             )}
                                             {existingCertification.agency && (

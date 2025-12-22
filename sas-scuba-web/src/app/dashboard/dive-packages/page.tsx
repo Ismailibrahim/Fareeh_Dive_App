@@ -7,7 +7,7 @@ import { divePackageService, DivePackage } from "@/lib/api/services/dive-package
 import { useRouter } from "next/navigation";
 import { Plus, Package } from "lucide-react";
 import Link from "next/link";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 
 export default function DivePackagesPage() {
     const router = useRouter();
@@ -130,11 +130,11 @@ export default function DivePackagesPage() {
                                             </div>
                                             <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                                 <span>
-                                                    Start: {pkg.package_start_date ? format(new Date(pkg.package_start_date), "MMM d, yyyy") : 'N/A'}
+                                                    Start: {safeFormatDate(pkg.package_start_date, "MMM d, yyyy", "N/A")}
                                                 </span>
                                                 {pkg.package_end_date && (
                                                     <span>
-                                                        End: {format(new Date(pkg.package_end_date), "MMM d, yyyy")}
+                                                        End: {safeFormatDate(pkg.package_end_date, "MMM d, yyyy", "N/A")}
                                                     </span>
                                                 )}
                                             </div>

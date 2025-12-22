@@ -14,12 +14,14 @@ class InvoiceItem extends Model
         'description',
         'quantity',
         'unit_price',
+        'discount',
         'total',
     ];
 
     protected $casts = [
         'quantity' => 'integer',
         'unit_price' => 'decimal:2',
+        'discount' => 'decimal:2',
         'total' => 'decimal:2',
     ];
 

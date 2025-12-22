@@ -21,9 +21,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, User, Mail, Phone, DollarSign, CreditCard, FileText, Tag as TagIcon, Upload, X, CheckCircle2 } from "lucide-react";
-import DatePicker from "react-datepicker";
+import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { safeParseDate } from "@/lib/utils/date-format";
 import { fileUploadService } from "@/lib/api/services/file-upload.service";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -157,10 +158,10 @@ export function AgentForm({ initialData, agentId }: AgentFormProps) {
                 payment_method: initialData.billing_info.payment_method,
             } : undefined,
             contract: initialData?.contract ? {
-                contract_start_date: initialData.contract.contract_start_date ? new Date(initialData.contract.contract_start_date) : null,
-                contract_end_date: initialData.contract.contract_end_date ? new Date(initialData.contract.contract_end_date) : null,
-                commission_valid_from: initialData.contract.commission_valid_from ? new Date(initialData.contract.commission_valid_from) : null,
-                commission_valid_until: initialData.contract.commission_valid_until ? new Date(initialData.contract.commission_valid_until) : null,
+                contract_start_date: initialData.contract.contract_start_date ? (safeParseDate(initialData.contract.contract_start_date) ?? null) : null,
+                contract_end_date: initialData.contract.contract_end_date ? (safeParseDate(initialData.contract.contract_end_date) ?? null) : null,
+                commission_valid_from: initialData.contract.commission_valid_from ? (safeParseDate(initialData.contract.commission_valid_from) ?? null) : null,
+                commission_valid_until: initialData.contract.commission_valid_until ? (safeParseDate(initialData.contract.commission_valid_until) ?? null) : null,
                 signed_agreement_url: initialData.contract.signed_agreement_url || "",
                 special_conditions: initialData.contract.special_conditions || "",
             } : undefined,

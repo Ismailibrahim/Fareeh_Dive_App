@@ -9,11 +9,14 @@ class Invoice extends Model
     protected $fillable = [
         'dive_center_id',
         'booking_id',
+        'customer_id',
         'agent_id',
         'invoice_no',
         'invoice_date',
         'subtotal',
         'tax',
+        'service_charge',
+        'discount',
         'total',
         'currency',
         'status',
@@ -25,6 +28,8 @@ class Invoice extends Model
         'invoice_date' => 'date',
         'subtotal' => 'decimal:2',
         'tax' => 'decimal:2',
+        'service_charge' => 'decimal:2',
+        'discount' => 'decimal:2',
         'total' => 'decimal:2',
     ];
 
@@ -37,6 +42,11 @@ class Invoice extends Model
     public function booking()
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class);
     }
 
     public function agent()

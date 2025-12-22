@@ -127,7 +127,7 @@ export function BookingInstructorForm({ initialData, bookingInstructorId }: Book
                                         <SelectContent>
                                             {bookingDives.map((bookingDive) => (
                                                 <SelectItem key={bookingDive.id} value={String(bookingDive.id)}>
-                                                    {bookingDive.booking?.customer?.full_name || `Booking #${bookingDive.booking_id}`} - {bookingDive.dive_site?.name || 'Dive Site'} {bookingDive.dive_date ? `(${new Date(bookingDive.dive_date).toLocaleDateString()})` : ''}
+                                                    {bookingDive.booking?.customer?.full_name || `Booking #${bookingDive.booking_id}`} - {bookingDive.dive_site?.name || 'Dive Site'} {bookingDive.dive_date ? `(${safeFormatDate(bookingDive.dive_date, "MMM d, yyyy", "")})` : ''}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

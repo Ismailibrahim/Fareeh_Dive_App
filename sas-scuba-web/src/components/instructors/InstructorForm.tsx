@@ -20,8 +20,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { User, Award, Mail, Phone, CalendarIcon, FileText, Briefcase, MapPin, Shield, Clock, Upload, X, CheckCircle2 } from "lucide-react";
-import DatePicker from "react-datepicker";
+import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
 import { format } from "date-fns";
+import { safeParseDate } from "@/lib/utils/date-format";
 import { cn } from "@/lib/utils";
 import { fileUploadService } from "@/lib/api/services/file-upload.service";
 
@@ -91,8 +92,8 @@ export function InstructorForm({ initialData, instructorId }: InstructorFormProp
             instructor_number: initialData?.instructor_number || "",
             certification_agency: initialData?.certification_agency || "",
             certification_level: initialData?.certification_level || "",
-            certification_date: initialData?.certification_date ? new Date(initialData.certification_date) : null,
-            certification_expiry: initialData?.certification_expiry ? new Date(initialData.certification_expiry) : null,
+            certification_date: initialData?.certification_date ? (safeParseDate(initialData.certification_date) ?? null) : null,
+            certification_expiry: initialData?.certification_expiry ? (safeParseDate(initialData.certification_expiry) ?? null) : null,
             instructor_status: initialData?.instructor_status || "Active",
             emergency_contact_name: initialData?.emergency_contact_name || "",
             emergency_contact_phone: initialData?.emergency_contact_phone || "",
@@ -109,14 +110,14 @@ export function InstructorForm({ initialData, instructorId }: InstructorFormProp
             total_dives_logged: initialData?.total_dives_logged,
             total_students_certified: initialData?.total_students_certified,
             bio: initialData?.bio || "",
-            medical_certificate_expiry: initialData?.medical_certificate_expiry ? new Date(initialData.medical_certificate_expiry) : null,
+            medical_certificate_expiry: initialData?.medical_certificate_expiry ? (safeParseDate(initialData.medical_certificate_expiry) ?? null) : null,
             insurance_provider: initialData?.insurance_provider || "",
             insurance_provider_contact_no: initialData?.insurance_provider_contact_no || "",
             insurance_type: initialData?.insurance_type || "",
             insurance_policy_number: initialData?.insurance_policy_number || "",
-            insurance_expiry: initialData?.insurance_expiry ? new Date(initialData.insurance_expiry) : null,
+            insurance_expiry: initialData?.insurance_expiry ? (safeParseDate(initialData.insurance_expiry) ?? null) : null,
             notes: initialData?.notes || "",
-            hired_date: initialData?.hired_date ? new Date(initialData.hired_date) : null,
+            hired_date: initialData?.hired_date ? (safeParseDate(initialData.hired_date) ?? null) : null,
             certificate_file_url: initialData?.certificate_file_url || "",
             insurance_file_url: initialData?.insurance_file_url || "",
             contract_file_url: initialData?.contract_file_url || "",

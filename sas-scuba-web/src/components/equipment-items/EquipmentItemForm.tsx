@@ -22,7 +22,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, Ruler, Hash, CheckCircle, Barcode, Tag, Palette, CalendarIcon, Wrench, Calculator, MapPin } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import DatePicker from "react-datepicker";
+import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
 import { cn } from "@/lib/utils";
 import { EquipmentItemImageUpload } from "./EquipmentItemImageUpload";
 

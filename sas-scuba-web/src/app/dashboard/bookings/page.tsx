@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, MoreHorizontal, Calendar, Plus, User, FileText, Users } from "lucide-react";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
 import {
     DropdownMenu,
@@ -177,7 +177,7 @@ export default function BookingsPage() {
                                             {booking.booking_date ? (
                                                 <div className="flex items-center gap-2">
                                                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                    {format(new Date(booking.booking_date), "MMM d, yyyy")}
+                                                    {safeFormatDate(booking.booking_date, "MMM d, yyyy", "-")}
                                                 </div>
                                             ) : (
                                                 "-"
@@ -273,7 +273,7 @@ export default function BookingsPage() {
                                                 <Calendar className="h-4 w-4" />
                                                 Booking Date
                                             </CardDescription>
-                                            <p>{format(new Date(booking.booking_date), "MMM d, yyyy")}</p>
+                                            <p>{safeFormatDate(booking.booking_date, "MMM d, yyyy", "-")}</p>
                                         </div>
                                     )}
                                     {booking.number_of_divers && (

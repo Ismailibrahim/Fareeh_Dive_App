@@ -23,7 +23,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CalendarIcon, Shield, User, Phone, FileText, Upload, X, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import DatePicker from "react-datepicker";
+import { safeParseDate } from "@/lib/utils/date-format";
+import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
 import { fileUploadService } from "@/lib/api/services/file-upload.service";
 import { Switch } from "@/components/ui/switch";
 
@@ -76,7 +77,7 @@ export function CustomerInsuranceForm({ initialData, insuranceId, disableCustome
             insurance_provider: initialData?.insurance_provider || "",
             insurance_no: initialData?.insurance_no || "",
             insurance_hotline_no: initialData?.insurance_hotline_no || "",
-            expiry_date: initialData?.expiry_date ? new Date(initialData.expiry_date) : undefined,
+            expiry_date: initialData?.expiry_date ? safeParseDate(initialData.expiry_date) ?? undefined : undefined,
             file_url: initialData?.file_url || "",
             status: initialData?.status !== undefined ? initialData.status : true,
         },

@@ -30,9 +30,9 @@ class DiveCenterController extends Controller
             return response()->json(['message' => 'No associated dive center found.'], 404);
         }
 
-        // Validate all profile fields
+        // Validate all profile fields (all optional to allow partial updates)
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'nullable|string|max:255',
             'legal_name' => 'nullable|string|max:255',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:50',
@@ -41,7 +41,7 @@ class DiveCenterController extends Controller
             'city' => 'nullable|string|max:255',
             'state' => 'nullable|string|max:255',
             'zip' => 'nullable|string|max:20',
-            'country' => 'required|string|max:255',
+            'country' => 'nullable|string|max:255',
             'timezone' => 'nullable|string|max:255',
             'currency' => 'nullable|string|max:10',
             'settings' => 'nullable|array', // JSON field
@@ -58,7 +58,16 @@ class DiveCenterController extends Controller
             $validated['settings'] = array_merge($existingSettings, $newSettings);
         }
 
-        $diveCenter->update($validated);
+        // Only update fields that are provided (partial update)
+        // Remove null values but keep empty strings, 0, false, etc.
+        $updateData = [];
+        foreach ($validated as $key => $value) {
+            if ($value !== null || $key === 'settings') {
+                $updateData[$key] = $value;
+            }
+        }
+
+        $diveCenter->update($updateData);
 
         return response()->json([
             'message' => 'Dive Center settings updated successfully.',

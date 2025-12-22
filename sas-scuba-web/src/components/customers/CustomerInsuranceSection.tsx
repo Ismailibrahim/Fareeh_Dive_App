@@ -22,7 +22,8 @@ import {
 import { Shield, ChevronDown, Plus, Edit, Trash2, Calendar, Phone, FileText, Building } from "lucide-react";
 import { CustomerInsurance } from "@/lib/api/services/customer-insurance.service";
 import { useCustomerInsurances, useDeleteCustomerInsurance } from "@/lib/hooks/use-customer-insurances";
-import { format, isAfter, addDays } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
+import { isAfter, addDays } from "date-fns";
 import Link from "next/link";
 
 interface CustomerInsuranceSectionProps {
@@ -140,7 +141,7 @@ export function CustomerInsuranceSection({ customerId }: CustomerInsuranceSectio
                                                             <div className="flex items-center gap-1">
                                                                 <Calendar className="h-3 w-3" />
                                                                 <span>
-                                                                    Expires: {format(new Date(insurance.expiry_date), "MMM dd, yyyy")}
+                                                                    Expires: {safeFormatDate(insurance.expiry_date, "MMM dd, yyyy", "N/A")}
                                                                     {expiryStatus && expiryStatus.status === 'expired' && (
                                                                         <Badge variant="destructive" className="ml-2 text-xs">Expired</Badge>
                                                                     )}

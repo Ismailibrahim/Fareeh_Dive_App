@@ -23,8 +23,9 @@ import { agencyService, Agency } from "@/lib/api/services/agency.service";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarIcon, Award, User, Building, UserCircle, FileText, Upload, X, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
+import { safeParseDate } from "@/lib/utils/date-format";
 import { cn } from "@/lib/utils";
-import DatePicker from "react-datepicker";
+import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
 import { fileUploadService } from "@/lib/api/services/file-upload.service";
 import { Switch } from "@/components/ui/switch";
 
@@ -92,8 +93,8 @@ export function CustomerCertificationForm({ initialData, certificationId, disabl
             customer_id: initialData?.customer_id ? String(initialData.customer_id) : "",
             certification_name: initialData?.certification_name || "",
             certification_no: initialData?.certification_no || "",
-            certification_date: initialData?.certification_date ? new Date(initialData.certification_date) : undefined,
-            last_dive_date: initialData?.last_dive_date ? new Date(initialData.last_dive_date) : undefined,
+            certification_date: initialData?.certification_date ? safeParseDate(initialData.certification_date) ?? undefined : undefined,
+            last_dive_date: initialData?.last_dive_date ? safeParseDate(initialData.last_dive_date) ?? undefined : undefined,
             no_of_dives: initialData?.no_of_dives ?? undefined,
             agency: initialData?.agency || "",
             instructor: initialData?.instructor || "",

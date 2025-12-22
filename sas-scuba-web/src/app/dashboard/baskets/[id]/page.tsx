@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { equipmentBasketService, EquipmentBasket } from "@/lib/api/services/equipment-basket.service";
 import { bookingEquipmentService } from "@/lib/api/services/booking-equipment.service";
 import { ShoppingBasket, Calendar, User, Package, Plus, RotateCcw, Layers, ArrowLeft } from "lucide-react";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { BulkAddEquipmentDialog } from "@/components/booking-equipment/BulkAddEquipmentDialog";
@@ -222,7 +222,7 @@ export default function BasketDetailPage() {
                     </CardHeader>
                     <CardContent>
                         <p className="text-lg">
-                            {basket.checkout_date ? format(new Date(basket.checkout_date), "MMM d, yyyy") : 'N/A'}
+                            {safeFormatDate(basket.checkout_date, "MMM d, yyyy", "N/A")}
                         </p>
                     </CardContent>
                 </Card>
@@ -269,12 +269,12 @@ export default function BasketDetailPage() {
                         )}
                         <div>
                             <label className="text-sm font-medium text-muted-foreground">Expected Return</label>
-                            <p>{basket.expected_return_date ? format(new Date(basket.expected_return_date), "MMM d, yyyy") : 'N/A'}</p>
+                            <p>{safeFormatDate(basket.expected_return_date, "MMM d, yyyy", "N/A")}</p>
                         </div>
                         {basket.actual_return_date && (
                             <div>
                                 <label className="text-sm font-medium text-muted-foreground">Actual Return</label>
-                                <p>{format(new Date(basket.actual_return_date), "MMM d, yyyy")}</p>
+                                <p>{safeFormatDate(basket.actual_return_date, "MMM d, yyyy", "N/A")}</p>
                             </div>
                         )}
                     </div>
@@ -426,9 +426,9 @@ export default function BasketDetailPage() {
                                                     )}
                                                 </div>
                                                 <p className="text-sm text-muted-foreground">
-                                                    {equipment.checkout_date && `Checkout: ${format(new Date(equipment.checkout_date), "MMM d, yyyy")}`}
+                                                    {equipment.checkout_date && `Checkout: ${safeFormatDate(equipment.checkout_date, "MMM d, yyyy", "N/A")}`}
                                                     {equipment.checkout_date && equipment.return_date && ' • '}
-                                                    {equipment.return_date && `Return: ${format(new Date(equipment.return_date), "MMM d, yyyy")}`}
+                                                    {equipment.return_date && `Return: ${safeFormatDate(equipment.return_date, "MMM d, yyyy", "N/A")}`}
                                                 </p>
                                                 {equipment.damage_description && (
                                                     <p className="text-xs text-destructive mt-1">

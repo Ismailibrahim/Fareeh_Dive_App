@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, MoreHorizontal, Calendar, Plus, MapPin, Ship, Clock } from "lucide-react";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
 import {
     DropdownMenu,
@@ -175,7 +175,7 @@ export default function BookingDivesPage() {
                                         </TableCell>
                                         <TableCell>
                                             {bookingDive.dive_date ? (
-                                                format(new Date(bookingDive.dive_date), "MMM d, yyyy")
+                                                safeFormatDate(bookingDive.dive_date, "MMM d, yyyy", "-")
                                             ) : (
                                                 "-"
                                             )}
@@ -275,7 +275,7 @@ export default function BookingDivesPage() {
                                                 <Calendar className="h-4 w-4" />
                                                 Dive Date
                                             </CardDescription>
-                                            <p>{format(new Date(bookingDive.dive_date), "MMM d, yyyy")}</p>
+                                            <p>{safeFormatDate(bookingDive.dive_date, "MMM d, yyyy", "-")}</p>
                                         </div>
                                     )}
                                     {bookingDive.dive_time && (

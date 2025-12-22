@@ -5,7 +5,7 @@ import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 import { cn } from "@/lib/utils";
 
 // Option 1: react-datepicker (currently installed)
@@ -152,7 +152,7 @@ export default function DatePickerDemoPage() {
                                 </div>
                                 {date3 && (
                                     <p className="text-sm text-muted-foreground">
-                                        Selected: {format(new Date(date3), "PPP")}
+                                        Selected: {safeFormatDate(date3, "PPP", "No date selected")}
                                     </p>
                                 )}
                             </div>
@@ -261,5 +261,7 @@ export default function DatePickerDemoPage() {
         </div>
     );
 }
+
+
 
 

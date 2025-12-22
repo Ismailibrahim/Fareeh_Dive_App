@@ -33,7 +33,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { CustomerCertification, customerCertificationService } from "@/lib/api/services/customer-certification.service";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 import { Badge } from "@/components/ui/badge";
 
 export default function CustomerCertificationsPage() {
@@ -148,7 +148,7 @@ export default function CustomerCertificationsPage() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            {format(new Date(cert.certification_date), "MMM d, yyyy")}
+                                            {safeFormatDate(cert.certification_date, "MMM d, yyyy")}
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant="outline">{cert.agency || "N/A"}</Badge>
@@ -229,7 +229,7 @@ export default function CustomerCertificationsPage() {
                                 <div className="grid grid-cols-2 gap-4 text-sm mt-2">
                                     <div>
                                         <span className="text-muted-foreground block text-xs">Date</span>
-                                        <span>{format(new Date(cert.certification_date), "MMM d, yyyy")}</span>
+                                        <span>{safeFormatDate(cert.certification_date, "MMM d, yyyy")}</span>
                                     </div>
                                     <div>
                                         <span className="text-muted-foreground block text-xs">Agency</span>

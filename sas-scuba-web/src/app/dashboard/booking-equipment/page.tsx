@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, MoreHorizontal, Calendar, Plus, Package, DollarSign, ShoppingBasket, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
 import {
     DropdownMenu,
@@ -224,10 +224,10 @@ export default function BookingEquipmentPage() {
                                         <TableCell>
                                             <div className="text-sm space-y-0.5">
                                                 {be.checkout_date && (
-                                                    <div>Checkout: {format(new Date(be.checkout_date), "MMM d, yyyy")}</div>
+                                                    <div>Checkout: {safeFormatDate(be.checkout_date, "MMM d, yyyy", "N/A")}</div>
                                                 )}
                                                 {be.return_date && (
-                                                    <div>Return: {format(new Date(be.return_date), "MMM d, yyyy")}</div>
+                                                    <div>Return: {safeFormatDate(be.return_date, "MMM d, yyyy", "N/A")}</div>
                                                 )}
                                             </div>
                                         </TableCell>
@@ -371,10 +371,10 @@ export default function BookingEquipmentPage() {
                                             <CardDescription>Dates</CardDescription>
                                             <div className="text-sm space-y-0.5">
                                                 {be.checkout_date && (
-                                                    <p>Checkout: {format(new Date(be.checkout_date), "MMM d, yyyy")}</p>
+                                                    <p>Checkout: {safeFormatDate(be.checkout_date, "MMM d, yyyy", "N/A")}</p>
                                                 )}
                                                 {be.return_date && (
-                                                    <p>Return: {format(new Date(be.return_date), "MMM d, yyyy")}</p>
+                                                    <p>Return: {safeFormatDate(be.return_date, "MMM d, yyyy", "N/A")}</p>
                                                 )}
                                             </div>
                                         </div>

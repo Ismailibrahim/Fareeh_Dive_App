@@ -9,7 +9,7 @@ import { invoiceService, Invoice } from "@/lib/api/services/invoice.service";
 import { InvoiceGenerationDialog } from "@/components/invoices/InvoiceGenerationDialog";
 import { ArrowLeft, FileText, DollarSign, Plus, Calendar, User } from "lucide-react";
 import Link from "next/link";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 
 export default function BookingDetailPage() {
     const params = useParams();
@@ -100,7 +100,7 @@ export default function BookingDetailPage() {
                     </CardHeader>
                     <CardContent>
                         <p className="text-lg">
-                            {booking.booking_date ? format(new Date(booking.booking_date), "MMM d, yyyy") : 'N/A'}
+                            {safeFormatDate(booking.booking_date, "MMM d, yyyy", "N/A")}
                         </p>
                     </CardContent>
                 </Card>
@@ -197,14 +197,14 @@ export default function BookingDetailPage() {
                                                 </Link>
                                                 <p className="text-sm text-muted-foreground">
                                                     {invoice.invoice_type || 'Full'} • {invoice.status}
-                                                    {invoice.invoice_date && ` • ${format(new Date(invoice.invoice_date), "MMM d, yyyy")}`}
+                                                    {invoice.invoice_date && ` • ${safeFormatDate(invoice.invoice_date, "MMM d, yyyy", "N/A")}`}
                                                 </p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="font-semibold">${invoice.total.toFixed(2)}</p>
+                                                <p className="font-semibold">${Number(invoice.total || 0).toFixed(2)}</p>
                                                 {invoiceRemaining > 0 && (
                                                     <p className="text-sm text-muted-foreground">
-                                                        Remaining: ${invoiceRemaining.toFixed(2)}
+                                                        Remaining: ${Number(invoiceRemaining || 0).toFixed(2)}
                                                     </p>
                                                 )}
                                             </div>

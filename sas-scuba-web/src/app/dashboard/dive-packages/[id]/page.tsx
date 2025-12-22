@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { divePackageService, DivePackage, DivePackageStatus } from "@/lib/api/services/dive-package.service";
 import { Package, Calendar, User, DollarSign } from "lucide-react";
-import { format } from "date-fns";
+import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
 
 export default function DivePackageDetailPage() {
@@ -149,11 +149,11 @@ export default function DivePackageDetailPage() {
                         </div>
                         <div>
                             <label className="text-sm font-medium text-muted-foreground">Start Date</label>
-                            <p>{pkg.package_start_date ? format(new Date(pkg.package_start_date), "MMM d, yyyy") : 'N/A'}</p>
+                            <p>{safeFormatDate(pkg.package_start_date, "MMM d, yyyy", "N/A")}</p>
                         </div>
                         <div>
                             <label className="text-sm font-medium text-muted-foreground">End Date</label>
-                            <p>{pkg.package_end_date ? format(new Date(pkg.package_end_date), "MMM d, yyyy") : 'N/A'}</p>
+                            <p>{safeFormatDate(pkg.package_end_date, "MMM d, yyyy", "N/A")}</p>
                         </div>
                         {pkg.package_per_dive_price && (
                             <div>
@@ -191,7 +191,7 @@ export default function DivePackageDetailPage() {
                                                 Booking #{booking.id}
                                             </Link>
                                             <p className="text-sm text-muted-foreground">
-                                                {(booking as any).package_day_number ? `Day ${(booking as any).package_day_number} • ` : ''}{booking.booking_date ? format(new Date(booking.booking_date), "MMM d, yyyy") : 'N/A'}
+                                                {(booking as any).package_day_number ? `Day ${(booking as any).package_day_number} • ` : ''}{safeFormatDate(booking.booking_date, "MMM d, yyyy", "N/A")}
                                             </p>
                                         </div>
                                         <span className="text-sm">{booking.status}</span>
@@ -223,7 +223,7 @@ export default function DivePackageDetailPage() {
                                                 Dive #{dive.package_dive_number}
                                             </Link>
                                             <p className="text-sm text-muted-foreground">
-                                                {dive.dive_site?.name || 'Unknown Site'} • {dive.dive_date ? format(new Date(dive.dive_date), "MMM d, yyyy") : 'N/A'}
+                                                {dive.dive_site?.name || 'Unknown Site'} • {safeFormatDate(dive.dive_date, "MMM d, yyyy", "N/A")}
                                             </p>
                                         </div>
                                         <span className="text-sm">{dive.status}</span>

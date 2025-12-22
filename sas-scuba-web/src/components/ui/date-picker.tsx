@@ -113,7 +113,17 @@ export function DatePicker({
         setOpen(false);
     };
 
-    const displayValue = value ? format(new Date(value + "T00:00:00"), "PPP") : placeholder;
+    const displayValue = value ? (() => {
+        try {
+            const date = new Date(value + "T00:00:00");
+            if (isNaN(date.getTime())) {
+                return placeholder;
+            }
+            return format(date, "PPP");
+        } catch {
+            return placeholder;
+        }
+    })() : placeholder;
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
