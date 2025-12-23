@@ -48,4 +48,12 @@ class Customer extends Model
     {
         return $this->hasOne(CustomerAccommodation::class);
     }
+
+    public function diveGroups()
+    {
+        return $this->belongsToMany(DiveGroup::class, 'dive_group_members')
+            ->withPivot('joined_at')
+            ->withTimestamps()
+            ->using(DiveGroupMember::class);
+    }
 }

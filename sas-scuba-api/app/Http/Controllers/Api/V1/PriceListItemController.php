@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
+use App\Models\PriceListItemTier;
+use App\Models\Customer;
+use App\Services\DivePricingService;
 use Illuminate\Http\Request;
 
 class PriceListItemController extends Controller
@@ -61,6 +64,14 @@ class PriceListItemController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
+            'base_price' => 'nullable|numeric|min:0',
+            'pricing_model' => 'nullable|in:SINGLE,RANGE,TIERED',
+            'min_dives' => 'nullable|integer|min:1',
+            'max_dives' => 'nullable|integer|min:1',
+            'priority' => 'nullable|integer',
+            'valid_from' => 'nullable|date',
+            'valid_until' => 'nullable|date|after_or_equal:valid_from',
+            'applicable_to' => 'nullable|in:ALL,MEMBER,NON_MEMBER,GROUP,CORPORATE',
             'unit' => 'nullable|string|max:50',
             'tax_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_inclusive' => 'nullable|boolean',
@@ -94,10 +105,20 @@ class PriceListItemController extends Controller
         $validated['price_list_id'] = $priceList->id;
         $validated['sort_order'] = $validated['sort_order'] ?? 0;
         $validated['is_active'] = $validated['is_active'] ?? true;
+        $validated['pricing_model'] = $validated['pricing_model'] ?? 'SINGLE';
+        $validated['min_dives'] = $validated['min_dives'] ?? 1;
+        $validated['max_dives'] = $validated['max_dives'] ?? 1;
+        $validated['priority'] = $validated['priority'] ?? 0;
+        $validated['applicable_to'] = $validated['applicable_to'] ?? 'ALL';
+        
+        // Set base_price from price if not provided
+        if (!isset($validated['base_price']) && isset($validated['price'])) {
+            $validated['base_price'] = $validated['price'];
+        }
 
         $item = PriceListItem::create($validated);
 
-        return response()->json($item, 201);
+        return response()->json($item->load('priceTiers'), 201);
     }
 
     /**
@@ -135,6 +156,14 @@ class PriceListItemController extends Controller
             'name' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
             'price' => 'sometimes|numeric|min:0',
+            'base_price' => 'nullable|numeric|min:0',
+            'pricing_model' => 'nullable|in:SINGLE,RANGE,TIERED',
+            'min_dives' => 'nullable|integer|min:1',
+            'max_dives' => 'nullable|integer|min:1',
+            'priority' => 'nullable|integer',
+            'valid_from' => 'nullable|date',
+            'valid_until' => 'nullable|date|after_or_equal:valid_from',
+            'applicable_to' => 'nullable|in:ALL,MEMBER,NON_MEMBER,GROUP,CORPORATE',
             'unit' => 'nullable|string|max:50',
             'tax_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_inclusive' => 'nullable|boolean',
@@ -145,7 +174,7 @@ class PriceListItemController extends Controller
 
         $priceListItem->update($validated);
 
-        return response()->json($priceListItem);
+        return response()->json($priceListItem->load('priceTiers'));
     }
 
     /**
@@ -424,6 +453,140 @@ class PriceListItemController extends Controller
             \Log::error('PriceListItemController::bulkUpdateTaxService error: ' . $e->getMessage());
             return response()->json(['message' => 'An error occurred: ' . $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Get price suggestions based on dive count.
+     */
+    public function suggestPrice(Request $request)
+    {
+        $validated = $request->validate([
+            'dive_count' => 'required|integer|min:1',
+            'service_type' => 'required|string',
+            'customer_id' => 'nullable|exists:customers,id',
+        ]);
+
+        $pricingService = new DivePricingService();
+        $customerType = null;
+
+        if (isset($validated['customer_id'])) {
+            $customer = Customer::find($validated['customer_id']);
+            if ($customer) {
+                $customerType = $pricingService->getCustomerType($customer);
+            }
+        }
+
+        $suggestions = $pricingService->getPriceSuggestions(
+            $validated['dive_count'],
+            $validated['service_type'],
+            $customerType
+        );
+
+        return response()->json([
+            'dive_count' => $validated['dive_count'],
+            'service_type' => $validated['service_type'],
+            'customer_type' => $customerType,
+            'suggestions' => $suggestions,
+        ]);
+    }
+
+    /**
+     * Get tiers for a price list item.
+     */
+    public function getTiers(PriceListItem $priceListItem)
+    {
+        $user = request()->user();
+        $diveCenter = $user->diveCenter;
+        
+        if ($priceListItem->priceList->dive_center_id !== $diveCenter->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $tiers = $priceListItem->priceTiers()->orderBy('from_dives')->get();
+        return response()->json($tiers);
+    }
+
+    /**
+     * Create a tier for a price list item.
+     */
+    public function createTier(Request $request, PriceListItem $priceListItem)
+    {
+        $user = $request->user();
+        $diveCenter = $user->diveCenter;
+        
+        if ($priceListItem->priceList->dive_center_id !== $diveCenter->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'tier_name' => 'nullable|string|max:100',
+            'from_dives' => 'required|integer|min:1',
+            'to_dives' => 'required|integer|min:1|gte:from_dives',
+            'price_per_dive' => 'required|numeric|min:0',
+            'total_price' => 'nullable|numeric|min:0',
+            'is_active' => 'nullable|boolean',
+            'sort_order' => 'nullable|integer',
+        ]);
+
+        $validated['item_id'] = $priceListItem->id;
+        $validated['is_active'] = $validated['is_active'] ?? true;
+        $validated['sort_order'] = $validated['sort_order'] ?? 0;
+
+        $tier = PriceListItemTier::create($validated);
+
+        return response()->json($tier, 201);
+    }
+
+    /**
+     * Update a tier for a price list item.
+     */
+    public function updateTier(Request $request, PriceListItem $priceListItem, PriceListItemTier $tier)
+    {
+        $user = $request->user();
+        $diveCenter = $user->diveCenter;
+        
+        if ($priceListItem->priceList->dive_center_id !== $diveCenter->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        if ($tier->item_id !== $priceListItem->id) {
+            return response()->json(['message' => 'Tier does not belong to this item'], 422);
+        }
+
+        $validated = $request->validate([
+            'tier_name' => 'nullable|string|max:100',
+            'from_dives' => 'sometimes|integer|min:1',
+            'to_dives' => 'sometimes|integer|min:1|gte:from_dives',
+            'price_per_dive' => 'sometimes|numeric|min:0',
+            'total_price' => 'nullable|numeric|min:0',
+            'is_active' => 'nullable|boolean',
+            'sort_order' => 'nullable|integer',
+        ]);
+
+        $tier->update($validated);
+
+        return response()->json($tier);
+    }
+
+    /**
+     * Delete a tier for a price list item.
+     */
+    public function deleteTier(PriceListItem $priceListItem, PriceListItemTier $tier)
+    {
+        $user = request()->user();
+        $diveCenter = $user->diveCenter;
+        
+        if ($priceListItem->priceList->dive_center_id !== $diveCenter->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        if ($tier->item_id !== $priceListItem->id) {
+            return response()->json(['message' => 'Tier does not belong to this item'], 422);
+        }
+
+        $tier->delete();
+
+        return response()->noContent();
     }
 }
 

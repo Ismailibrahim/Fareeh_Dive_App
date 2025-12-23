@@ -68,6 +68,11 @@ class Agent extends Model
         return $this->belongsToMany(Tag::class, 'agent_tags');
     }
 
+    public function diveGroups(): HasMany
+    {
+        return $this->hasMany(DiveGroup::class);
+    }
+
     // Performance Metrics Accessors
     public function getTotalClientsReferredAttribute(): int
     {

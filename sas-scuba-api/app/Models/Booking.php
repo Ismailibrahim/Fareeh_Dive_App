@@ -10,6 +10,7 @@ class Booking extends Model
         'dive_center_id',
         'customer_id',
         'agent_id',
+        'dive_group_id',
         'booking_date',
         'number_of_divers',
         'status',
@@ -36,6 +37,11 @@ class Booking extends Model
     public function agent()
     {
         return $this->belongsTo(Agent::class);
+    }
+
+    public function diveGroup()
+    {
+        return $this->belongsTo(DiveGroup::class);
     }
 
     public function bookingDives()

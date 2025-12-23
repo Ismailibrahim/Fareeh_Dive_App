@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\BookingDive;
 use App\Models\Booking;
+use App\Models\DiveGroup;
+use App\Services\DivePricingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -18,7 +20,7 @@ class BookingDiveController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = BookingDive::with(['booking.customer', 'diveSite', 'boat', 'priceListItem']);
+        $query = BookingDive::with(['booking.customer', 'booking.diveGroup', 'diveSite', 'boat', 'priceListItem']);
 
         if ($user->dive_center_id) {
             // Use join instead of whereHas for better performance
@@ -41,8 +43,11 @@ class BookingDiveController extends Controller
         $validated = $request->validate([
             'booking_id' => 'nullable|exists:bookings,id',
             'customer_id' => 'nullable|exists:customers,id',
+            'dive_group_id' => 'nullable|exists:dive_groups,id',
             'booking_date' => 'nullable|date',
             'number_of_divers' => 'nullable|integer|min:1',
+            'member_diver_counts' => 'nullable|array',
+            'member_diver_counts.*' => 'integer|min:1',
             'dive_site_id' => 'required|exists:dive_sites,id',
             'boat_id' => 'nullable|exists:boats,id',
             'dive_date' => 'nullable|date',
@@ -55,6 +60,124 @@ class BookingDiveController extends Controller
             'completed_at' => 'nullable|date',
             'dive_log_notes' => 'nullable|string',
         ]);
+
+        // Handle dive group booking
+        if (isset($validated['dive_group_id'])) {
+            $diveGroup = DiveGroup::where('id', $validated['dive_group_id'])
+                ->where('dive_center_id', $diveCenterId)
+                ->with('members')
+                ->firstOrFail();
+
+            if (!$diveGroup->isActive()) {
+                return response()->json([
+                    'message' => 'Cannot book for inactive group'
+                ], 422);
+            }
+
+            $members = $diveGroup->members;
+            if ($members->isEmpty()) {
+                return response()->json([
+                    'message' => 'Group has no members'
+                ], 422);
+            }
+
+            // Create bookings for all group members
+            DB::beginTransaction();
+            try {
+                $bookings = [];
+                $bookingDives = [];
+                $memberDiverCounts = $validated['member_diver_counts'] ?? [];
+
+                foreach ($members as $member) {
+                    // Use per-member diver count if provided, otherwise fallback to number_of_divers or default to 1
+                    // Handle both string and integer keys from JSON
+                    $diverCount = 1;
+                    if (!empty($memberDiverCounts)) {
+                        // Try integer key first
+                        if (isset($memberDiverCounts[$member->id])) {
+                            $diverCount = (int)$memberDiverCounts[$member->id];
+                        } 
+                        // Try string key (JSON often sends numeric keys as strings)
+                        elseif (isset($memberDiverCounts[(string)$member->id])) {
+                            $diverCount = (int)$memberDiverCounts[(string)$member->id];
+                        }
+                        // Fallback to number_of_divers if set
+                        elseif (isset($validated['number_of_divers'])) {
+                            $diverCount = (int)$validated['number_of_divers'];
+                        }
+                    } elseif (isset($validated['number_of_divers'])) {
+                        $diverCount = (int)$validated['number_of_divers'];
+                    }
+
+                    $booking = Booking::create([
+                        'dive_center_id' => $diveCenterId,
+                        'customer_id' => $member->id,
+                        'agent_id' => $diveGroup->agent_id,
+                        'dive_group_id' => $diveGroup->id,
+                        'booking_date' => $validated['booking_date'] ?? $validated['dive_date'] ?? now()->toDateString(),
+                        'number_of_divers' => $diverCount,
+                        'status' => 'Pending',
+                    ]);
+
+                    // Prepare dive data for this member
+                    $diveData = [
+                        'booking_id' => $booking->id,
+                        'dive_site_id' => $validated['dive_site_id'],
+                        'boat_id' => $validated['boat_id'] ?? null,
+                        'dive_date' => $validated['dive_date'] ?? null,
+                        'dive_time' => $validated['dive_time'] ?? null,
+                        'price_list_item_id' => $validated['price_list_item_id'] ?? null,
+                        'price' => $validated['price'] ?? null,
+                        'dive_duration' => $validated['dive_duration'] ?? null,
+                        'max_depth' => $validated['max_depth'] ?? null,
+                        'status' => $validated['status'] ?? 'Scheduled',
+                        'completed_at' => $validated['completed_at'] ?? null,
+                        'dive_log_notes' => $validated['dive_log_notes'] ?? null,
+                    ];
+
+                    // Auto-select price if not provided
+                    if (!isset($diveData['price_list_item_id'])) {
+                        $pricingService = new DivePricingService();
+                        $existingDiveCount = $booking->bookingDives()->count();
+                        $newDiveCount = $existingDiveCount + 1;
+                        $customerType = $pricingService->getCustomerType($member);
+                        $priceListItem = $pricingService->getBestPrice(
+                            $newDiveCount,
+                            'Dive Trip',
+                            $customerType,
+                            $validated['dive_date'] ?? now()->toDateString()
+                        );
+                        
+                        if ($priceListItem) {
+                            $diveData['price_list_item_id'] = $priceListItem->id;
+                            if ($priceListItem->pricing_model === 'TIERED') {
+                                $diveData['price'] = $pricingService->calculateTieredPrice($newDiveCount, $priceListItem);
+                            } else {
+                                $diveData['price'] = $priceListItem->base_price ?? $priceListItem->price;
+                            }
+                        }
+                    }
+
+                    $bookingDive = BookingDive::create($diveData);
+                    $bookings[] = $booking;
+                    $bookingDives[] = $bookingDive;
+                }
+
+                DB::commit();
+                
+                return response()->json([
+                    'message' => 'Bookings created successfully for group',
+                    'bookings' => $bookings,
+                    'booking_dives' => $bookingDives,
+                ], 201);
+            } catch (\Exception $e) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'Failed to create group bookings',
+                    'error' => $e->getMessage()
+                ], 500);
+            }
+        }
 
         // Walk-in support: Auto-create booking if booking_id not provided
         $bookingId = $validated['booking_id'] ?? null;
@@ -86,7 +209,7 @@ class BookingDiveController extends Controller
             }
         } elseif (!$bookingId) {
             return response()->json([
-                'message' => 'Either booking_id or customer_id must be provided'
+                'message' => 'Either booking_id, customer_id, or dive_group_id must be provided'
             ], 422);
         }
 
@@ -107,13 +230,47 @@ class BookingDiveController extends Controller
             }
         }
 
-        // Validate price_list_item belongs to same dive center if provided
+        // Auto-select price if not provided
+        $priceListItem = null;
+        $autoSelectedPrice = null;
+        
         if (isset($validated['price_list_item_id'])) {
+            // Validate manually selected price_list_item belongs to same dive center
             $priceListItem = \App\Models\PriceListItem::where('id', $validated['price_list_item_id'])
                 ->whereHas('priceList', function ($q) use ($diveCenterId) {
                     $q->where('dive_center_id', $diveCenterId);
                 })
                 ->firstOrFail();
+        } else {
+            // Auto-select best price based on dive count
+            $pricingService = new DivePricingService();
+            
+            // Count existing dives for this booking
+            $existingDiveCount = $booking->bookingDives()->count();
+            $newDiveCount = $existingDiveCount + 1;
+            
+            // Get customer type
+            $customerType = null;
+            if ($booking->customer) {
+                $customerType = $pricingService->getCustomerType($booking->customer);
+            }
+            
+            // Get best price for the dive count
+            $priceListItem = $pricingService->getBestPrice(
+                $newDiveCount,
+                'Dive Trip', // Default service type, can be made configurable
+                $customerType,
+                $validated['dive_date'] ?? now()->toDateString()
+            );
+            
+            if ($priceListItem) {
+                // Calculate price based on pricing model
+                if ($priceListItem->pricing_model === 'TIERED') {
+                    $autoSelectedPrice = $pricingService->calculateTieredPrice($newDiveCount, $priceListItem);
+                } else {
+                    $autoSelectedPrice = $priceListItem->base_price ?? $priceListItem->price;
+                }
+            }
         }
 
         // Prepare dive data
@@ -123,8 +280,8 @@ class BookingDiveController extends Controller
             'boat_id' => $validated['boat_id'] ?? null,
             'dive_date' => $validated['dive_date'] ?? null,
             'dive_time' => $validated['dive_time'] ?? null,
-            'price_list_item_id' => $validated['price_list_item_id'] ?? null,
-            'price' => $validated['price'] ?? null,
+            'price_list_item_id' => $priceListItem ? $priceListItem->id : ($validated['price_list_item_id'] ?? null),
+            'price' => $validated['price'] ?? $autoSelectedPrice,
             'dive_duration' => $validated['dive_duration'] ?? null,
             'max_depth' => $validated['max_depth'] ?? null,
             'status' => $validated['status'] ?? 'Scheduled',

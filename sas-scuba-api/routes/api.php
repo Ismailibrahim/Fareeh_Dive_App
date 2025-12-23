@@ -117,16 +117,44 @@ Route::prefix('v1')->group(function () {
         Route::post('/price-list-items/bulk', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'bulkUpdate']);
         Route::post('/price-lists/{priceListId}/items/bulk-adjust-prices', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'bulkAdjustPrices']);
         Route::post('/price-lists/{priceListId}/items/bulk-update-tax-service', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'bulkUpdateTaxService']);
+        Route::get('/price-list-items/suggest-price', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'suggestPrice']);
+        
+        // Price list item tiers routes
+        Route::get('/price-list-items/{priceListItem}/tiers', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'getTiers']);
+        Route::post('/price-list-items/{priceListItem}/tiers', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'createTier']);
+        Route::put('/price-list-items/{priceListItem}/tiers/{tier}', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'updateTier']);
+        Route::delete('/price-list-items/{priceListItem}/tiers/{tier}', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'deleteTier']);
+        
+        // Pricing rules routes
+        Route::apiResource('pricing-rules', \App\Http\Controllers\Api\V1\PricingRuleController::class);
         Route::apiResource('dive-packages', \App\Http\Controllers\Api\V1\DivePackageController::class);
         Route::get('dive-packages/{divePackage}/status', [\App\Http\Controllers\Api\V1\DivePackageController::class, 'status']);
+        
+        // Package template routes
+        Route::apiResource('packages', \App\Http\Controllers\Api\V1\PackageController::class);
+        Route::get('packages/{package}/breakdown', [\App\Http\Controllers\Api\V1\PackageController::class, 'breakdown']);
+        Route::post('packages/{package}/calculate', [\App\Http\Controllers\Api\V1\PackageController::class, 'calculate']);
+        
+        // Package booking routes
+        Route::apiResource('package-bookings', \App\Http\Controllers\Api\V1\PackageBookingController::class);
+        Route::post('package-bookings/calculate', [\App\Http\Controllers\Api\V1\PackageBookingController::class, 'calculate']);
+        Route::post('package-bookings/{packageBooking}/create-bookings', [\App\Http\Controllers\Api\V1\PackageBookingController::class, 'createBookings']);
         Route::apiResource('invoices', \App\Http\Controllers\Api\V1\InvoiceController::class);
         Route::post('invoices/generate-from-booking', [\App\Http\Controllers\Api\V1\InvoiceController::class, 'generateFromBooking']);
         Route::post('invoices/{invoice}/add-damage-charge', [\App\Http\Controllers\Api\V1\InvoiceController::class, 'addDamageCharge']);
         Route::post('invoices/{invoice}/add-item', [\App\Http\Controllers\Api\V1\InvoiceController::class, 'addItem']);
         Route::delete('invoices/{invoice}/items/{invoiceItem}', [\App\Http\Controllers\Api\V1\InvoiceController::class, 'deleteItem']);
         Route::apiResource('payments', \App\Http\Controllers\Api\V1\PaymentController::class);
+        Route::apiResource('payment-methods', \App\Http\Controllers\Api\V1\PaymentMethodController::class);
         Route::apiResource('equipment-baskets', \App\Http\Controllers\Api\V1\EquipmentBasketController::class);
         Route::put('equipment-baskets/{equipmentBasket}/return', [\App\Http\Controllers\Api\V1\EquipmentBasketController::class, 'returnBasket']);
+        
+        // Dive groups routes
+        Route::apiResource('dive-groups', \App\Http\Controllers\Api\V1\DiveGroupController::class);
+        Route::post('dive-groups/{diveGroup}/members', [\App\Http\Controllers\Api\V1\DiveGroupController::class, 'addMember']);
+        Route::delete('dive-groups/{diveGroup}/members/{customer}', [\App\Http\Controllers\Api\V1\DiveGroupController::class, 'removeMember']);
+        Route::post('dive-groups/{diveGroup}/book', [\App\Http\Controllers\Api\V1\DiveGroupController::class, 'bookGroup']);
+        Route::post('dive-groups/{diveGroup}/invoice', [\App\Http\Controllers\Api\V1\DiveGroupController::class, 'generateInvoice']);
     });
 
     // Public pre-registration routes (no authentication required)
