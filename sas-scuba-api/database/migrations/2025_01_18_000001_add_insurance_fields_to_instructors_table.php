@@ -11,6 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Check if table exists before trying to alter it
+        if (!Schema::hasTable('instructors')) {
+            return;
+        }
+
         Schema::table('instructors', function (Blueprint $table) {
             // Add insurance_provider_contact_no if it doesn't exist
             if (!Schema::hasColumn('instructors', 'insurance_provider_contact_no')) {
@@ -29,6 +34,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('instructors')) {
+            return;
+        }
+
         Schema::table('instructors', function (Blueprint $table) {
             if (Schema::hasColumn('instructors', 'insurance_provider_contact_no')) {
                 $table->dropColumn('insurance_provider_contact_no');

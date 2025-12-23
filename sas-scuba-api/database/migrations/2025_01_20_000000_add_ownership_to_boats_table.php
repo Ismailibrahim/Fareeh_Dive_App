@@ -11,9 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Check if table exists before trying to alter it
+        if (!Schema::hasTable('boats')) {
+            return;
+        }
+
         Schema::table('boats', function (Blueprint $table) {
-            $table->boolean('ownership')->default(true)->after('active');
-            // true = Owned, false = Rented
+            // Check if column doesn't already exist
+            if (!Schema::hasColumn('boats', 'ownership')) {
+                $table->boolean('ownership')->default(true)->after('active');
+                // true = Owned, false = Rented
+            }
         });
     }
 
@@ -22,8 +30,14 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('boats')) {
+            return;
+        }
+
         Schema::table('boats', function (Blueprint $table) {
-            $table->dropColumn('ownership');
+            if (Schema::hasColumn('boats', 'ownership')) {
+                $table->dropColumn('ownership');
+            }
         });
     }
 };

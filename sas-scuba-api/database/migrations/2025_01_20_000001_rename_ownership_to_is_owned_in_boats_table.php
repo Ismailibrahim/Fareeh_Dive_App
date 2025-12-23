@@ -12,6 +12,16 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Check if table exists before trying to alter it
+        if (!Schema::hasTable('boats')) {
+            return;
+        }
+
+        // Check if ownership column exists (from previous migration)
+        if (!Schema::hasColumn('boats', 'ownership')) {
+            return;
+        }
+
         // Use raw SQL for better compatibility across database systems
         $driver = DB::getDriverName();
         
@@ -49,6 +59,15 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('boats')) {
+            return;
+        }
+
+        // Check if is_owned column exists
+        if (!Schema::hasColumn('boats', 'is_owned')) {
+            return;
+        }
+
         $driver = DB::getDriverName();
         
         if ($driver === 'mysql') {
