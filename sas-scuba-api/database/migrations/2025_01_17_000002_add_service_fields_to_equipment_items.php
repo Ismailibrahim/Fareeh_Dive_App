@@ -11,12 +11,28 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Check if table exists before trying to alter it
+        if (!Schema::hasTable('equipment_items')) {
+            return;
+        }
+
         Schema::table('equipment_items', function (Blueprint $table) {
-            $table->date('purchase_date')->nullable();
-            $table->boolean('requires_service')->default(false);
-            $table->integer('service_interval_days')->nullable();
-            $table->date('last_service_date')->nullable();
-            $table->date('next_service_date')->nullable();
+            // Check if columns don't already exist
+            if (!Schema::hasColumn('equipment_items', 'purchase_date')) {
+                $table->date('purchase_date')->nullable();
+            }
+            if (!Schema::hasColumn('equipment_items', 'requires_service')) {
+                $table->boolean('requires_service')->default(false);
+            }
+            if (!Schema::hasColumn('equipment_items', 'service_interval_days')) {
+                $table->integer('service_interval_days')->nullable();
+            }
+            if (!Schema::hasColumn('equipment_items', 'last_service_date')) {
+                $table->date('last_service_date')->nullable();
+            }
+            if (!Schema::hasColumn('equipment_items', 'next_service_date')) {
+                $table->date('next_service_date')->nullable();
+            }
         });
     }
 

@@ -12,10 +12,18 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Check if table exists before trying to alter it
+        if (!Schema::hasTable('equipment_items')) {
+            return;
+        }
+
         // For MySQL, we can reorder columns using MODIFY COLUMN ... AFTER
         if (DB::getDriverName() === 'mysql') {
-            DB::statement('ALTER TABLE equipment_items MODIFY COLUMN created_at TIMESTAMP NULL AFTER color');
-            DB::statement('ALTER TABLE equipment_items MODIFY COLUMN updated_at TIMESTAMP NULL AFTER created_at');
+            // Check if color column exists (from previous migration)
+            if (Schema::hasColumn('equipment_items', 'color')) {
+                DB::statement('ALTER TABLE equipment_items MODIFY COLUMN created_at TIMESTAMP NULL AFTER color');
+                DB::statement('ALTER TABLE equipment_items MODIFY COLUMN updated_at TIMESTAMP NULL AFTER created_at');
+            }
         }
         // For other databases, we'll need to drop and recreate the columns
         // Note: This approach preserves data
