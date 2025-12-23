@@ -11,8 +11,21 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Check if table exists before trying to alter it
+        if (!Schema::hasTable('equipment_items')) {
+            return;
+        }
+
         Schema::table('equipment_items', function (Blueprint $table) {
-            $table->string('image_url')->nullable()->after('color');
+            // Check if column doesn't already exist
+            if (!Schema::hasColumn('equipment_items', 'image_url')) {
+                // Try to add after 'color' if it exists, otherwise just add it
+                if (Schema::hasColumn('equipment_items', 'color')) {
+                    $table->string('image_url')->nullable()->after('color');
+                } else {
+                    $table->string('image_url')->nullable();
+                }
+            }
         });
     }
 
@@ -21,8 +34,14 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('equipment_items')) {
+            return;
+        }
+
         Schema::table('equipment_items', function (Blueprint $table) {
-            $table->dropColumn('image_url');
+            if (Schema::hasColumn('equipment_items', 'image_url')) {
+                $table->dropColumn('image_url');
+            }
         });
     }
 };
