@@ -15,9 +15,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EquipmentItem, equipmentItemService } from "@/lib/api/services/equipment-item.service";
 import { equipmentServiceHistoryService, BulkServiceFormData } from "@/lib/api/services/equipment-service-history.service";
+import { serviceProviderService, ServiceProvider } from "@/lib/api/services/service-provider.service";
 import { useState, useEffect } from "react";
 import { Wrench, User, Building, DollarSign, Package, Calculator } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -31,7 +33,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckCircle, AlertCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, AlertCircle, Calendar } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const bulkServiceSchema = z.object({
@@ -51,6 +53,7 @@ interface BulkServiceFormProps {
 
 export function BulkServiceForm({ onSuccess }: BulkServiceFormProps) {
     const [equipmentItems, setEquipmentItems] = useState<EquipmentItem[]>([]);
+    const [serviceProviders, setServiceProviders] = useState<ServiceProvider[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
@@ -76,6 +79,7 @@ export function BulkServiceForm({ onSuccess }: BulkServiceFormProps) {
 
     useEffect(() => {
         fetchEquipmentItems();
+        fetchServiceProviders();
     }, []);
 
     const fetchEquipmentItems = async () => {
@@ -89,6 +93,16 @@ export function BulkServiceForm({ onSuccess }: BulkServiceFormProps) {
             setErrorMessage("Failed to load equipment items");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchServiceProviders = async () => {
+        try {
+            const data = await serviceProviderService.getAll();
+            setServiceProviders(data);
+        } catch (error) {
+            console.error("Failed to fetch service providers", error);
+            // Don't show error message for service providers as it's not critical
         }
     };
 
@@ -322,11 +336,6 @@ export function BulkServiceForm({ onSuccess }: BulkServiceFormProps) {
                                                     ) : (
                                                         "-"
                                                     )}
-                                                    ) : item.requires_service ? (
-                                                        <span className="text-muted-foreground">Not set</span>
-                                                    ) : (
-                                                        "-"
-                                                    )}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge variant={getStatusVariant(item.status)}>
@@ -415,12 +424,26 @@ export function BulkServiceForm({ onSuccess }: BulkServiceFormProps) {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Service Provider</FormLabel>
-                                        <FormControl>
-                                            <div className="relative">
-                                                <Building className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                                <Input placeholder="Service provider name" className="pl-9" {...field} />
-                                            </div>
-                                        </FormControl>
+                                        <Select 
+                                            onValueChange={field.onChange} 
+                                            value={field.value || undefined}
+                                        >
+                                            <FormControl>
+                                                <div className="relative">
+                                                    <Building className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                                                    <SelectTrigger className="pl-9">
+                                                        <SelectValue placeholder="Select a service provider" />
+                                                    </SelectTrigger>
+                                                </div>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {serviceProviders.map((provider) => (
+                                                    <SelectItem key={provider.id} value={provider.name}>
+                                                        {provider.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                         <FormMessage />
                                     </FormItem>
                                 )}
