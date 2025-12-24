@@ -12,6 +12,7 @@ import { useCustomer } from "@/lib/hooks/use-customers";
 import { CustomerCertificationsSection } from "@/components/customers/CustomerCertificationsSection";
 import { CustomerInsuranceSection } from "@/components/customers/CustomerInsuranceSection";
 import { CustomerAccommodationSection } from "@/components/customers/CustomerAccommodationSection";
+import { safeFormatDate } from "@/lib/utils/date-format";
 
 export default function CustomerDetailPage() {
     const params = useParams();
@@ -121,7 +122,7 @@ export default function CustomerDetailPage() {
                                                         <Calendar className="h-4 w-4 text-muted-foreground" />
                                                         Date of Birth
                                                     </div>
-                                                    <p className="text-sm">{customer.date_of_birth}</p>
+                                                    <p className="text-sm">{safeFormatDate(customer.date_of_birth, "MMM d, yyyy", "N/A")}</p>
                                                 </div>
                                             )}
                                         </div>
@@ -208,7 +209,7 @@ export default function CustomerDetailPage() {
                                     )}
 
                                     {/* Travel Documents Section */}
-                                    {(customer.passport_no || customer.nationality) && (
+                                    {(customer.passport_no || customer.nationality || customer.gender) && (
                                         <div className="pt-4 border-t">
                                             <div className="flex items-center gap-2 text-sm font-semibold text-primary mb-3">
                                                 <FileText className="h-4 w-4" />
@@ -222,6 +223,15 @@ export default function CustomerDetailPage() {
                                                             Passport No
                                                         </div>
                                                         <p className="text-sm">{customer.passport_no}</p>
+                                                    </div>
+                                                )}
+                                                {customer.gender && (
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2 text-sm font-medium">
+                                                            <UserCircle className="h-4 w-4 text-muted-foreground" />
+                                                            Gender
+                                                        </div>
+                                                        <p className="text-sm">{customer.gender}</p>
                                                     </div>
                                                 )}
                                                 {customer.nationality && (
@@ -238,20 +248,20 @@ export default function CustomerDetailPage() {
                                     )}
 
                                     {/* Departure Information Section */}
-                                    {(customer.departure_date || customer.departure_flight || customer.departure_to) && (
+                                    {(customer.departure_date || customer.departure_flight || customer.departure_flight_time || customer.departure_to) && (
                                         <div className="pt-4 border-t">
                                             <div className="flex items-center gap-2 text-sm font-semibold text-primary mb-3">
                                                 <Plane className="h-4 w-4" />
                                                 Departure Information
                                             </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                                 {customer.departure_date && (
                                                     <div className="space-y-1">
                                                         <div className="flex items-center gap-2 text-sm font-medium">
                                                             <Calendar className="h-4 w-4 text-muted-foreground" />
                                                             Departure Date
                                                         </div>
-                                                        <p className="text-sm">{customer.departure_date}</p>
+                                                        <p className="text-sm">{safeFormatDate(customer.departure_date, "MMM d, yyyy", "N/A")}</p>
                                                     </div>
                                                 )}
                                                 {customer.departure_flight && (
@@ -261,6 +271,15 @@ export default function CustomerDetailPage() {
                                                             Departure Flight
                                                         </div>
                                                         <p className="text-sm">{customer.departure_flight}</p>
+                                                    </div>
+                                                )}
+                                                {customer.departure_flight_time && (
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2 text-sm font-medium">
+                                                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                                                            Flight Time
+                                                        </div>
+                                                        <p className="text-sm">{customer.departure_flight_time}</p>
                                                     </div>
                                                 )}
                                                 {customer.departure_to && (
@@ -284,7 +303,7 @@ export default function CustomerDetailPage() {
                     <EmergencyContactsSection customerId={id} />
 
                     {/* Certifications Section */}
-                    <CustomerCertificationsSection customerId={id} />
+                    <CustomerCertificationsSection customerId={id} customer={customer} />
 
                     {/* Insurance Section */}
                     <CustomerInsuranceSection customerId={id} />
