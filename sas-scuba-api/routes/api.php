@@ -55,8 +55,11 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('booking-dives', \App\Http\Controllers\Api\V1\BookingDiveController::class);
         Route::post('booking-dives/{bookingDive}/complete', [\App\Http\Controllers\Api\V1\BookingDiveController::class, 'complete']);
         Route::get('booking-dives/{bookingDive}/log', [\App\Http\Controllers\Api\V1\BookingDiveController::class, 'log']);
+        Route::get('boat-list', [\App\Http\Controllers\Api\V1\BoatListController::class, 'index']);
         Route::apiResource('booking-equipment', \App\Http\Controllers\Api\V1\BookingEquipmentController::class);
         Route::post('booking-equipment/check-availability', [\App\Http\Controllers\Api\V1\BookingEquipmentController::class, 'checkAvailability']);
+        Route::post('booking-equipment/bulk-check-availability', [\App\Http\Controllers\Api\V1\BookingEquipmentController::class, 'bulkCheckAvailability']);
+        Route::post('booking-equipment/bulk', [\App\Http\Controllers\Api\V1\BookingEquipmentController::class, 'bulkStore']);
         Route::put('booking-equipment/{bookingEquipment}/return', [\App\Http\Controllers\Api\V1\BookingEquipmentController::class, 'returnEquipment']);
         Route::post('booking-equipment/bulk-return', [\App\Http\Controllers\Api\V1\BookingEquipmentController::class, 'bulkReturn']);
         Route::apiResource('booking-instructors', \App\Http\Controllers\Api\V1\BookingInstructorController::class);
@@ -67,6 +70,8 @@ Route::prefix('v1')->group(function () {
         Route::post('equipment/import', [\App\Http\Controllers\Api\V1\EquipmentController::class, 'import']);
         Route::apiResource('equipment', \App\Http\Controllers\Api\V1\EquipmentController::class);
         Route::apiResource('equipment-items', \App\Http\Controllers\Api\V1\EquipmentItemController::class);
+        Route::post('equipment-items/find-available-by-type', [\App\Http\Controllers\Api\V1\EquipmentItemController::class, 'findAvailableByEquipmentType']);
+        Route::get('equipment-items/{equipmentItem}/assignment-history', [\App\Http\Controllers\Api\V1\EquipmentItemController::class, 'assignmentHistory']);
         Route::apiResource('boats', \App\Http\Controllers\Api\V1\BoatController::class);
         Route::apiResource('dive-sites', \App\Http\Controllers\Api\V1\DiveSiteController::class);
         Route::apiResource('dive-logs', \App\Http\Controllers\Api\V1\DiveLogController::class);
@@ -83,6 +88,9 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('service-providers', \App\Http\Controllers\Api\V1\ServiceProviderController::class);
         Route::apiResource('categories', \App\Http\Controllers\Api\V1\CategoryController::class);
         Route::apiResource('locations', \App\Http\Controllers\Api\V1\LocationController::class);
+        Route::apiResource('suppliers', \App\Http\Controllers\Api\V1\SupplierController::class);
+        Route::apiResource('expense-categories', \App\Http\Controllers\Api\V1\ExpenseCategoryController::class);
+        Route::apiResource('expenses', \App\Http\Controllers\Api\V1\ExpenseController::class);
         Route::apiResource('service-types', \App\Http\Controllers\Api\V1\ServiceTypeController::class);
         Route::apiResource('taxes', \App\Http\Controllers\Api\V1\TaxController::class);
         Route::apiResource('instructors', \App\Http\Controllers\Api\V1\InstructorController::class);
