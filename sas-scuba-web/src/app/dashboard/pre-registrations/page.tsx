@@ -36,7 +36,13 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Eye, Check, X, Copy, ExternalLink, AlertCircle, User, Mail, Phone, Calendar, Award, Building, MapPin, Download, QrCode } from "lucide-react";
 import { preRegistrationService, PreRegistrationSubmission, PreRegistrationSubmissionDetail } from "@/lib/api/services/pre-registration.service";
 import { safeFormatDate } from "@/lib/utils/date-format";
-import QRCode from "react-qr-code";
+import dynamic from "next/dynamic";
+
+// Lazy load QRCode component to reduce initial bundle size
+const QRCode = dynamic(() => import("react-qr-code"), {
+    loading: () => <div className="w-32 h-32 bg-gray-100 animate-pulse rounded" />,
+    ssr: false,
+});
 
 export default function PreRegistrationsPage() {
     const router = useRouter();

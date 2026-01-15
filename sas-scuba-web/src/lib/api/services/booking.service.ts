@@ -1,11 +1,14 @@
 import apiClient from "../client";
 import { Customer } from "./customer.service";
+import { DiveGroup } from "./dive-group.service";
 
 export interface Booking {
     id: number;
     dive_center_id: number;
     customer_id: number;
     customer?: Customer;
+    dive_group_id?: number;
+    dive_group?: DiveGroup;
     booking_date?: string;
     start_date?: string;
     number_of_divers?: number;
@@ -27,9 +30,33 @@ export interface BookingFormData {
     notes?: string;
 }
 
+export interface PaginationParams {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    status?: string;
+}
+
+export interface PaginatedResponse<T> {
+    data: T[];
+    total: number;
+    per_page: number;
+    current_page: number;
+    last_page: number;
+    from?: number;
+    to?: number;
+}
+
 export const bookingService = {
-    getAll: async (page = 1) => {
-        const response = await apiClient.get<{ data: Booking[]; meta: any }>(`/api/v1/bookings?page=${page}`);
+    getAll: async (params?: PaginationParams) => {
+        const queryParams = new URLSearchParams();
+        if (params?.page) queryParams.append('page', String(params.page));
+        if (params?.per_page) queryParams.append('per_page', String(params.per_page));
+        if (params?.search) queryParams.append('search', params.search);
+        if (params?.status) queryParams.append('status', params.status);
+        
+        const queryString = queryParams.toString();
+        const response = await apiClient.get<{ data: Booking[]; meta: any }>(`/api/v1/bookings${queryString ? `?${queryString}` : ''}`);
         return response.data;
     },
 

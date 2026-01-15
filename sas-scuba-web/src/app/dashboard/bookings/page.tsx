@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useMemo } from "react";
+import { useDebouncedCallback } from "use-debounce";
 import { Header } from "@/components/layout/Header";
-import { Booking, bookingService } from "@/lib/api/services/booking.service";
+import { Booking } from "@/lib/api/services/booking.service";
+import { useBookings, useDeleteBooking } from "@/lib/hooks/use-bookings";
+import { Pagination } from "@/components/ui/pagination";
 import {
     Table,
     TableBody,
@@ -38,40 +41,61 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function BookingsPage() {
-    const [bookings, setBookings] = useState<Booking[]>([]);
-    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
 
     // Delete state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [bookingToDelete, setBookingToDelete] = useState<Booking | null>(null);
 
-    const fetchBookings = async () => {
-        setLoading(true);
-        try {
-            const data = await bookingService.getAll();
-            const bookingsList = Array.isArray(data) ? data : (data as any).data || [];
-            setBookings(bookingsList);
-        } catch (error) {
-            console.error("Failed to fetch bookings", error);
-        } finally {
-            setLoading(false);
+    // Debounce search term (500ms delay)
+    const debouncedSearch = useDebouncedCallback((value: string) => {
+        setDebouncedSearchTerm(value);
+        setCurrentPage(1); // Reset to first page on new search
+    }, 500);
+
+    // Fetch bookings using React Query
+    const { data: bookingsData, isLoading, error } = useBookings({
+        page: currentPage,
+        per_page: 20,
+        search: debouncedSearchTerm || undefined,
+    });
+
+    // Delete mutation
+    const deleteMutation = useDeleteBooking();
+
+    // Extract bookings and pagination from response
+    const bookings = useMemo(() => {
+        if (!bookingsData) return [];
+        return bookingsData.data || [];
+    }, [bookingsData]);
+
+    const pagination = useMemo(() => {
+        if (!bookingsData) {
+            return {
+                total: 0,
+                per_page: 20,
+                last_page: 1,
+                current_page: 1,
+            };
         }
+        return {
+            total: bookingsData.total || 0,
+            per_page: bookingsData.per_page || 20,
+            last_page: bookingsData.last_page || 1,
+            current_page: bookingsData.current_page || currentPage,
+        };
+    }, [bookingsData, currentPage]);
+
+    const handleSearchChange = (value: string) => {
+        setSearchTerm(value);
+        debouncedSearch(value);
     };
 
-    useEffect(() => {
-        fetchBookings();
-    }, []);
-
-    // Refresh data when page comes into focus (e.g., when navigating back from edit page)
-    useEffect(() => {
-        const handleFocus = () => {
-            fetchBookings();
-        };
-        
-        window.addEventListener('focus', handleFocus);
-        return () => window.removeEventListener('focus', handleFocus);
-    }, []);
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+    };
 
     const handleDeleteClick = (booking: Booking) => {
         setBookingToDelete(booking);
@@ -81,13 +105,11 @@ export default function BookingsPage() {
     const confirmDelete = async () => {
         if (!bookingToDelete) return;
         try {
-            await bookingService.delete(bookingToDelete.id);
-            setBookings(bookings.filter(b => b.id !== bookingToDelete.id));
-        } catch (error) {
-            console.error("Failed to delete booking", error);
-        } finally {
+            await deleteMutation.mutateAsync(bookingToDelete.id);
             setDeleteDialogOpen(false);
             setBookingToDelete(null);
+        } catch (error) {
+            console.error("Failed to delete booking", error);
         }
     };
 
@@ -106,11 +128,8 @@ export default function BookingsPage() {
         }
     };
 
-    const filteredBookings = bookings.filter(booking =>
-        booking.customer?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        booking.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        booking.status?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Bookings are already filtered by the API, but we can do client-side filtering for instant feedback
+    const filteredBookings = bookings;
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -133,7 +152,7 @@ export default function BookingsPage() {
                             placeholder="Search bookings..."
                             className="pl-8"
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => handleSearchChange(e.target.value)}
                         />
                     </div>
                 </div>
@@ -152,7 +171,7 @@ export default function BookingsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {loading ? (
+                            {isLoading ? (
                                 <TableRow>
                                     <TableCell colSpan={6} className="h-24 text-center">
                                         Loading...
@@ -237,7 +256,7 @@ export default function BookingsPage() {
 
                 {/* Mobile Card View */}
                 <div className="grid grid-cols-1 gap-4 md:hidden">
-                    {loading ? (
+                    {isLoading ? (
                         <Card>
                             <CardContent className="pt-6">
                                 <p className="text-center text-muted-foreground">Loading...</p>
@@ -314,6 +333,17 @@ export default function BookingsPage() {
                         ))
                     )}
                 </div>
+
+                {/* Pagination */}
+                {pagination.last_page > 1 && (
+                    <div className="flex justify-center mt-4">
+                        <Pagination
+                            currentPage={pagination.current_page}
+                            totalPages={pagination.last_page}
+                            onPageChange={handlePageChange}
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Delete Confirmation Dialog */}

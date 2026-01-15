@@ -1,10 +1,20 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Header } from "@/components/layout/Header";
-import { BulkEquipmentItemForm } from "@/components/equipment-items/BulkEquipmentItemForm";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+
+// Lazy load BulkEquipmentItemForm to reduce initial bundle size
+const BulkEquipmentItemForm = dynamic(() => import("@/components/equipment-items/BulkEquipmentItemForm").then(mod => ({ default: mod.BulkEquipmentItemForm })), {
+    loading: () => (
+        <div className="flex items-center justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+    ),
+    ssr: false, // Forms don't need SSR
+});
 
 export default function BulkCreateEquipmentItemPage() {
     return (
