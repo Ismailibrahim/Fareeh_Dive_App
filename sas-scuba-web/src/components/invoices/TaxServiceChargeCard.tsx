@@ -282,8 +282,8 @@ export function TaxServiceChargeCard({ invoice, onUpdate }: TaxServiceChargeCard
             // The backend will recalculate service_charge and tax based on the new mode
             const updatedInvoice = await invoiceService.update(invoice.id, {
                 discount: currentDiscount > 0 ? currentDiscount : 0,
-                recalculate: true, // Force recalculation with new mode
-            });
+                // Note: recalculate is handled by backend based on mode
+            } as any);
             
             console.log('Invoice updated, new values:', JSON.stringify({
                 subtotal: updatedInvoice.subtotal,

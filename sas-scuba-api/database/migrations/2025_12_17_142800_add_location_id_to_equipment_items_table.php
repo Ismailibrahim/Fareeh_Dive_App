@@ -21,9 +21,20 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('equipment_items')) {
+            return;
+        }
+
         Schema::table('equipment_items', function (Blueprint $table) {
-            $table->dropForeign(['location_id']);
-            $table->dropColumn('location_id');
+            if (Schema::hasColumn('equipment_items', 'location_id')) {
+                try {
+                    $table->dropForeign(['location_id']);
+                } catch (\Exception $e) {
+                    // Foreign key might not exist, continue
+                }
+                
+                $table->dropColumn('location_id');
+            }
         });
     }
 };

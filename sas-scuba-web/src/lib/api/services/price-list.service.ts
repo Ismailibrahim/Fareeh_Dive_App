@@ -24,6 +24,14 @@ export interface PriceListItem {
     name: string;
     description?: string;
     price: number;
+    base_price?: number;
+    pricing_model?: 'SINGLE' | 'RANGE' | 'TIERED';
+    min_dives?: number;
+    max_dives?: number;
+    priority?: number;
+    valid_from?: string;
+    valid_until?: string;
+    applicable_to?: 'ALL' | 'MEMBER' | 'NON_MEMBER' | 'GROUP' | 'CORPORATE';
     unit?: string;
     tax_percentage?: number;
     tax_inclusive?: boolean;
@@ -32,6 +40,46 @@ export interface PriceListItem {
     is_active: boolean;
     created_at: string;
     updated_at: string;
+    price_tiers?: PriceListItemTier[];
+}
+
+export interface PriceListItemTier {
+    id: number;
+    item_id: number;
+    tier_name?: string;
+    from_dives: number;
+    to_dives: number;
+    price_per_dive: number;
+    total_price?: number;
+    is_active: boolean;
+    sort_order: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PricingRule {
+    id: number;
+    rule_name: string;
+    rule_type: 'OVERLAP_HANDLING' | 'VALIDATION' | 'DISCOUNT' | 'SURCHARGE';
+    condition?: Record<string, any>;
+    action: 'APPLY_LOWEST' | 'APPLY_HIGHEST_PRIORITY' | 'REJECT' | 'WARN';
+    sort_order: number;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PriceSuggestion {
+    id: number;
+    name: string;
+    description?: string;
+    pricing_model: 'SINGLE' | 'RANGE' | 'TIERED';
+    min_dives: number;
+    max_dives: number;
+    priority: number;
+    price: number;
+    base_price: number;
+    applicable_to: 'ALL' | 'MEMBER' | 'NON_MEMBER' | 'GROUP' | 'CORPORATE';
 }
 
 export interface PriceListItemFormData {
@@ -42,10 +90,37 @@ export interface PriceListItemFormData {
     name: string;
     description?: string;
     price: number;
+    base_price?: number;
+    pricing_model?: 'SINGLE' | 'RANGE' | 'TIERED';
+    min_dives?: number;
+    max_dives?: number;
+    priority?: number;
+    valid_from?: string;
+    valid_until?: string;
+    applicable_to?: 'ALL' | 'MEMBER' | 'NON_MEMBER' | 'GROUP' | 'CORPORATE';
     unit?: string;
     tax_percentage?: number;
     tax_inclusive?: boolean;
     service_charge_inclusive?: boolean;
+    sort_order?: number;
+    is_active?: boolean;
+}
+
+export interface PriceListItemTierFormData {
+    tier_name?: string;
+    from_dives: number;
+    to_dives: number;
+    price_per_dive: number;
+    total_price?: number;
+    is_active?: boolean;
+    sort_order?: number;
+}
+
+export interface PricingRuleFormData {
+    rule_name: string;
+    rule_type: 'OVERLAP_HANDLING' | 'VALIDATION' | 'DISCOUNT' | 'SURCHARGE';
+    condition?: Record<string, any>;
+    action: 'APPLY_LOWEST' | 'APPLY_HIGHEST_PRIORITY' | 'REJECT' | 'WARN';
     sort_order?: number;
     is_active?: boolean;
 }

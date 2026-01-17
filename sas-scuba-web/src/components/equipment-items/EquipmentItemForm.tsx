@@ -28,22 +28,23 @@ import { EquipmentItemImageUpload } from "./EquipmentItemImageUpload";
 
 const equipmentItemSchema = z.object({
     equipment_id: z.string().min(1, "Equipment is required"),
-    location_id: z.string().optional().transform((val) => val === "" ? undefined : val),
+    location_id: z.string().optional().or(z.literal("")),
     size: z.string().optional(),
     serial_no: z.string().optional(),
     inventory_code: z.string().optional(),
     brand: z.string().optional(),
     color: z.string().optional(),
     image_url: z.string().optional(),
-    status: z.enum(['Available', 'Rented', 'Maintenance'], {
-        required_error: "Status is required",
-    }),
+    status: z.enum(['Available', 'Rented', 'Maintenance']),
     purchase_date: z.string().optional(),
     requires_service: z.boolean().optional(),
-    service_interval_days: z.string().optional().transform((val) => val ? parseInt(val) : undefined),
+    service_interval_days: z.string().optional(),
     last_service_date: z.string().optional(),
     next_service_date: z.string().optional(),
 });
+
+// Form values type (matches schema)
+type EquipmentItemFormValues = z.infer<typeof equipmentItemSchema>;
 
 interface EquipmentItemFormProps {
     initialData?: EquipmentItem;
@@ -61,17 +62,21 @@ export function EquipmentItemForm({ initialData, equipmentItemId }: EquipmentIte
     useEffect(() => {
         const fetchEquipment = async () => {
             try {
-                const data = await equipmentService.getAll();
+                // Fetch all equipment with a high per_page to get all items
+                // Add timestamp to bypass browser cache if needed
+                const data = await equipmentService.getAll({ per_page: 1000 });
                 const list = Array.isArray(data) ? data : (data as any).data || [];
                 setEquipment(list);
                 
                 // If editing and initialData has equipment_id, load sizes and brands for that equipment
                 if (initialData?.equipment_id) {
-                    const initialEquipment = list.find((eq) => eq.id === initialData.equipment_id);
-                    if (initialEquipment?.sizes && initialEquipment.sizes.length > 0) {
+                    const initialEquipment = list.find((eq) => {
+                        return eq.id === initialData.equipment_id || String(eq.id) === String(initialData.equipment_id);
+                    });
+                    if (initialEquipment?.sizes && Array.isArray(initialEquipment.sizes) && initialEquipment.sizes.length > 0) {
                         setAvailableSizes(initialEquipment.sizes);
                     }
-                    if (initialEquipment?.brands && initialEquipment.brands.length > 0) {
+                    if (initialEquipment?.brands && Array.isArray(initialEquipment.brands) && initialEquipment.brands.length > 0) {
                         setAvailableBrands(initialEquipment.brands);
                     }
                 }
@@ -96,7 +101,7 @@ export function EquipmentItemForm({ initialData, equipmentItemId }: EquipmentIte
         fetchLocations();
     }, []);
 
-    const form = useForm<EquipmentItemFormData>({
+    const form = useForm<EquipmentItemFormValues>({
         resolver: zodResolver(equipmentItemSchema),
         defaultValues: {
             equipment_id: initialData?.equipment_id ? String(initialData.equipment_id) : "",
@@ -137,32 +142,54 @@ export function EquipmentItemForm({ initialData, equipmentItemId }: EquipmentIte
 
     // Update available sizes and brands when equipment selection changes
     useEffect(() => {
-        if (selectedEquipmentId) {
-            const selectedEquipment = equipment.find((eq) => String(eq.id) === selectedEquipmentId);
-            if (selectedEquipment?.sizes && selectedEquipment.sizes.length > 0) {
-                setAvailableSizes(selectedEquipment.sizes);
-            } else {
-                setAvailableSizes([]);
-            }
-            // Clear size selection if current size is not in available sizes
-            const currentSize = form.getValues('size');
-            if (currentSize && selectedEquipment?.sizes && !selectedEquipment.sizes.includes(currentSize)) {
-                form.setValue('size', '');
-            }
-            
-            if (selectedEquipment?.brands && selectedEquipment.brands.length > 0) {
-                setAvailableBrands(selectedEquipment.brands);
-            } else {
-                setAvailableBrands([]);
-            }
-            // Clear brand selection if current brand is not in available brands
-            const currentBrand = form.getValues('brand');
-            if (currentBrand && selectedEquipment?.brands && !selectedEquipment.brands.includes(currentBrand)) {
-                form.setValue('brand', '');
-            }
-        } else {
+        if (!selectedEquipmentId || equipment.length === 0) {
             setAvailableSizes([]);
             setAvailableBrands([]);
+            if (!selectedEquipmentId) {
+                form.setValue('size', '');
+                form.setValue('brand', '');
+            }
+            return;
+        }
+
+        // Find equipment by comparing IDs (handle both string and number)
+        const selectedEquipment = equipment.find((eq) => {
+            return String(eq.id) === String(selectedEquipmentId) || eq.id === Number(selectedEquipmentId);
+        });
+        
+        if (!selectedEquipment) {
+            console.warn('Equipment not found for ID:', selectedEquipmentId, 'Available equipment:', equipment.map(e => ({ id: e.id, name: e.name })));
+            setAvailableSizes([]);
+            setAvailableBrands([]);
+            return;
+        }
+
+        // Update available sizes - handle both array and null/undefined
+        const sizes = selectedEquipment.sizes;
+        if (sizes && Array.isArray(sizes) && sizes.length > 0) {
+            setAvailableSizes(sizes);
+        } else {
+            setAvailableSizes([]);
+        }
+        
+        // Update available brands - handle both array and null/undefined
+        const brands = selectedEquipment.brands;
+        if (brands && Array.isArray(brands) && brands.length > 0) {
+            setAvailableBrands(brands);
+        } else {
+            setAvailableBrands([]);
+        }
+        
+        // Clear size selection if current size is not in available sizes
+        const currentSize = form.getValues('size');
+        if (currentSize && (!sizes || !Array.isArray(sizes) || !sizes.includes(currentSize))) {
+            form.setValue('size', '');
+        }
+        
+        // Clear brand selection if current brand is not in available brands
+        const currentBrand = form.getValues('brand');
+        if (currentBrand && (!brands || !Array.isArray(brands) || !brands.includes(currentBrand))) {
+            form.setValue('brand', '');
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedEquipmentId, equipment]);
@@ -198,28 +225,28 @@ export function EquipmentItemForm({ initialData, equipmentItemId }: EquipmentIte
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [requiresService, serviceIntervalDays, lastServiceDate, purchaseDate]);
 
-    async function onSubmit(data: z.infer<typeof equipmentItemSchema>) {
+    async function onSubmit(data: EquipmentItemFormValues) {
         setLoading(true);
         try {
             const payload: EquipmentItemFormData = {
                 equipment_id: parseInt(data.equipment_id),
-                location_id: data.location_id ? parseInt(data.location_id) : undefined,
-                size: data.size || undefined,
-                serial_no: data.serial_no || undefined,
-                inventory_code: data.inventory_code || undefined,
-                brand: data.brand || undefined,
-                color: data.color || undefined,
-                image_url: data.image_url || undefined,
+                location_id: data.location_id && data.location_id !== "" ? parseInt(data.location_id) : undefined,
+                size: data.size && data.size !== "" ? data.size : undefined,
+                serial_no: data.serial_no && data.serial_no !== "" ? data.serial_no : undefined,
+                inventory_code: data.inventory_code && data.inventory_code !== "" ? data.inventory_code : undefined,
+                brand: data.brand && data.brand !== "" ? data.brand : undefined,
+                color: data.color && data.color !== "" ? data.color : undefined,
+                image_url: data.image_url && data.image_url !== "" ? data.image_url : undefined,
                 status: data.status,
-                purchase_date: data.purchase_date || undefined,
+                purchase_date: data.purchase_date && data.purchase_date !== "" ? data.purchase_date : undefined,
                 requires_service: data.requires_service || false,
-                service_interval_days: data.service_interval_days || undefined,
-                last_service_date: data.last_service_date || undefined,
-                next_service_date: data.next_service_date || undefined,
+                service_interval_days: data.service_interval_days && data.service_interval_days !== "" ? parseInt(data.service_interval_days) : undefined,
+                last_service_date: data.last_service_date && data.last_service_date !== "" ? data.last_service_date : undefined,
+                next_service_date: data.next_service_date && data.next_service_date !== "" ? data.next_service_date : undefined,
             };
 
             if (equipmentItemId) {
-                await equipmentItemService.update(equipmentItemId, payload);
+                await equipmentItemService.update(Number(equipmentItemId), payload);
             } else {
                 await equipmentItemService.create(payload);
             }
@@ -255,7 +282,7 @@ export function EquipmentItemForm({ initialData, equipmentItemId }: EquipmentIte
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Equipment</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl>
                                                 <div className="relative">
                                                     <Package className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
@@ -342,7 +369,7 @@ export function EquipmentItemForm({ initialData, equipmentItemId }: EquipmentIte
                                                 <Ruler className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
                                                 <Select 
                                                     onValueChange={field.onChange} 
-                                                    defaultValue={field.value}
+                                                    value={field.value || ""}
                                                     disabled={!selectedEquipmentId || availableSizes.length === 0}
                                                 >
                                                     <SelectTrigger className="pl-9">
@@ -387,7 +414,7 @@ export function EquipmentItemForm({ initialData, equipmentItemId }: EquipmentIte
                                                 <Tag className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
                                                 <Select 
                                                     onValueChange={field.onChange} 
-                                                    defaultValue={field.value}
+                                                    value={field.value || ""}
                                                     disabled={!selectedEquipmentId || availableBrands.length === 0}
                                                 >
                                                     <SelectTrigger className="pl-9">
@@ -481,7 +508,7 @@ export function EquipmentItemForm({ initialData, equipmentItemId }: EquipmentIte
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Status</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                         <FormControl>
                                             <div className="relative">
                                                 <CheckCircle className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />

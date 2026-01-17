@@ -73,7 +73,7 @@ const FormItemContext = React.createContext<FormItemContextValue>(
   {} as FormItemContextValue
 )
 
-function FormItem({ className, ...props }: React.ComponentProps<"div">) {
+function FormItem({ className, suppressHydrationWarning, ...props }: React.ComponentProps<"div">) {
   const id = React.useId()
 
   return (
@@ -81,6 +81,7 @@ function FormItem({ className, ...props }: React.ComponentProps<"div">) {
       <div
         data-slot="form-item"
         className={cn("grid gap-2", className)}
+        suppressHydrationWarning={suppressHydrationWarning !== false}
         {...props}
       />
     </FormItemContext.Provider>
@@ -117,6 +118,7 @@ function FormControl({ ...props }: React.ComponentProps<typeof Slot>) {
           : `${formDescriptionId} ${formMessageId}`
       }
       aria-invalid={!!error}
+      suppressHydrationWarning
       {...props}
     />
   )

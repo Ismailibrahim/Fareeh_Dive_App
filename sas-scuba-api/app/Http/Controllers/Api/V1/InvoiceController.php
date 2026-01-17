@@ -11,12 +11,21 @@ use App\Models\BookingDive;
 use App\Models\BookingEquipment;
 use App\Models\PriceListItem;
 use App\Models\Tax;
+use App\Services\TaxService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class InvoiceController extends Controller
 {
     use AuthorizesDiveCenterAccess;
+
+    /**
+     * Get tax service instance
+     */
+    protected function getTaxService(): TaxService
+    {
+        return new TaxService();
+    }
     /**
      * Display a listing of invoices.
      */
@@ -25,7 +34,15 @@ class InvoiceController extends Controller
         $user = $request->user();
         $diveCenterId = $user->dive_center_id;
 
-        $query = Invoice::with(['booking.customer', 'customer', 'invoiceItems', 'payments'])
+        // Select only needed columns and eager load relationships upfront
+        $query = Invoice::select('id', 'dive_center_id', 'booking_id', 'customer_id', 'invoice_no', 'invoice_date', 'invoice_type', 'status', 'subtotal', 'tax', 'service_charge', 'discount', 'total', 'currency', 'notes', 'created_at', 'updated_at')
+            ->with([
+                'booking:id,customer_id,dive_center_id,booking_date,status',
+                'booking.customer:id,full_name,email',
+                'customer:id,full_name,email',
+                'invoiceItems:id,invoice_id,description,quantity,unit_price,total',
+                'payments:id,invoice_id,amount,payment_date,payment_method_id'
+            ])
             ->where('dive_center_id', $diveCenterId);
 
         // Filter by status
@@ -45,7 +62,11 @@ class InvoiceController extends Controller
             $query->where('invoice_type', $request->input('invoice_type'));
         }
 
-        return $query->orderBy('created_at', 'desc')->paginate(20);
+        // Get pagination parameters
+        $perPage = $request->get('per_page', 20);
+        $perPage = min(max($perPage, 1), 100); // Limit between 1 and 100
+
+        return $query->orderBy('created_at', 'desc')->paginate($perPage);
     }
 
     /**
@@ -148,6 +169,7 @@ class InvoiceController extends Controller
             'invoice_type' => 'nullable|in:Advance,Final,Full',
             'include_dives' => 'nullable|boolean',
             'include_equipment' => 'nullable|boolean',
+            'include_excursions' => 'nullable|boolean',
             'tax_percentage' => 'nullable|numeric|min:0|max:100',
         ]);
 
@@ -159,6 +181,7 @@ class InvoiceController extends Controller
 
         $includeDives = $validated['include_dives'] ?? true;
         $includeEquipment = $validated['include_equipment'] ?? true;
+        $includeExcursions = $validated['include_excursions'] ?? true;
         $invoiceType = $validated['invoice_type'] ?? 'Full';
         
         // Get tax percentage from dive center settings or use provided value
@@ -227,6 +250,29 @@ class InvoiceController extends Controller
                 }
             }
 
+            // Add completed excursions
+            if ($includeExcursions) {
+                $completedExcursions = $booking->bookingExcursions()
+                    ->where('status', 'Completed')
+                    ->whereDoesntHave('invoiceItems')
+                    ->with(['excursion', 'priceListItem'])
+                    ->get();
+
+                foreach ($completedExcursions as $excursion) {
+                    $price = $excursion->price ?? 0;
+                    $item = InvoiceItem::create([
+                        'invoice_id' => $invoice->id,
+                        'booking_excursion_id' => $excursion->id,
+                        'price_list_item_id' => $excursion->price_list_item_id,
+                        'description' => 'Excursion - ' . ($excursion->excursion->name ?? 'Unknown') . ' - ' . ($excursion->excursion_date ? date('M d, Y', strtotime($excursion->excursion_date)) : ''),
+                        'quantity' => $excursion->number_of_participants ?? 1,
+                        'unit_price' => $price,
+                        'total' => $price * ($excursion->number_of_participants ?? 1),
+                    ]);
+                    $subtotal += $price * ($excursion->number_of_participants ?? 1);
+                }
+            }
+
             $subtotal = round($subtotal, 2);
             
             // Get tax calculation mode from dive center settings
@@ -253,23 +299,11 @@ class InvoiceController extends Controller
                 }
             }
             if ($serviceChargePercentage <= 0) {
-                $serviceChargeTax = Tax::where('name', 'Service Charge')
-                    ->orWhere('name', 'service charge')
-                    ->orWhere('name', 'SERVICE CHARGE')
-                    ->first();
-                if ($serviceChargeTax) {
-                    $serviceChargePercentage = (float) $serviceChargeTax->percentage;
-                }
+                $serviceChargePercentage = $this->getTaxService()->getServiceChargePercentage();
             }
             
             if ($taxPercentage <= 0) {
-                $tgstTax = Tax::where('name', 'T-GST')
-                    ->orWhere('name', 't-gst')
-                    ->orWhere('name', 'TGST')
-                    ->first();
-                if ($tgstTax) {
-                    $taxPercentage = (float) $tgstTax->percentage;
-                }
+                $taxPercentage = $this->getTaxService()->getTGSTPercentage();
             }
             
             // Step 2 & 3: Calculate based on mode
@@ -341,7 +375,7 @@ class InvoiceController extends Controller
 
             DB::commit();
 
-            $invoice->load(['booking.customer', 'invoiceItems.bookingDive', 'invoiceItems.bookingEquipment', 'payments']);
+            $invoice->load(['booking.customer', 'invoiceItems.bookingDive', 'invoiceItems.bookingEquipment', 'invoiceItems.bookingExcursion', 'payments']);
             return response()->json($invoice, 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -360,32 +394,40 @@ class InvoiceController extends Controller
         // Verify invoice belongs to user's dive center
         $this->authorizeDiveCenterAccess($invoice, 'Unauthorized access to this invoice');
 
-        // Load relationships safely
-        $invoice->load([
-            'customer',
+        // Eager load all relationships upfront for better performance
+        $relations = [
+            'customer:id,full_name,email,phone',
             'invoiceItems.priceListItem',
             'payments'
-        ]);
+        ];
         
-        // Conditionally load booking-related relationships
+        // Conditionally add booking-related relationships
         if ($invoice->booking_id) {
-            $invoice->load(['booking.customer']);
+            $relations[] = 'booking:id,customer_id,dive_center_id,booking_date,status';
+            $relations[] = 'booking.customer:id,full_name,email';
         }
         
-        // Load dive and equipment relationships for items that have them
-        $invoice->load([
+        // Load dive, equipment, and excursion relationships for items that have them
+        $relations[] = [
             'invoiceItems' => function ($query) {
                 $query->with([
-                    'bookingDive.diveSite',
-                    'bookingEquipment.equipmentItem.equipment'
+                    'bookingDive:id,dive_site_id,dive_date',
+                    'bookingDive.diveSite:id,name',
+                    'bookingEquipment:id,equipment_item_id',
+                    'bookingEquipment.equipmentItem:id,equipment_id,size',
+                    'bookingEquipment.equipmentItem.equipment:id,name',
+                    'bookingExcursion:id,excursion_id,excursion_date',
+                    'bookingExcursion.excursion:id,name'
                 ]);
             }
-        ]);
+        ];
         
         // Load related invoice if exists
         if ($invoice->related_invoice_id) {
-            $invoice->load('relatedInvoice');
+            $relations[] = 'relatedInvoice:id,invoice_no,invoice_date,total';
         }
+        
+        $invoice->load($relations);
 
         return response()->json($invoice);
     }
@@ -468,21 +510,11 @@ class InvoiceController extends Controller
                 }
             }
             if ($serviceChargePercentage <= 0) {
-                $serviceChargeTax = Tax::where('name', 'Service Charge')
-                    ->orWhere('name', 'service charge')
-                    ->orWhere('name', 'SERVICE CHARGE')
-                    ->first();
-                if ($serviceChargeTax) {
-                    $serviceChargePercentage = (float) $serviceChargeTax->percentage;
-                }
+                $serviceChargePercentage = $this->getTaxService()->getServiceChargePercentage();
             }
             
-            $tgstTax = Tax::where('name', 'T-GST')
-                ->orWhere('name', 't-gst')
-                ->orWhere('name', 'TGST')
-                ->first();
-            if ($tgstTax) {
-                $taxPercentage = (float) $tgstTax->percentage;
+            if ($taxPercentage <= 0) {
+                $taxPercentage = $this->getTaxService()->getTGSTPercentage();
             }
             
             // Determine if we should apply service charge and tax
@@ -818,21 +850,11 @@ class InvoiceController extends Controller
                 }
             }
             if ($serviceChargePercentage <= 0) {
-                $serviceChargeTax = Tax::where('name', 'Service Charge')
-                    ->orWhere('name', 'service charge')
-                    ->orWhere('name', 'SERVICE CHARGE')
-                    ->first();
-                if ($serviceChargeTax) {
-                    $serviceChargePercentage = (float) $serviceChargeTax->percentage;
-                }
+                $serviceChargePercentage = $this->getTaxService()->getServiceChargePercentage();
             }
             
-            $tgstTax = Tax::where('name', 'T-GST')
-                ->orWhere('name', 't-gst')
-                ->orWhere('name', 'TGST')
-                ->first();
-            if ($tgstTax) {
-                $taxPercentage = (float) $tgstTax->percentage;
+            if ($taxPercentage <= 0) {
+                $taxPercentage = $this->getTaxService()->getTGSTPercentage();
             } elseif ($invoice->tax && $invoice->subtotal && $invoice->subtotal > 0) {
                 $originalServiceCharge = $invoice->service_charge ?? 0;
                 $originalBase = $invoice->subtotal + $originalServiceCharge;
@@ -1009,13 +1031,8 @@ class InvoiceController extends Controller
                             $taxPercentage = ($invoice->tax / $invoice->subtotal) * 100;
                         } else {
                             // Try to get T-GST from taxes table
-                            $tgstTax = Tax::where('name', 'T-GST')
-                                ->orWhere('name', 't-gst')
-                                ->orWhere('name', 'TGST')
-                                ->first();
-                            if ($tgstTax) {
-                                $taxPercentage = (float) $tgstTax->percentage;
-                            } else {
+                            $taxPercentage = $this->getTaxService()->getTGSTPercentage();
+                            if ($taxPercentage <= 0) {
                                 // Fallback: Try to get from dive center settings
                                 if ($diveCenter && $diveCenter->settings) {
                                     $settings = is_array($diveCenter->settings) ? $diveCenter->settings : json_decode($diveCenter->settings, true);
@@ -1036,19 +1053,13 @@ class InvoiceController extends Controller
             
             // If tax percentage is still not set, try to get it from T-GST tax table or settings
             if ($taxPercentage <= 0) {
-                $tgstTax = Tax::where('name', 'T-GST')
-                    ->orWhere('name', 't-gst')
-                    ->orWhere('name', 'TGST')
-                    ->first();
-                if ($tgstTax) {
-                    $taxPercentage = (float) $tgstTax->percentage;
-                } else {
-                    // Fallback: Try to get from dive center settings
-                    if ($diveCenter && $diveCenter->settings) {
-                        $settings = is_array($diveCenter->settings) ? $diveCenter->settings : json_decode($diveCenter->settings, true);
-                        if (isset($settings['tax_percentage'])) {
-                            $taxPercentage = (float) $settings['tax_percentage'];
-                        }
+                $taxPercentage = $this->getTaxService()->getTGSTPercentage();
+                
+                // Fallback: Try to get from dive center settings
+                if ($taxPercentage <= 0 && $diveCenter && $diveCenter->settings) {
+                    $settings = is_array($diveCenter->settings) ? $diveCenter->settings : json_decode($diveCenter->settings, true);
+                    if (isset($settings['tax_percentage'])) {
+                        $taxPercentage = (float) $settings['tax_percentage'];
                     }
                 }
             }
@@ -1097,31 +1108,19 @@ class InvoiceController extends Controller
             
             // If not found in settings, try to get from Tax table
             if ($serviceChargePercentage <= 0) {
-                $serviceChargeTax = Tax::where('name', 'Service Charge')
-                    ->orWhere('name', 'service charge')
-                    ->orWhere('name', 'SERVICE CHARGE')
-                    ->first();
-                if ($serviceChargeTax) {
-                    $serviceChargePercentage = (float) $serviceChargeTax->percentage;
-                }
+                $serviceChargePercentage = $this->getTaxService()->getServiceChargePercentage();
             }
             
             // Step 3: Calculate T-GST percentage
             // If tax percentage is not set yet, try to get it from T-GST tax table or settings
             if ($taxPercentage <= 0) {
-                $tgstTax = Tax::where('name', 'T-GST')
-                    ->orWhere('name', 't-gst')
-                    ->orWhere('name', 'TGST')
-                    ->first();
-                if ($tgstTax) {
-                    $taxPercentage = (float) $tgstTax->percentage;
-                } else {
-                    // Fallback: Try to get from dive center settings
-                    if ($diveCenter && $diveCenter->settings) {
-                        $settings = is_array($diveCenter->settings) ? $diveCenter->settings : json_decode($diveCenter->settings, true);
-                        if (isset($settings['tax_percentage'])) {
-                            $taxPercentage = (float) $settings['tax_percentage'];
-                        }
+                $taxPercentage = $this->getTaxService()->getTGSTPercentage();
+                
+                // Fallback: Try to get from dive center settings
+                if ($taxPercentage <= 0 && $diveCenter && $diveCenter->settings) {
+                    $settings = is_array($diveCenter->settings) ? $diveCenter->settings : json_decode($diveCenter->settings, true);
+                    if (isset($settings['tax_percentage'])) {
+                        $taxPercentage = (float) $settings['tax_percentage'];
                     }
                 }
             }
@@ -1374,21 +1373,11 @@ class InvoiceController extends Controller
                 }
             }
             if ($serviceChargePercentage <= 0) {
-                $serviceChargeTax = Tax::where('name', 'Service Charge')
-                    ->orWhere('name', 'service charge')
-                    ->orWhere('name', 'SERVICE CHARGE')
-                    ->first();
-                if ($serviceChargeTax) {
-                    $serviceChargePercentage = (float) $serviceChargeTax->percentage;
-                }
+                $serviceChargePercentage = $this->getTaxService()->getServiceChargePercentage();
             }
             
-            $tgstTax = Tax::where('name', 'T-GST')
-                ->orWhere('name', 't-gst')
-                ->orWhere('name', 'TGST')
-                ->first();
-            if ($tgstTax) {
-                $taxPercentage = (float) $tgstTax->percentage;
+            if ($taxPercentage <= 0) {
+                $taxPercentage = $this->getTaxService()->getTGSTPercentage();
             } elseif ($invoice->tax !== null && $invoice->tax > 0) {
                 $originalSubtotal = $invoice->subtotal ?? $subtotal;
                 $originalServiceCharge = $invoice->service_charge ?? 0;

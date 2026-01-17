@@ -1,38 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { loginSchema, LoginCredentials } from "@/types/auth";
+import { useState, useEffect } from "react";
+import { LoginCredentials } from "@/types/auth";
 import { authService } from "@/lib/api/services/auth.service";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { LoginForm } from "@/components/auth/LoginForm";
+
+// Disable SSR for this page to prevent hydration errors with browser extensions
+export const dynamic = 'force-dynamic';
 
 export default function LoginPage() {
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [isMounted, setIsMounted] = useState(false);
 
-    const form = useForm<LoginCredentials>({
-        resolver: zodResolver(loginSchema),
-        defaultValues: {
-            email: "",
-            password: "",
-        },
-    });
+    // Ensure component only renders form after client-side mount
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     async function onSubmit(data: LoginCredentials) {
         setLoading(true);
@@ -41,8 +31,46 @@ export default function LoginPage() {
             await authService.login(data);
             router.push("/dashboard");
         } catch (err: any) {
-            setError(err.response?.data?.message || "Login failed. Please check your credentials.");
+            // Handle different error types
+            if (err.code === 'ERR_NETWORK' || err.message === 'Network Error' || err.userMessage) {
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+                setError(
+                    err.userMessage || 
+                    `Cannot connect to server at ${apiUrl}. Please ensure the backend API server is running.`
+                );
+            } else if (err.response?.status === 422) {
+                // Laravel validation errors
+                const errors = err.response?.data?.errors;
+                console.error("Validation errors:", errors);
+                console.error("Full error response:", err.response?.data);
+                
+                if (errors) {
+                    // Get the first error message
+                    const firstErrorKey = Object.keys(errors)[0];
+                    const firstError = errors[firstErrorKey];
+                    const errorMessage = Array.isArray(firstError) ? firstError[0] : firstError;
+                    setError(errorMessage || "Validation error. Please check your input.");
+                } else if (err.response?.data?.message) {
+                    setError(err.response.data.message);
+                } else {
+                    setError("Invalid email or password. Please try again.");
+                }
+            } else if (err.response?.status === 419) {
+                // CSRF token mismatch
+                setError("CSRF token validation failed. Please refresh the page and try again.");
+            } else if (err.response?.status === 401) {
+                setError("Invalid email or password. Please try again.");
+            } else if (err.message && err.message.includes('CSRF')) {
+                setError(err.message);
+            } else if (err.response?.data?.message) {
+                setError(err.response.data.message);
+            } else if (err.response?.data?.error) {
+                setError(err.response.data.error);
+            } else {
+                setError("Login failed. Please check your credentials and try again.");
+            }
             console.error("Login Error:", err);
+            console.error("Error response data:", err.response?.data);
         } finally {
             setLoading(false);
         }
@@ -57,7 +85,7 @@ export default function LoginPage() {
                         Enter your email and password to access your account
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent suppressHydrationWarning>
                     {error && (
                         <Alert variant="destructive" className="mb-4">
                             <AlertCircle className="h-4 w-4" />
@@ -65,39 +93,21 @@ export default function LoginPage() {
                             <AlertDescription>{error}</AlertDescription>
                         </Alert>
                     )}
-                    <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                            <FormField
-                                control={form.control}
-                                name="email"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Email</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="Enter your email" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="password"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Password</FormLabel>
-                                        <FormControl>
-                                            <Input type="password" placeholder="Enter your password" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <Button type="submit" className="w-full" disabled={loading}>
-                                {loading ? "Signing in..." : "Sign In"}
-                            </Button>
-                        </form>
-                    </Form>
+                    {!isMounted ? (
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <div className="h-4 w-16 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
+                                <div className="h-9 w-full bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
+                            </div>
+                            <div className="space-y-2">
+                                <div className="h-4 w-20 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
+                                <div className="h-9 w-full bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
+                            </div>
+                            <div className="h-9 w-full bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
+                        </div>
+                    ) : (
+                        <LoginForm onSubmit={onSubmit} loading={loading} />
+                    )}
                 </CardContent>
                 <CardFooter className="flex justify-center">
                     <p className="text-sm text-muted-foreground">

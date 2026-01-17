@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\Boat;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class BoatController extends Controller
 {
@@ -16,17 +17,31 @@ class BoatController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        $diveCenterId = $user->dive_center_id;
+        $activeFilter = $request->has('active') ? $request->boolean('active') : null;
+        
+        if ($diveCenterId) {
+            // Build cache key
+            $cacheKey = "boats_{$diveCenterId}_" . ($activeFilter !== null ? ($activeFilter ? 'active' : 'inactive') : 'all');
+            
+            // Only cache if no active filter or filter is provided (boats don't change often)
+            $cacheTime = 1800; // 30 minutes
+            
+            return Cache::remember($cacheKey, $cacheTime, function () use ($diveCenterId, $activeFilter) {
+                $query = Boat::where('dive_center_id', $diveCenterId);
+                
+                if ($activeFilter !== null) {
+                    $query->where('active', $activeFilter);
+                }
+                
+                return $query->orderBy('name')->paginate(20);
+            });
+        }
+
         $query = Boat::query();
-
-        if ($user->dive_center_id) {
-            $query->where('dive_center_id', $user->dive_center_id);
+        if ($activeFilter !== null) {
+            $query->where('active', $activeFilter);
         }
-
-        // Filter by active status if provided
-        if ($request->has('active')) {
-            $query->where('active', $request->boolean('active'));
-        }
-
         return $query->paginate(20);
     }
 
@@ -46,6 +61,10 @@ class BoatController extends Controller
         ]);
 
         $boat = Boat::create($validated);
+        
+        // Clear boats cache for this dive center
+        $this->clearBoatsCache($boat->dive_center_id);
+        
         return response()->json($boat, 201);
     }
 
@@ -76,6 +95,10 @@ class BoatController extends Controller
         ]);
 
         $boat->update($validated);
+        
+        // Clear boats cache for this dive center
+        $this->clearBoatsCache($boat->dive_center_id);
+        
         return response()->json($boat);
     }
 
@@ -87,8 +110,23 @@ class BoatController extends Controller
         // Verify boat belongs to user's dive center
         $this->authorizeDiveCenterAccess($boat, 'Unauthorized access to this boat');
         
+        $diveCenterId = $boat->dive_center_id;
         $boat->delete();
+        
+        // Clear boats cache for this dive center
+        $this->clearBoatsCache($diveCenterId);
+        
         return response()->noContent();
+    }
+
+    /**
+     * Clear boats cache for a dive center
+     */
+    private function clearBoatsCache($diveCenterId)
+    {
+        Cache::forget("boats_{$diveCenterId}_all");
+        Cache::forget("boats_{$diveCenterId}_active");
+        Cache::forget("boats_{$diveCenterId}_inactive");
     }
 }
 

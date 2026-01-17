@@ -17,7 +17,7 @@ export function useEquipment(params?: PaginationParams) {
     return useQuery({
         queryKey: equipmentKeys.list(params),
         queryFn: () => equipmentService.getAll(params),
-        staleTime: 2 * 60 * 1000, // 2 minutes
+        staleTime: 30 * 1000, // 30 seconds - shorter stale time for faster updates
     });
 }
 
@@ -57,8 +57,12 @@ export function useUpdateEquipment() {
         mutationFn: ({ id, data }: { id: number; data: EquipmentFormData }) =>
             equipmentService.update(id, data),
         onSuccess: (data, variables) => {
+            // Invalidate all equipment list queries (with any params)
             queryClient.invalidateQueries({ queryKey: equipmentKeys.lists() });
+            // Invalidate specific equipment detail
             queryClient.invalidateQueries({ queryKey: equipmentKeys.detail(variables.id) });
+            // Also invalidate all equipment queries to ensure fresh data
+            queryClient.invalidateQueries({ queryKey: equipmentKeys.all });
         },
     });
 }

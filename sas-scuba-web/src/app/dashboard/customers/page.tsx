@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, MoreHorizontal, User as UserIcon, Plus, Award, AlertCircle } from "lucide-react";
 import Link from "next/link";
+import { safeFormatDate } from "@/lib/utils/date-format";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -27,6 +28,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -152,15 +154,36 @@ export default function CustomersPage() {
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center">
-                                        Loading...
-                                    </TableCell>
-                                </TableRow>
+                                <>
+                                    {Array.from({ length: 5 }).map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell>
+                                                <Skeleton className="h-10 w-10 rounded-full" />
+                                            </TableCell>
+                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell className="text-right">
+                                                <Skeleton className="h-8 w-8 ml-auto" />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </>
                             ) : error ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center text-red-600">
-                                        Error loading customers. Please try again.
+                                    <TableCell colSpan={8} className="h-24 text-center">
+                                        <div className="flex flex-col items-center gap-2 text-red-600">
+                                            <AlertCircle className="h-5 w-5" />
+                                            <div>
+                                                <p className="font-medium">Error loading customers</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {error instanceof Error ? error.message : 'Please try again or refresh the page'}
+                                                </p>
+                                            </div>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ) : customers.length === 0 ? (
@@ -198,7 +221,7 @@ export default function CustomersPage() {
                                             {customer.gender || "-"}
                                         </TableCell>
                                         <TableCell>
-                                            {customer.date_of_birth || "-"}
+                                            {customer.date_of_birth ? safeFormatDate(customer.date_of_birth, "MMM d, yyyy", "-") : "-"}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <DropdownMenu>
@@ -240,7 +263,23 @@ export default function CustomersPage() {
                 {/* Mobile Card View */}
                 <div className="grid grid-cols-1 gap-4 md:hidden">
                     {isLoading ? (
-                        <div className="text-center p-4">Loading...</div>
+                        <div className="space-y-4">
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <div key={i} className="rounded-lg border bg-card p-4 space-y-3">
+                                    <div className="flex items-center gap-3">
+                                        <Skeleton className="h-10 w-10 rounded-full" />
+                                        <div className="flex-1 space-y-2">
+                                            <Skeleton className="h-4 w-32" />
+                                            <Skeleton className="h-3 w-48" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <Skeleton className="h-16" />
+                                        <Skeleton className="h-16" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     ) : error ? (
                         <div className="text-center p-4 border rounded-md bg-red-50 text-red-600">
                             Error loading customers. Please try again.
@@ -292,7 +331,7 @@ export default function CustomersPage() {
                                     </div>
                                     <div>
                                         <span className="text-muted-foreground block text-xs">DOB (Gender)</span>
-                                        <span>{customer.date_of_birth || "-"} ({customer.gender || "-"})</span>
+                                        <span>{customer.date_of_birth ? safeFormatDate(customer.date_of_birth, "MMM d, yyyy", "-") : "-"} ({customer.gender || "-"})</span>
                                     </div>
                                 </div>
                             </div>

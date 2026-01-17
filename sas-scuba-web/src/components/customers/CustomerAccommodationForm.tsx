@@ -29,6 +29,9 @@ const accommodationSchema = z.object({
     room_no: z.string().optional(),
 });
 
+// Form values type (matches schema)
+type AccommodationFormValues = z.infer<typeof accommodationSchema>;
+
 interface CustomerAccommodationFormProps {
     customerId: string | number;
     initialData?: CustomerAccommodation;
@@ -58,10 +61,9 @@ export function CustomerAccommodationForm({ customerId, initialData, onSave, onC
         fetchIslands();
     }, []);
 
-    const form = useForm<CustomerAccommodationFormData>({
+    const form = useForm<AccommodationFormValues>({
         resolver: zodResolver(accommodationSchema),
         defaultValues: {
-            customer_id: Number(customerId),
             name: initialData?.name || "",
             address: initialData?.address || "",
             contact_no: initialData?.contact_no || "",
@@ -70,7 +72,7 @@ export function CustomerAccommodationForm({ customerId, initialData, onSave, onC
         },
     });
 
-    async function onSubmit(data: CustomerAccommodationFormData) {
+    async function onSubmit(data: AccommodationFormValues) {
         try {
             // Convert empty strings to undefined
             const payload: CustomerAccommodationFormData = {

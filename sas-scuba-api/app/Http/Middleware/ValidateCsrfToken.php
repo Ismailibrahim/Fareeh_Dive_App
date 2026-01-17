@@ -13,6 +13,8 @@ class ValidateCsrfToken extends Middleware
      */
     protected $except = [
         'api/v1/pre-registration/*/submit',
+        // Note: Login/register routes use Sanctum's stateful API which handles CSRF automatically
+        // They should NOT be excluded here as they rely on CSRF tokens from /sanctum/csrf-cookie
     ];
 }
 

@@ -1,26 +1,39 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { CompanyForm } from "@/components/settings/CompanyForm";
 import { PaymentMethodsList } from "@/components/settings/PaymentMethodsList";
-import { NationalitiesList } from "@/components/settings/NationalitiesList";
-import { UnitsList } from "@/components/settings/UnitsList";
-import { IslandsList } from "@/components/settings/IslandsList";
-import { CountriesList } from "@/components/settings/CountriesList";
-import { RelationshipsList } from "@/components/settings/RelationshipsList";
-import { AgenciesList } from "@/components/settings/AgenciesList";
-import { LocationsList } from "@/components/settings/LocationsList";
-import { CategoriesList } from "@/components/settings/CategoriesList";
-import { ServiceProvidersList } from "@/components/settings/ServiceProvidersList";
 import { CurrencyRatesManager } from "@/components/settings/CurrencyRatesManager";
-import { ServiceTypesList } from "@/components/settings/ServiceTypesList";
 import { TaxManager } from "@/components/settings/TaxManager";
 import { Building2, Settings2, CreditCard, Palette, Globe, ChevronDown, DollarSign, Percent, Users } from "lucide-react";
 import { UsersList } from "@/components/settings/UsersList";
 import { Separator } from "@/components/ui/separator";
 import { Header } from "@/components/layout/Header";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Lazy load dropdown components for better performance
+const NationalitiesList = lazy(() => import("@/components/settings/NationalitiesList").then(m => ({ default: m.NationalitiesList })));
+const UnitsList = lazy(() => import("@/components/settings/UnitsList").then(m => ({ default: m.UnitsList })));
+const IslandsList = lazy(() => import("@/components/settings/IslandsList").then(m => ({ default: m.IslandsList })));
+const CountriesList = lazy(() => import("@/components/settings/CountriesList").then(m => ({ default: m.CountriesList })));
+const RelationshipsList = lazy(() => import("@/components/settings/RelationshipsList").then(m => ({ default: m.RelationshipsList })));
+const AgenciesList = lazy(() => import("@/components/settings/AgenciesList").then(m => ({ default: m.AgenciesList })));
+const ServiceTypesList = lazy(() => import("@/components/settings/ServiceTypesList").then(m => ({ default: m.ServiceTypesList })));
+const LocationsList = lazy(() => import("@/components/settings/LocationsList").then(m => ({ default: m.LocationsList })));
+const CategoriesList = lazy(() => import("@/components/settings/CategoriesList").then(m => ({ default: m.CategoriesList })));
+const ServiceProvidersList = lazy(() => import("@/components/settings/ServiceProvidersList").then(m => ({ default: m.ServiceProvidersList })));
+const SuppliersList = lazy(() => import("@/components/settings/SuppliersList").then(m => ({ default: m.SuppliersList })));
+
+// Loading skeleton for accordion items
+const DropdownItemSkeleton = () => (
+    <div className="space-y-4 py-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-64 w-full" />
+    </div>
+);
 
 const sidebarNavItems = [
     {
@@ -157,47 +170,98 @@ export default function SettingsPage() {
                             {activeTab === "preferences" && <div className="p-12 text-center text-muted-foreground">System Preferences (Coming Soon)</div>}
                             {activeTab === "ui" && <div className="p-12 text-center text-muted-foreground">UI Interface Settings (Coming Soon)</div>}
                             {activeTab === "dropdown" && (
-                                <div className="space-y-8">
-                                    <div>
-                                        <h3 className="text-lg font-semibold mb-4">Nationalities</h3>
-                                        <NationalitiesList />
-                                    </div>
-                                    <div className="border-t pt-8">
-                                        <h3 className="text-lg font-semibold mb-4">Units</h3>
-                                        <UnitsList />
-                                    </div>
-                                    <div className="border-t pt-8">
-                                        <h3 className="text-lg font-semibold mb-4">Islands</h3>
-                                        <IslandsList />
-                                    </div>
-                                    <div className="border-t pt-8">
-                                        <h3 className="text-lg font-semibold mb-4">Countries</h3>
-                                        <CountriesList />
-                                    </div>
-                                    <div className="border-t pt-8">
-                                        <h3 className="text-lg font-semibold mb-4">Relationships</h3>
-                                        <RelationshipsList />
-                                    </div>
-                                    <div className="border-t pt-8">
-                                        <h3 className="text-lg font-semibold mb-4">Agencies</h3>
-                                        <AgenciesList />
-                                    </div>
-                                    <div className="border-t pt-8">
-                                        <h3 className="text-lg font-semibold mb-4">Service Types</h3>
-                                        <ServiceTypesList />
-                                    </div>
-                                    <div className="border-t pt-8">
-                                        <h3 className="text-lg font-semibold mb-4">Locations</h3>
-                                        <LocationsList />
-                                    </div>
-                                    <div className="border-t pt-8">
-                                        <h3 className="text-lg font-semibold mb-4">Categories</h3>
-                                        <CategoriesList />
-                                    </div>
-                                    <div className="border-t pt-8">
-                                        <h3 className="text-lg font-semibold mb-4">Service Providers</h3>
-                                        <ServiceProvidersList />
-                                    </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold mb-6">Dropdown Options</h3>
+                                    <Accordion type="single" collapsible className="w-full">
+                                        <AccordionItem value="nationalities">
+                                            <AccordionTrigger>Nationalities</AccordionTrigger>
+                                            <AccordionContent>
+                                                <Suspense fallback={<DropdownItemSkeleton />}>
+                                                    <NationalitiesList />
+                                                </Suspense>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                        <AccordionItem value="units">
+                                            <AccordionTrigger>Units</AccordionTrigger>
+                                            <AccordionContent>
+                                                <Suspense fallback={<DropdownItemSkeleton />}>
+                                                    <UnitsList />
+                                                </Suspense>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                        <AccordionItem value="islands">
+                                            <AccordionTrigger>Islands</AccordionTrigger>
+                                            <AccordionContent>
+                                                <Suspense fallback={<DropdownItemSkeleton />}>
+                                                    <IslandsList />
+                                                </Suspense>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                        <AccordionItem value="countries">
+                                            <AccordionTrigger>Countries</AccordionTrigger>
+                                            <AccordionContent>
+                                                <Suspense fallback={<DropdownItemSkeleton />}>
+                                                    <CountriesList />
+                                                </Suspense>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                        <AccordionItem value="relationships">
+                                            <AccordionTrigger>Relationships</AccordionTrigger>
+                                            <AccordionContent>
+                                                <Suspense fallback={<DropdownItemSkeleton />}>
+                                                    <RelationshipsList />
+                                                </Suspense>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                        <AccordionItem value="agencies">
+                                            <AccordionTrigger>Agencies</AccordionTrigger>
+                                            <AccordionContent>
+                                                <Suspense fallback={<DropdownItemSkeleton />}>
+                                                    <AgenciesList />
+                                                </Suspense>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                        <AccordionItem value="service-types">
+                                            <AccordionTrigger>Service Types</AccordionTrigger>
+                                            <AccordionContent>
+                                                <Suspense fallback={<DropdownItemSkeleton />}>
+                                                    <ServiceTypesList />
+                                                </Suspense>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                        <AccordionItem value="locations">
+                                            <AccordionTrigger>Locations</AccordionTrigger>
+                                            <AccordionContent>
+                                                <Suspense fallback={<DropdownItemSkeleton />}>
+                                                    <LocationsList />
+                                                </Suspense>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                        <AccordionItem value="categories">
+                                            <AccordionTrigger>Categories</AccordionTrigger>
+                                            <AccordionContent>
+                                                <Suspense fallback={<DropdownItemSkeleton />}>
+                                                    <CategoriesList />
+                                                </Suspense>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                        <AccordionItem value="service-providers">
+                                            <AccordionTrigger>Service Providers</AccordionTrigger>
+                                            <AccordionContent>
+                                                <Suspense fallback={<DropdownItemSkeleton />}>
+                                                    <ServiceProvidersList />
+                                                </Suspense>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                        <AccordionItem value="suppliers">
+                                            <AccordionTrigger>Suppliers</AccordionTrigger>
+                                            <AccordionContent>
+                                                <Suspense fallback={<DropdownItemSkeleton />}>
+                                                    <SuppliersList />
+                                                </Suspense>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                    </Accordion>
                                 </div>
                             )}
                         </div>

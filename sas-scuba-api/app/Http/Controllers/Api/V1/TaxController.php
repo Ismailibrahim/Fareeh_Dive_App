@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tax;
+use App\Services\TaxService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
@@ -34,6 +35,7 @@ class TaxController extends Controller
         
         // Invalidate cache when new tax is added
         Cache::forget('taxes');
+        (new TaxService())->clearCache();
         
         return response()->json($tax, 201);
     }
@@ -60,6 +62,7 @@ class TaxController extends Controller
         
         // Invalidate cache when tax is updated
         Cache::forget('taxes');
+        (new TaxService())->clearCache();
         
         return response()->json($tax);
     }
@@ -73,6 +76,7 @@ class TaxController extends Controller
         
         // Invalidate cache when tax is deleted
         Cache::forget('taxes');
+        (new TaxService())->clearCache();
         
         return response()->noContent();
     }

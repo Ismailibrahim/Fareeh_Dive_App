@@ -50,6 +50,7 @@ const preRegistrationSchema = z.object({
         date_of_birth: z.string().optional(),
         departure_date: z.string().optional(),
         departure_flight: z.string().optional(),
+        departure_flight_time: z.string().optional(),
         departure_to: z.string().optional(),
     }),
     emergency_contacts: z.array(z.object({
@@ -121,6 +122,7 @@ export default function PreRegistrationPage() {
                 date_of_birth: "",
                 departure_date: "",
                 departure_flight: "",
+                departure_flight_time: "",
                 departure_to: "",
             },
             emergency_contacts: [{
@@ -503,7 +505,7 @@ export default function PreRegistrationPage() {
                                         <Plane className="h-5 w-5 text-primary" />
                                         Departure Information
                                     </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                         <FormField
                                             control={form.control}
                                             name="customer.departure_date"
@@ -550,6 +552,19 @@ export default function PreRegistrationPage() {
                                                             <Plane className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                                             <Input placeholder="e.g. EK123" className="pl-9" {...field} value={field.value ?? ""} />
                                                         </div>
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="customer.departure_flight_time"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Flight Time</FormLabel>
+                                                    <FormControl>
+                                                        <Input type="time" {...field} value={field.value ?? ""} />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>

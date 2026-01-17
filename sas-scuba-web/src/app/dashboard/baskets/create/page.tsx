@@ -15,11 +15,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { equipmentBasketService, CreateBasketRequest } from "@/lib/api/services/equipment-basket.service";
+import { equipmentBasketService, CreateBasketRequest, EquipmentBasket } from "@/lib/api/services/equipment-basket.service";
 import { customerService, Customer } from "@/lib/api/services/customer.service";
 import { bookingService, Booking } from "@/lib/api/services/booking.service";
 import { equipmentItemService, EquipmentItem } from "@/lib/api/services/equipment-item.service";
 import { bookingEquipmentService, BookingEquipmentFormData } from "@/lib/api/services/booking-equipment.service";
+import { EquipmentTemplates } from "@/components/booking-equipment/EquipmentTemplates";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,6 +73,8 @@ export default function CreateBasketPage() {
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [equipmentItems, setEquipmentItems] = useState<EquipmentItem[]>([]);
     const [itemsToAdd, setItemsToAdd] = useState<EquipmentItemToAdd[]>([]);
+    const [previousBaskets, setPreviousBaskets] = useState<EquipmentBasket[]>([]);
+    const [showCopyDialog, setShowCopyDialog] = useState(false);
     
     // Search and filter states for equipment selector
     const [equipmentSearchOpen, setEquipmentSearchOpen] = useState<{ [key: string]: boolean }>({});
@@ -105,9 +108,10 @@ export default function CreateBasketPage() {
                 const bookingList = Array.isArray(bookingData) ? bookingData : (bookingData as any).data || [];
                 setBookings(bookingList);
 
-                const equipmentData = await equipmentItemService.getAll({ page: 1, status: 'Available' });
-                const equipmentList = Array.isArray(equipmentData) ? equipmentData : (equipmentData as any).data || [];
-                setEquipmentItems(equipmentList);
+                // Don't load all equipment items upfront - load on demand when popover opens
+                // const equipmentData = await equipmentItemService.getAll({ page: 1, status: 'Available' });
+                // const equipmentList = Array.isArray(equipmentData) ? equipmentData : (equipmentData as any).data || [];
+                // setEquipmentItems(equipmentList);
             } catch (error) {
                 console.error("Failed to fetch data", error);
             }
@@ -125,6 +129,26 @@ export default function CreateBasketPage() {
             notes: "",
         },
     });
+
+    // Fetch previous baskets when customer is selected
+    const customerId = form.watch('customer_id');
+    useEffect(() => {
+        if (customerId) {
+            const fetchPreviousBaskets = async () => {
+                try {
+                    const basketData = await equipmentBasketService.getAll({ customer_id: parseInt(customerId) });
+                    const basketList = Array.isArray(basketData) ? basketData : (basketData as any).data || [];
+                    // Get only recent baskets (last 10)
+                    setPreviousBaskets(basketList.slice(0, 10));
+                } catch (error) {
+                    console.error("Failed to fetch previous baskets", error);
+                }
+            };
+            fetchPreviousBaskets();
+        } else {
+            setPreviousBaskets([]);
+        }
+    }, [customerId]);
 
     const parseDate = (dateString: string | undefined): Date | null => {
         if (!dateString) return null;
@@ -176,6 +200,68 @@ export default function CreateBasketPage() {
         setItemsToAdd(itemsToAdd.map(item => 
             item.id === id ? { ...item, ...updates } : item
         ));
+    };
+
+    // Load equipment items when popover opens (server-side search)
+    const loadEquipmentItems = async (searchTerm: string = "", sizeFilter: string = "") => {
+        try {
+            const params: any = { 
+                page: 1, 
+                per_page: 50,
+                status: 'Available' 
+            };
+            if (searchTerm) {
+                params.search = searchTerm;
+            }
+            const equipmentData = await equipmentItemService.getAll(params);
+            const equipmentList = Array.isArray(equipmentData) ? equipmentData : (equipmentData as any).data || [];
+            
+            // Apply size filter client-side if needed (or could be server-side)
+            let filtered = equipmentList;
+            if (sizeFilter && sizeFilter !== 'all') {
+                filtered = filtered.filter((item: EquipmentItem) => item.size === sizeFilter);
+            }
+            
+            setEquipmentItems(filtered);
+        } catch (error) {
+            console.error("Failed to fetch equipment items", error);
+        }
+    };
+
+    // Copy items from previous basket
+    const handleCopyFromBasket = async (basket: EquipmentBasket) => {
+        try {
+            const fullBasket = await equipmentBasketService.getById(basket.id);
+            const basketEquipment = (fullBasket as any).booking_equipment || (fullBasket as any).bookingEquipment || [];
+            
+            const newItems: EquipmentItemToAdd[] = basketEquipment.map((eq: any, index: number) => {
+                if (eq.equipment_source === 'Center' && eq.equipment_item_id) {
+                    return {
+                        id: `center-${Date.now()}-${index}`,
+                        equipment_source: 'Center',
+                        equipment_item_id: eq.equipment_item_id,
+                        price: eq.price || 0,
+                    };
+                } else {
+                    return {
+                        id: `customer-${Date.now()}-${index}`,
+                        equipment_source: 'Customer Own',
+                        customer_equipment_type: eq.customer_equipment_type,
+                        customer_equipment_brand: eq.customer_equipment_brand,
+                        customer_equipment_model: eq.customer_equipment_model,
+                        customer_equipment_serial: eq.customer_equipment_serial,
+                        customer_equipment_notes: eq.customer_equipment_notes,
+                        price: eq.price || 0,
+                    };
+                }
+            });
+            
+            setItemsToAdd([...itemsToAdd, ...newItems]);
+            setShowCopyDialog(false);
+        } catch (error) {
+            console.error("Failed to copy items from basket", error);
+            alert("Failed to copy items from previous basket");
+        }
     };
 
     // Get unique sizes from equipment items
@@ -347,7 +433,7 @@ export default function CreateBasketPage() {
                     }
 
                     const checkoutDate = new Date(); // Use today's date as checkout date
-                    const promises = validItems.map(item => {
+                    const equipmentItems = validItems.map(item => {
                         // Build payload, only including defined values
                         const equipmentPayload: BookingEquipmentFormData = {
                             basket_id: basket.id,
@@ -397,59 +483,44 @@ export default function CreateBasketPage() {
                         }
 
                         // Remove undefined values before sending
-                        const cleanedPayload = removeUndefined(equipmentPayload);
-                        return bookingEquipmentService.create(cleanedPayload as BookingEquipmentFormData);
+                        return removeUndefined(equipmentPayload) as BookingEquipmentFormData;
                     });
 
-                    await Promise.all(promises);
-                    console.log(`Successfully added ${validItems.length} equipment items to basket ${basket.id}`);
+                    // Use bulk API instead of individual calls
+                    const bulkResult = await bookingEquipmentService.bulkCreate({ items: equipmentItems });
+                    
+                    if (bulkResult.failed_count > 0) {
+                        let errorMessage = `Basket created successfully, but ${bulkResult.failed_count} of ${validItems.length} equipment items failed to add.\n\n`;
+                        
+                        bulkResult.failed.forEach((failed, index) => {
+                            errorMessage += `\nItem ${failed.index + 1}: ${failed.error}`;
+                            if (failed.conflicting_assignments && failed.conflicting_assignments.length > 0) {
+                                errorMessage += `\nConflicting assignments:`;
+                                failed.conflicting_assignments.forEach((conflict: any) => {
+                                    errorMessage += `\n  - Customer: ${conflict.customer_name}`;
+                                    if (conflict.basket_no) {
+                                        errorMessage += ` (Basket: ${conflict.basket_no})`;
+                                    }
+                                    errorMessage += `, Dates: ${conflict.checkout_date} to ${conflict.return_date}`;
+                                });
+                            }
+                        });
+                        
+                        errorMessage += "\n\nYou can add items manually to the basket.";
+                        alert(errorMessage);
+                    }
+                    
+                    if (bulkResult.success_count > 0) {
+                        console.log(`Successfully added ${bulkResult.success_count} equipment items to basket ${basket.id}`);
+                    }
                 } catch (equipmentError: any) {
                     console.error("Failed to add equipment items", equipmentError);
                     // Basket was created successfully, but equipment items failed
                     // Still redirect to basket page so user can add items manually
-                    let equipmentErrorMessage = "Basket created successfully, but some equipment items failed to add.\n\n";
-                    
-                    // Check if this is a validation error (422)
-                    if (equipmentError?.response?.status === 422) {
-                        const errorData = equipmentError.response.data;
-                        
-                        // Check if this is an availability error with conflicts
-                        if (errorData?.conflicting_assignments) {
-                            const conflicts = errorData.conflicting_assignments;
-                            equipmentErrorMessage += errorData.message || "Equipment is not available for the requested dates.\n\n";
-                            equipmentErrorMessage += `Requested dates: ${errorData.checkout_date} to ${errorData.return_date}\n\n`;
-                            equipmentErrorMessage += "Conflicting assignments:\n";
-                            conflicts.forEach((conflict: any, index: number) => {
-                                equipmentErrorMessage += `\n${index + 1}. Customer: ${conflict.customer_name}`;
-                                if (conflict.basket_no) {
-                                    equipmentErrorMessage += ` (Basket: ${conflict.basket_no})`;
-                                }
-                                equipmentErrorMessage += `\n   Dates: ${conflict.checkout_date} to ${conflict.return_date}`;
-                                equipmentErrorMessage += `\n   Status: ${conflict.assignment_status}`;
-                            });
-                            equipmentErrorMessage += "\n\nYou can add items manually to the basket.";
-                        } else {
-                            // Handle validation errors
-                            equipmentErrorMessage += errorData.message || "Validation error occurred.\n\n";
-                            
-                            // Include validation errors if present
-                            if (errorData.errors) {
-                                const validationErrors = Object.entries(errorData.errors)
-                                    .map(([field, messages]: [string, any]) => {
-                                        const messageList = Array.isArray(messages) ? messages.join(", ") : messages;
-                                        return `${field}: ${messageList}`;
-                                    })
-                                    .join("\n");
-                                equipmentErrorMessage += `Validation errors:\n${validationErrors}\n\n`;
-                            }
-                            
-                            equipmentErrorMessage += "You can add items manually to the basket.";
-                        }
-                    } else {
-                        equipmentErrorMessage += equipmentError?.response?.data?.message || 
-                            equipmentError?.message || 
-                            "You can add them manually.";
-                    }
+                    let equipmentErrorMessage = "Basket created successfully, but failed to add equipment items.\n\n";
+                    equipmentErrorMessage += equipmentError?.response?.data?.message || 
+                        equipmentError?.message || 
+                        "You can add them manually.";
                     alert(equipmentErrorMessage);
                     router.push(`/dashboard/baskets/${basket.id}?refresh=true`);
                     return;
@@ -649,6 +720,48 @@ export default function CreateBasketPage() {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
+                                    {/* Templates - only show if customer and dates are set */}
+                                    {form.watch('customer_id') && (
+                                        <EquipmentTemplates
+                                            basketId={0} // Will be set after basket creation
+                                            checkoutDate={formatDateToString(new Date())}
+                                            returnDate={form.watch('expected_return_date') || undefined}
+                                            bookingId={((): number | undefined => {
+                                                const bookingId = form.watch('booking_id');
+                                                return bookingId && bookingId !== "none" ? parseInt(bookingId) : undefined;
+                                            })()}
+                                            onSuccess={() => {
+                                                // Items will be added after basket is created
+                                                // For now, just refresh the page or show success
+                                            }}
+                                        />
+                                    )}
+
+                                    {/* Copy from Previous Basket */}
+                                    {previousBaskets.length > 0 && (
+                                        <div>
+                                            <Label className="text-sm font-medium mb-2 block">Copy from Previous Basket</Label>
+                                            <div className="flex flex-wrap gap-2">
+                                                {previousBaskets.map((basket) => (
+                                                    <Button
+                                                        key={basket.id}
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={() => handleCopyFromBasket(basket)}
+                                                        className="text-sm"
+                                                    >
+                                                        {basket.center_bucket_no || basket.basket_no}
+                                                        {basket.booking_equipment && (
+                                                            <Badge variant="secondary" className="ml-2">
+                                                                {basket.booking_equipment.length} items
+                                                            </Badge>
+                                                        )}
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="flex gap-2">
                                         <Button type="button" variant="outline" onClick={addCenterEquipmentItem}>
                                             <Plus className="h-4 w-4 mr-2" />
@@ -689,9 +802,15 @@ export default function CreateBasketPage() {
                                                         <div className="grid grid-cols-2 gap-4">
                                                             <div>
                                                                 <Label className="text-sm">Equipment Item *</Label>
-                                                                <Popover
+                                                                    <Popover
                                                                     open={equipmentSearchOpen[item.id] || false}
-                                                                    onOpenChange={(open) => setEquipmentSearchOpen({ ...equipmentSearchOpen, [item.id]: open })}
+                                                                    onOpenChange={(open) => {
+                                                                        setEquipmentSearchOpen({ ...equipmentSearchOpen, [item.id]: open });
+                                                                        if (open && equipmentItems.length === 0) {
+                                                                            // Load equipment items when popover opens for the first time
+                                                                            loadEquipmentItems();
+                                                                        }
+                                                                    }}
                                                                 >
                                                                     <PopoverTrigger asChild>
                                                                         <Button

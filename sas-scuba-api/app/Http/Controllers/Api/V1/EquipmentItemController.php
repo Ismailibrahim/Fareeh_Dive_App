@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\EquipmentItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class EquipmentItemController extends Controller
 {
@@ -27,18 +28,29 @@ class EquipmentItemController extends Controller
             $query->where('status', $request->status);
         }
 
-        // Add server-side search
+        // Add server-side search with optimized query (avoid N+1)
         if ($request->has('search') && !empty($request->get('search'))) {
             $search = $request->get('search');
-            $query->where(function($q) use ($search) {
-                $q->where('serial_no', 'like', "%{$search}%")
-                  ->orWhere('size', 'like', "%{$search}%")
-                  ->orWhere('inventory_code', 'like', "%{$search}%")
-                  ->orWhere('brand', 'like', "%{$search}%")
-                  ->orWhereHas('equipment', function($equipmentQuery) use ($search) {
-                      $equipmentQuery->where('name', 'like', "%{$search}%");
-                  });
-            });
+            // Sanitize search input
+            $search = preg_replace('/[^a-zA-Z0-9\s.-]/', '', $search);
+            $search = substr($search, 0, 100);
+            $search = trim($search);
+            
+            if (!empty($search)) {
+                $query->where(function($q) use ($search) {
+                    $q->where('serial_no', 'like', "%{$search}%")
+                      ->orWhere('size', 'like', "%{$search}%")
+                      ->orWhere('inventory_code', 'like', "%{$search}%")
+                      ->orWhere('brand', 'like', "%{$search}%")
+                      // Use join instead of whereHas to avoid N+1 query
+                      ->orWhereExists(function($subQuery) use ($search) {
+                          $subQuery->select(DB::raw(1))
+                              ->from('equipment')
+                              ->whereColumn('equipment.id', 'equipment_items.equipment_id')
+                              ->where('equipment.name', 'like', "%{$search}%");
+                      });
+                });
+            }
         }
 
         // Get pagination parameters
@@ -178,6 +190,110 @@ class EquipmentItemController extends Controller
         
         $equipmentItem->delete();
         return response()->noContent();
+    }
+
+    /**
+     * Find available equipment items by equipment type(s)
+     * Used for templates to find available items for each equipment type
+     */
+    public function findAvailableByEquipmentType(Request $request)
+    {
+        $user = $request->user();
+        $diveCenterId = $user->dive_center_id;
+
+        $validated = $request->validate([
+            'equipment_ids' => 'required|array|min:1',
+            'equipment_ids.*' => 'required|integer|exists:equipment,id',
+            'checkout_date' => 'required|date',
+            'return_date' => 'required|date|after:checkout_date',
+        ]);
+
+        // Verify all equipment types belong to user's dive center
+        $equipmentTypes = \App\Models\Equipment::whereIn('id', $validated['equipment_ids'])
+            ->where('dive_center_id', $diveCenterId)
+            ->pluck('id')
+            ->toArray();
+
+        if (count($equipmentTypes) !== count($validated['equipment_ids'])) {
+            return response()->json([
+                'message' => 'Some equipment types do not belong to your dive center'
+            ], 403);
+        }
+
+        $checkoutDate = $validated['checkout_date'];
+        $returnDate = $validated['return_date'];
+        $availabilityService = new \App\Services\EquipmentAvailabilityService();
+
+        // Get all equipment items for these equipment types that are Available
+        $equipmentItems = EquipmentItem::whereIn('equipment_id', $equipmentTypes)
+            ->where('status', 'Available')
+            ->with(['equipment', 'location'])
+            ->get();
+
+        // Group by equipment_id and check availability for each
+        $results = [];
+        foreach ($equipmentTypes as $equipmentId) {
+            $itemsForType = $equipmentItems->where('equipment_id', $equipmentId);
+            $availableItems = [];
+
+            foreach ($itemsForType as $item) {
+                $isAvailable = $availabilityService->isAvailable(
+                    $item->id,
+                    $checkoutDate,
+                    $returnDate
+                );
+
+                if ($isAvailable) {
+                    $availableItems[] = $item;
+                }
+            }
+
+            $equipment = \App\Models\Equipment::find($equipmentId);
+            $results[] = [
+                'equipment_id' => $equipmentId,
+                'equipment_name' => $equipment->name ?? 'Unknown',
+                'available_items' => $availableItems,
+                'available_count' => count($availableItems),
+                'total_items' => $itemsForType->count(),
+            ];
+        }
+
+        return response()->json([
+            'checkout_date' => $checkoutDate,
+            'return_date' => $returnDate,
+            'results' => $results,
+        ]);
+    }
+
+    /**
+     * Get assignment history for a specific equipment item
+     */
+    public function assignmentHistory(Request $request, EquipmentItem $equipmentItem)
+    {
+        // Verify equipment item belongs to user's dive center (via equipment relationship)
+        $equipmentItem->load('equipment');
+        if (!$equipmentItem->equipment) {
+            abort(404, 'Equipment item not found');
+        }
+        $this->authorizeDiveCenterAccess($equipmentItem->equipment, 'Unauthorized access to this equipment item');
+
+        // Get all booking equipment records for this item
+        $assignments = \App\Models\BookingEquipment::where('equipment_item_id', $equipmentItem->id)
+            ->with([
+                'basket.customer',
+                'booking.customer',
+                'basket',
+                'booking'
+            ])
+            ->orderBy('checkout_date', 'desc')
+            ->get();
+
+        return response()->json([
+            'equipment_item' => $equipmentItem->load(['equipment', 'location']),
+            'assignments' => $assignments,
+            'total_assignments' => $assignments->count(),
+            'active_assignments' => $assignments->where('assignment_status', '!=', 'Returned')->count(),
+        ]);
     }
 }
 

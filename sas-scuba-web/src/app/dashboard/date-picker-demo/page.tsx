@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { CalendarIcon } from "lucide-react";
 import { safeFormatDate } from "@/lib/utils/date-format";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 // Option 1: react-datepicker (currently installed)

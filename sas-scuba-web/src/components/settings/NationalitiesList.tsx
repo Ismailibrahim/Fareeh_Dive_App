@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, Edit, MoreHorizontal, Flag } from "lucide-react";
 import {
@@ -37,22 +37,32 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { nationalityService, Nationality, NationalityFormData } from "@/lib/api/services/nationality.service";
+import { Nationality, NationalityFormData } from "@/lib/api/services/nationality.service";
+import { 
+    useNationalities, 
+    useCreateNationality, 
+    useUpdateNationality, 
+    useDeleteNationality 
+} from "@/lib/hooks/use-settings-dropdowns";
 
 const nationalitySchema = z.object({
     name: z.string().min(1, "Nationality name is required.").max(255, "Name must be less than 255 characters."),
 });
 
 export function NationalitiesList() {
-    const [nationalities, setNationalities] = useState<Nationality[]>([]);
-    const [loading, setLoading] = useState(true);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingNationality, setEditingNationality] = useState<Nationality | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
+
+    const { data: nationalities = [], isLoading } = useNationalities();
+    const createMutation = useCreateNationality();
+    const updateMutation = useUpdateNationality();
+    const deleteMutation = useDeleteNationality();
 
     const form = useForm<NationalityFormData>({
         resolver: zodResolver(nationalitySchema),
@@ -60,23 +70,6 @@ export function NationalitiesList() {
             name: "",
         },
     });
-
-    useEffect(() => {
-        fetchNationalities();
-    }, []);
-
-    const fetchNationalities = async () => {
-        try {
-            setLoading(true);
-            const data = await nationalityService.getAll();
-            setNationalities(data);
-        } catch (error) {
-            console.error("Failed to fetch nationalities", error);
-            alert("Failed to load nationalities.");
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const handleOpenDialog = (nationality?: Nationality) => {
         if (nationality) {
@@ -98,14 +91,11 @@ export function NationalitiesList() {
     const onSubmit = async (data: NationalityFormData) => {
         try {
             if (editingNationality) {
-                await nationalityService.update(editingNationality.id, data);
-                alert("Nationality updated successfully.");
+                await updateMutation.mutateAsync({ id: editingNationality.id, data });
             } else {
-                await nationalityService.create(data);
-                alert("Nationality added successfully.");
+                await createMutation.mutateAsync(data);
             }
             handleCloseDialog();
-            fetchNationalities();
         } catch (error: any) {
             console.error("Failed to save nationality", error);
             const errorMessage = error.response?.data?.message || "Failed to save nationality.";
@@ -119,13 +109,11 @@ export function NationalitiesList() {
         }
 
         try {
-            await nationalityService.delete(id);
-            alert("Nationality deleted successfully.");
+            await deleteMutation.mutateAsync(id);
             const newTotalPages = Math.ceil((nationalities.length - 1) / itemsPerPage);
             if (currentPage > newTotalPages && newTotalPages > 0) {
                 setCurrentPage(newTotalPages);
             }
-            fetchNationalities();
         } catch (error: any) {
             console.error("Failed to delete nationality", error);
             const errorMessage = error.response?.data?.message || "Failed to delete nationality.";
@@ -180,11 +168,19 @@ export function NationalitiesList() {
                                         type="button"
                                         variant="outline"
                                         onClick={handleCloseDialog}
+                                        disabled={createMutation.isPending || updateMutation.isPending}
                                     >
                                         Cancel
                                     </Button>
-                                    <Button type="submit">
-                                        {editingNationality ? "Update" : "Add"}
+                                    <Button 
+                                        type="submit"
+                                        disabled={createMutation.isPending || updateMutation.isPending}
+                                    >
+                                        {createMutation.isPending || updateMutation.isPending
+                                            ? "Saving..."
+                                            : editingNationality
+                                            ? "Update"
+                                            : "Add"}
                                     </Button>
                                 </DialogFooter>
                             </form>
@@ -193,8 +189,34 @@ export function NationalitiesList() {
                 </Dialog>
             </div>
 
-            {loading ? (
-                <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            {isLoading ? (
+                <div className="space-y-4">
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {[...Array(5)].map((_, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell>
+                                            <div className="flex items-center gap-3">
+                                                <Skeleton className="h-8 w-8 rounded-full" />
+                                                <Skeleton className="h-4 w-32" />
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Skeleton className="h-8 w-8 ml-auto" />
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </div>
             ) : nationalities.length === 0 ? (
                 <div className="rounded-lg border border-dashed p-8 text-center bg-slate-50/50 dark:bg-slate-900/20">
                     <div className="flex flex-col items-center gap-2">
@@ -245,6 +267,7 @@ export function NationalitiesList() {
                                                         <DropdownMenuItem
                                                             className="text-red-600"
                                                             onClick={() => handleDelete(nationality.id)}
+                                                            disabled={deleteMutation.isPending}
                                                         >
                                                             <Trash2 className="mr-2 h-4 w-4" /> Delete
                                                         </DropdownMenuItem>
@@ -268,4 +291,3 @@ export function NationalitiesList() {
         </div>
     );
 }
-

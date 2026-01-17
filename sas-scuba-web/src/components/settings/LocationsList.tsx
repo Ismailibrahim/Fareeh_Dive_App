@@ -48,8 +48,11 @@ import { Badge } from "@/components/ui/badge";
 const locationSchema = z.object({
     name: z.string().min(1, "Location name is required.").max(255, "Name must be less than 255 characters."),
     description: z.string().optional(),
-    active: z.boolean().default(true),
+    active: z.boolean(),
 });
+
+// Form values type (matches schema)
+type LocationFormValues = z.infer<typeof locationSchema>;
 
 export function LocationsList() {
     const [locations, setLocations] = useState<Location[]>([]);
@@ -59,7 +62,7 @@ export function LocationsList() {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
-    const form = useForm<LocationFormData>({
+    const form = useForm<LocationFormValues>({
         resolver: zodResolver(locationSchema),
         defaultValues: {
             name: "",
@@ -110,13 +113,20 @@ export function LocationsList() {
         form.reset();
     };
 
-    const onSubmit = async (data: LocationFormData) => {
+    const onSubmit = async (data: LocationFormValues) => {
         try {
+            // Transform form data to API format
+            const payload: LocationFormData = {
+                name: data.name,
+                description: data.description && data.description !== "" ? data.description : undefined,
+                active: data.active,
+            };
+            
             if (editingLocation) {
-                await locationService.update(editingLocation.id, data);
+                await locationService.update(editingLocation.id, payload);
                 alert("Location updated successfully.");
             } else {
-                await locationService.create(data);
+                await locationService.create(payload);
                 alert("Location added successfully.");
             }
             handleCloseDialog();

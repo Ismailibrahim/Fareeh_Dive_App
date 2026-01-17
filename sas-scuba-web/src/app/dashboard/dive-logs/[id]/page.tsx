@@ -27,9 +27,11 @@ export default function DiveLogDetailPage() {
     }, [params.id]);
 
     const loadDiveLog = async () => {
+        const id = params.id as string;
+        if (!id) return;
         setLoading(true);
         try {
-            const data = await diveLogService.getById(params.id);
+            const data = await diveLogService.getById(id);
             setDiveLog(data);
             
             // Load customer certifications if customer exists

@@ -66,6 +66,11 @@ const menuGroups = [
                 icon: Waves,
             },
             {
+                title: "Booking Excursions",
+                href: "/dashboard/booking-excursions",
+                icon: MapPin,
+            },
+            {
                 title: "Dive Logs",
                 href: "/dashboard/dive-logs",
                 icon: FileText,
@@ -182,6 +187,11 @@ const menuGroups = [
                 title: "Dive Sites",
                 href: "/dashboard/dive-sites",
                 icon: MapPin,
+            },
+            {
+                title: "Excursions",
+                href: "/dashboard/excursions",
+                icon: Map,
             },
             {
                 title: "Sites & Boats",

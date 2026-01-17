@@ -18,9 +18,11 @@ export default function EditDiveLogPage() {
     }, [params.id]);
 
     const loadDiveLog = async () => {
+        const id = params.id as string;
+        if (!id) return;
         setLoading(true);
         try {
-            const data = await diveLogService.getById(params.id);
+            const data = await diveLogService.getById(id);
             setDiveLog(data);
         } catch (error) {
             console.error("Failed to load dive log", error);

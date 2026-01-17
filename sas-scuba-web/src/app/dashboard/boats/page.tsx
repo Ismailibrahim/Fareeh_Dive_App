@@ -35,6 +35,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function BoatsPage() {
     const [boats, setBoats] = useState<Boat[]>([]);
@@ -132,11 +133,24 @@ export default function BoatsPage() {
                         </TableHeader>
                         <TableBody>
                             {loading ? (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="h-24 text-center">
-                                        Loading...
-                                    </TableCell>
-                                </TableRow>
+                                <>
+                                    {Array.from({ length: 5 }).map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2">
+                                                    <Skeleton className="h-4 w-4" />
+                                                    <Skeleton className="h-4 w-32" />
+                                                </div>
+                                            </TableCell>
+                                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                                            <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                                            <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                                            <TableCell className="text-right">
+                                                <Skeleton className="h-8 w-8 ml-auto" />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </>
                             ) : filteredBoats.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={5} className="h-24 text-center">
@@ -192,7 +206,23 @@ export default function BoatsPage() {
                 {/* Mobile Card View */}
                 <div className="grid grid-cols-1 gap-4 md:hidden">
                     {loading ? (
-                        <div className="text-center p-4">Loading...</div>
+                        <>
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <Card key={i} className="p-4 space-y-3">
+                                    <div className="flex items-center gap-3">
+                                        <Skeleton className="h-10 w-10 rounded-full" />
+                                        <div className="flex-1 space-y-2">
+                                            <Skeleton className="h-4 w-32" />
+                                            <Skeleton className="h-3 w-48" />
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Skeleton className="h-6 w-16" />
+                                        <Skeleton className="h-6 w-16" />
+                                    </div>
+                                </Card>
+                            ))}
+                        </>
                     ) : filteredBoats.length === 0 ? (
                         <div className="text-center p-4 border rounded-md bg-muted/50">No boats found.</div>
                     ) : (

@@ -7,6 +7,7 @@ use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\PriceList;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class PriceListController extends Controller
 {
@@ -24,17 +25,22 @@ class PriceListController extends Controller
                 return response()->json(['message' => 'Dive center not found'], 404);
             }
 
-            $diveCenter = $user->diveCenter;
-            $query = PriceList::where('dive_center_id', $diveCenterId)
-                ->with('items')
-                ->orderBy('created_at', 'desc');
-
             // Get pagination parameters
             $perPage = $request->get('per_page', 20);
             $perPage = min(max($perPage, 1), 100);
+            
+            // Cache key includes dive center ID and pagination
+            $cacheKey = "price_lists_{$diveCenterId}_{$perPage}";
+            
+            // Cache for 30 minutes (1800 seconds)
+            $priceLists = Cache::remember($cacheKey, 1800, function () use ($diveCenterId, $perPage) {
+                return PriceList::where('dive_center_id', $diveCenterId)
+                    ->with('items')
+                    ->orderBy('created_at', 'desc')
+                    ->paginate($perPage);
+            });
 
-            $priceLists = $query->paginate($perPage);
-
+            $diveCenter = $user->diveCenter;
             // Add base currency info to each price list
             foreach ($priceLists->items() as $priceList) {
                 $priceList->base_currency = $diveCenter?->currency ?? 'USD';
@@ -74,6 +80,9 @@ class PriceListController extends Controller
             $priceList->load('items');
             $diveCenter = $user->diveCenter;
             $priceList->base_currency = $diveCenter?->currency ?? 'USD';
+
+            // Invalidate price lists cache for this dive center
+            $this->clearPriceListsCache($diveCenterId);
 
             return response()->json($priceList, 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -159,6 +168,9 @@ class PriceListController extends Controller
             $diveCenter = $user->diveCenter;
             $priceList->base_currency = $diveCenter?->currency ?? 'USD';
 
+            // Invalidate price lists cache for this dive center
+            $this->clearPriceListsCache($diveCenterId);
+
             return response()->json($priceList);
         } catch (\Exception $e) {
             \Log::error('PriceListController::update error: ' . $e->getMessage());
@@ -178,6 +190,9 @@ class PriceListController extends Controller
             $this->authorizeDiveCenterAccess($priceList, 'Unauthorized access to this price list');
 
             $priceList->delete();
+
+            // Invalidate price lists cache for this dive center
+            $this->clearPriceListsCache($diveCenterId);
 
             return response()->json(['message' => 'Price list deleted successfully'], 200);
         } catch (\Exception $e) {
@@ -240,6 +255,9 @@ class PriceListController extends Controller
                 $diveCenter = $user->diveCenter;
                 $newPriceList->base_currency = $diveCenter?->currency ?? 'USD';
 
+                // Invalidate price lists cache for this dive center
+                $this->clearPriceListsCache($diveCenterId);
+
                 return response()->json($newPriceList, 201);
             });
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -250,6 +268,17 @@ class PriceListController extends Controller
         } catch (\Exception $e) {
             \Log::error('PriceListController::duplicate error: ' . $e->getMessage());
             return response()->json(['message' => 'An error occurred: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Clear price lists cache for a dive center
+     */
+    private function clearPriceListsCache($diveCenterId)
+    {
+        // Clear cache for all possible pagination sizes (1-100)
+        for ($perPage = 1; $perPage <= 100; $perPage++) {
+            Cache::forget("price_lists_{$diveCenterId}_{$perPage}");
         }
     }
 }

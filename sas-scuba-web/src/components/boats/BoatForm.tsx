@@ -23,11 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 const boatSchema = z.object({
     name: z.string().min(1, "Boat name is required"),
-    capacity: z.string().optional().transform((val) => {
-        if (!val || val === "") return undefined;
-        const parsed = parseInt(val);
-        return isNaN(parsed) ? undefined : parsed;
-    }),
+    capacity: z.string().optional(),
     active: z.boolean().optional(),
     is_owned: z.boolean().optional(),
 });
@@ -41,28 +37,31 @@ export function BoatForm({ initialData, boatId }: BoatFormProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
 
-    const form = useForm<BoatFormData>({
+    // Form values type (strings from form inputs, transformed to numbers)
+    type BoatFormValues = z.infer<typeof boatSchema>;
+    
+    const form = useForm<BoatFormValues>({
         resolver: zodResolver(boatSchema),
         defaultValues: {
             name: initialData?.name || "",
-            capacity: initialData?.capacity ? String(initialData.capacity) : "",
+            capacity: initialData?.capacity ? String(initialData.capacity) : undefined,
             active: initialData?.active ?? true,
             is_owned: initialData?.is_owned ?? true,
         },
     });
 
-    async function onSubmit(data: z.infer<typeof boatSchema>) {
+    async function onSubmit(data: BoatFormValues) {
         setLoading(true);
         try {
             const payload: BoatFormData = {
                 name: data.name,
-                capacity: data.capacity,
+                capacity: data.capacity && data.capacity !== "" ? parseInt(data.capacity) : undefined,
                 active: data.active ?? true,
                 is_owned: data.is_owned ?? true,
             };
 
             if (boatId) {
-                await boatService.update(boatId, payload);
+                await boatService.update(Number(boatId), payload);
             } else {
                 await boatService.create(payload);
             }

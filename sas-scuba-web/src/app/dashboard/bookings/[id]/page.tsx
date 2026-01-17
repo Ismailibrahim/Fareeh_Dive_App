@@ -58,7 +58,7 @@ export default function BookingDetailPage() {
         return <div className="text-center py-8">Booking not found</div>;
     }
 
-    const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.total, 0);
+    const totalInvoiced = invoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
     const totalPaid = invoices.reduce((sum, inv) => {
         const paid = inv.payments?.reduce((pSum, p) => pSum + p.amount, 0) || 0;
         return sum + paid;
@@ -183,7 +183,7 @@ export default function BookingDetailPage() {
                         <div className="space-y-2">
                             {invoices.map((invoice) => {
                                 const invoicePaid = invoice.payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
-                                const invoiceRemaining = invoice.total - invoicePaid;
+                                const invoiceRemaining = (invoice.total || 0) - invoicePaid;
 
                                 return (
                                     <div key={invoice.id} className="p-4 border rounded-lg">

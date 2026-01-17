@@ -7,6 +7,7 @@ use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\Equipment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -21,40 +22,58 @@ class EquipmentController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Equipment::query();
-
-        if ($user->dive_center_id) {
-            $query->where('dive_center_id', $user->dive_center_id);
-        }
-
-        // Filter by category if provided
-        if ($request->has('category')) {
-            $query->where('category', $request->category);
-        }
-
-        // Add server-side search with sanitization
-        if ($request->has('search') && !empty($request->get('search'))) {
-            $search = $request->get('search');
-            // Sanitize search input: remove special characters except spaces, @, ., and -
-            $search = preg_replace('/[^a-zA-Z0-9\s@.-]/', '', $search);
-            // Limit search length to prevent abuse
-            $search = substr($search, 0, 100);
-            // Trim whitespace
-            $search = trim($search);
-            
-            if (!empty($search)) {
-                $query->where(function($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('category', 'like', "%{$search}%");
-                });
-            }
-        }
-
-        // Get pagination parameters
+        $diveCenterId = $user->dive_center_id;
+        
+        // Get pagination and filter parameters
         $perPage = $request->get('per_page', 20);
-        $perPage = min(max($perPage, 1), 100); // Limit between 1 and 100
+        $perPage = min(max($perPage, 1), 1000); // Allow up to 1000 for bulk operations
+        $category = $request->get('category');
+        $search = $request->get('search');
+        
+        // Build cache key based on parameters
+        $cacheKey = "equipment_{$diveCenterId}_{$perPage}_" . md5($category . $search);
+        
+        // Only cache if no search/filter (search results should be fresh)
+        $shouldCache = empty($search) && empty($category);
+        $cacheTime = 900; // 15 minutes
+        
+        if ($shouldCache) {
+            $equipment = Cache::remember($cacheKey, $cacheTime, function () use ($diveCenterId, $perPage) {
+                return Equipment::where('dive_center_id', $diveCenterId)
+                    ->with('equipmentItems')
+                    ->orderBy('name')
+                    ->paginate($perPage);
+            });
+        } else {
+            $query = Equipment::query();
+            
+            if ($diveCenterId) {
+                $query->where('dive_center_id', $diveCenterId);
+            }
 
-        return $query->with('equipmentItems')->paginate($perPage);
+            // Filter by category if provided
+            if ($category) {
+                $query->where('category', $category);
+            }
+
+            // Add server-side search with sanitization
+            if ($search) {
+                $search = preg_replace('/[^a-zA-Z0-9\s@.-]/', '', $search);
+                $search = substr($search, 0, 100);
+                $search = trim($search);
+                
+                if (!empty($search)) {
+                    $query->where(function($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%")
+                          ->orWhere('category', 'like', "%{$search}%");
+                    });
+                }
+            }
+
+            $equipment = $query->with('equipmentItems')->paginate($perPage);
+        }
+
+        return $equipment;
     }
 
     /**
@@ -75,6 +94,10 @@ class EquipmentController extends Controller
         ]);
 
         $equipment = Equipment::create($validated);
+        
+        // Clear equipment cache for this dive center
+        $this->clearEquipmentCache($user->dive_center_id);
+        
         return response()->json($equipment->load('equipmentItems'), 201);
     }
 
@@ -107,6 +130,10 @@ class EquipmentController extends Controller
         ]);
 
         $equipment->update($validated);
+        
+        // Clear equipment cache for this dive center
+        $this->clearEquipmentCache($equipment->dive_center_id);
+        
         return response()->json($equipment->load('equipmentItems'));
     }
 
@@ -118,7 +145,12 @@ class EquipmentController extends Controller
         // Verify equipment belongs to user's dive center
         $this->authorizeDiveCenterAccess($equipment, 'Unauthorized access to this equipment');
         
+        $diveCenterId = $equipment->dive_center_id;
         $equipment->delete();
+        
+        // Clear equipment cache for this dive center
+        $this->clearEquipmentCache($diveCenterId);
+        
         return response()->noContent();
     }
 
@@ -505,6 +537,38 @@ class EquipmentController extends Controller
                 'message' => 'Failed to generate template',
                 'error' => $e->getMessage(),
             ], 500);
+        }
+    }
+
+    /**
+     * Clear equipment cache for a dive center
+     */
+    private function clearEquipmentCache($diveCenterId)
+    {
+        // Clear cache for common pagination sizes (including 1000)
+        $commonPerPageValues = [10, 20, 25, 50, 100, 500, 1000];
+        foreach ($commonPerPageValues as $perPage) {
+            // Clear cache for empty category/search (most common case)
+            Cache::forget("equipment_{$diveCenterId}_{$perPage}_" . md5(''));
+        }
+        
+        // Also clear all cache keys for this dive center using pattern matching (if Redis)
+        // This ensures we clear any cache keys with different category/search combinations
+        try {
+            if (Cache::getStore() instanceof \Illuminate\Cache\RedisStore) {
+                $redis = Cache::getStore()->connection();
+                $prefix = config('cache.prefix', 'laravel_cache');
+                $pattern = "{$prefix}:equipment_{$diveCenterId}_*";
+                $keys = $redis->keys($pattern);
+                foreach ($keys as $key) {
+                    // Remove prefix to get the actual cache key
+                    $cacheKey = str_replace("{$prefix}:", '', $key);
+                    Cache::forget($cacheKey);
+                }
+            }
+        } catch (\Exception $e) {
+            // If Redis pattern matching fails, continue with regular cache clearing
+            // This is fine - the common per_page values above should cover most cases
         }
     }
 }

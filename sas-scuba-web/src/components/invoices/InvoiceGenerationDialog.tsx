@@ -38,6 +38,7 @@ export function InvoiceGenerationDialog({
     const [invoiceType, setInvoiceType] = useState<'Advance' | 'Final' | 'Full'>('Full');
     const [includeDives, setIncludeDives] = useState(true);
     const [includeEquipment, setIncludeEquipment] = useState(true);
+    const [includeExcursions, setIncludeExcursions] = useState(true);
     const [taxPercentage, setTaxPercentage] = useState<number>(0);
 
     useEffect(() => {
@@ -54,6 +55,7 @@ export function InvoiceGenerationDialog({
                 invoice_type: invoiceType,
                 include_dives: includeDives,
                 include_equipment: includeEquipment,
+                include_excursions: includeExcursions,
                 tax_percentage: taxPercentage || undefined,
             };
 
@@ -124,6 +126,14 @@ export function InvoiceGenerationDialog({
                                     onCheckedChange={(checked) => setIncludeEquipment(checked as boolean)}
                                 />
                                 <Label htmlFor="include-equipment">Include Equipment Rentals</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Checkbox
+                                    id="include-excursions"
+                                    checked={includeExcursions}
+                                    onCheckedChange={(checked) => setIncludeExcursions(checked as boolean)}
+                                />
+                                <Label htmlFor="include-excursions">Include Completed Excursions</Label>
                             </div>
                         </div>
                     </div>

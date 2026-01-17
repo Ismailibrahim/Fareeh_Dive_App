@@ -30,12 +30,15 @@ import { safeParseDate } from "@/lib/utils/date-format";
 
 const bookingSchema = z.object({
     customer_id: z.string().min(1, "Customer is required"),
-    start_date: z.date({ required_error: "Start date is required" }),
+    start_date: z.date().optional(),
     number_of_divers: z.string().optional().or(z.literal("")),
     dive_site_id: z.string().optional().or(z.literal("")),
-    status: z.enum(["Pending", "Confirmed", "Completed", "Cancelled"]).default("Pending"),
+    status: z.enum(["Pending", "Confirmed", "Completed", "Cancelled"]),
     notes: z.string().optional().or(z.literal("")),
 });
+
+// Form values type (matches schema)
+type BookingFormValues = z.infer<typeof bookingSchema>;
 
 interface BookingFormProps {
     initialData?: Booking;
@@ -69,14 +72,7 @@ export function BookingForm({ initialData, bookingId }: BookingFormProps) {
         fetchData();
     }, [bookingId]);
 
-    const form = useForm<{
-        customer_id: string;
-        start_date?: Date;
-        number_of_divers?: string;
-        dive_site_id?: string;
-        status: "Pending" | "Confirmed" | "Completed" | "Cancelled";
-        notes?: string;
-    }>({
+    const form = useForm<BookingFormValues>({
         resolver: zodResolver(bookingSchema),
         defaultValues: {
             customer_id: initialData?.customer_id ? String(initialData.customer_id) : "",
@@ -92,14 +88,7 @@ export function BookingForm({ initialData, bookingId }: BookingFormProps) {
         },
     });
 
-    async function onSubmit(data: {
-        customer_id: string;
-        start_date?: Date;
-        number_of_divers?: string;
-        dive_site_id?: string;
-        status: "Pending" | "Confirmed" | "Completed" | "Cancelled";
-        notes?: string;
-    }) {
+    async function onSubmit(data: BookingFormValues) {
         setLoading(true);
         setError(null);
         try {

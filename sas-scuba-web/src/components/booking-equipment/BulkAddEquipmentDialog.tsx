@@ -57,7 +57,7 @@ export function BulkAddEquipmentDialog({ open, onOpenChange, basketId, onSuccess
 
     const loadEquipmentItems = async () => {
         try {
-            const data = await equipmentItemService.getAll(1, undefined, 'Available');
+            const data = await equipmentItemService.getAll({ page: 1, status: 'Available' });
             const itemsList = Array.isArray(data) ? data : (data as any).data || [];
             setEquipmentItems(itemsList);
         } catch (error) {

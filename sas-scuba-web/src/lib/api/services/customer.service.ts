@@ -17,6 +17,7 @@ export interface Customer {
     date_of_birth?: string;
     departure_date?: string;
     departure_flight?: string;
+    departure_flight_time?: string;
     departure_to?: string;
     emergency_contacts?: EmergencyContact[];
     created_at: string;
@@ -36,6 +37,7 @@ export interface CustomerFormData {
     date_of_birth?: string;
     departure_date?: string;
     departure_flight?: string;
+    departure_flight_time?: string;
     departure_to?: string;
 }
 

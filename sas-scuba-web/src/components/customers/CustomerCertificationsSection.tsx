@@ -19,17 +19,19 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Award, ChevronDown, Plus, Edit, Trash2, Calendar, Building, UserCircle, FileText } from "lucide-react";
+import { Award, ChevronDown, Plus, Edit, Trash2, Calendar, Building, UserCircle, FileText, Flag } from "lucide-react";
 import { CustomerCertification } from "@/lib/api/services/customer-certification.service";
 import { useCustomerCertifications, useDeleteCustomerCertification } from "@/lib/hooks/use-customer-certifications";
 import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
+import { Customer } from "@/lib/api/services/customer.service";
 
 interface CustomerCertificationsSectionProps {
     customerId: number | string;
+    customer?: Customer; // Optional customer data as fallback
 }
 
-export function CustomerCertificationsSection({ customerId }: CustomerCertificationsSectionProps) {
+export function CustomerCertificationsSection({ customerId, customer: customerProp }: CustomerCertificationsSectionProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -135,6 +137,12 @@ export function CustomerCertificationsSection({ customerId }: CustomerCertificat
                                                             <div className="flex items-center gap-1">
                                                                 <UserCircle className="h-3 w-3" />
                                                                 <span>{certification.instructor}</span>
+                                                            </div>
+                                                        )}
+                                                        {(certification.customer?.nationality || customerProp?.nationality) && (
+                                                            <div className="flex items-center gap-1">
+                                                                <Flag className="h-3 w-3" />
+                                                                <span>Nationality: {certification.customer?.nationality || customerProp?.nationality}</span>
                                                             </div>
                                                         )}
                                                     </div>

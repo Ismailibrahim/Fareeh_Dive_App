@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { fileService, FileInfo } from "@/lib/api/services/file.service";
 import { Download, Trash2, File, Image as ImageIcon, FileText } from "lucide-react";
+import { safeFormatDate } from "@/lib/utils/date-format";
 import {
     AlertDialog,
     AlertDialogAction,

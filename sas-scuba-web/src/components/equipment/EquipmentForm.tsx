@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { equipmentService, EquipmentFormData, Equipment } from "@/lib/api/services/equipment.service";
 import { categoryService, Category } from "@/lib/api/services/category.service";
+import { useCreateEquipment, useUpdateEquipment } from "@/lib/hooks/use-equipment";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,12 +37,16 @@ interface EquipmentFormProps {
 
 export function EquipmentForm({ initialData, equipmentId }: EquipmentFormProps) {
     const router = useRouter();
-    const [loading, setLoading] = useState(false);
     const [categories, setCategories] = useState<Category[]>([]);
     const [categoriesLoading, setCategoriesLoading] = useState(true);
 
     const [sizeInput, setSizeInput] = useState("");
     const [brandInput, setBrandInput] = useState("");
+
+    // Use React Query hooks for mutations
+    const createMutation = useCreateEquipment();
+    const updateMutation = useUpdateEquipment();
+    const loading = createMutation.isPending || updateMutation.isPending;
 
     const form = useForm<EquipmentFormData>({
         resolver: zodResolver(equipmentSchema),
@@ -114,19 +119,16 @@ export function EquipmentForm({ initialData, equipmentId }: EquipmentFormProps) 
     };
 
     async function onSubmit(data: EquipmentFormData) {
-        setLoading(true);
         try {
             if (equipmentId) {
-                await equipmentService.update(equipmentId, data);
+                await updateMutation.mutateAsync({ id: Number(equipmentId), data });
             } else {
-                await equipmentService.create(data);
+                await createMutation.mutateAsync(data);
             }
             router.push("/dashboard/equipment");
             router.refresh();
         } catch (error) {
             console.error("Failed to save equipment", error);
-        } finally {
-            setLoading(false);
         }
     }
 

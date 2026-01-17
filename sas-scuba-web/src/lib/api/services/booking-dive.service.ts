@@ -63,8 +63,10 @@ export interface BookingDive {
 export interface BookingDiveFormData {
     booking_id?: number;
     customer_id?: number;
+    dive_group_id?: number;
     booking_date?: string;
     number_of_divers?: number;
+    member_diver_counts?: Record<number, number>; // Map of member_id => number of divers
     dive_site_id: number;
     boat_id?: number;
     dive_date?: string;

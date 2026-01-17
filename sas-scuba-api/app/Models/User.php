@@ -62,4 +62,36 @@ class User extends Authenticatable
     {
         return $this->hasOne(Instructor::class);
     }
+
+    /**
+     * Get the array representation of the user for session storage.
+     * This prevents relationship serialization issues.
+     */
+    public function toArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'dive_center_id' => $this->dive_center_id,
+            'full_name' => $this->full_name,
+            'email' => $this->email,
+            'phone' => $this->phone,
+            'role' => $this->role,
+            'active' => $this->active,
+            'created_at' => $this->created_at?->toDateTimeString(),
+            'updated_at' => $this->updated_at?->toDateTimeString(),
+        ];
+    }
+
+    /**
+     * Prepare the model for serialization.
+     * This prevents relationships from being serialized which can cause errors.
+     */
+    public function __sleep(): array
+    {
+        // Clear relationships before serialization
+        $this->unsetRelations();
+        
+        // Return only the attributes we want to serialize
+        return array_keys($this->getAttributes());
+    }
 }

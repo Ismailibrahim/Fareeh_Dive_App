@@ -23,9 +23,29 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('invoices')) {
+            return;
+        }
+
         Schema::table('invoices', function (Blueprint $table) {
-            $table->dropForeign(['related_invoice_id']);
-            $table->dropColumn(['invoice_type', 'related_invoice_id']);
+            $columnsToDrop = [];
+            
+            if (Schema::hasColumn('invoices', 'related_invoice_id')) {
+                try {
+                    $table->dropForeign(['related_invoice_id']);
+                } catch (\Exception $e) {
+                    // Foreign key might not exist, continue
+                }
+                $columnsToDrop[] = 'related_invoice_id';
+            }
+            
+            if (Schema::hasColumn('invoices', 'invoice_type')) {
+                $columnsToDrop[] = 'invoice_type';
+            }
+            
+            if (!empty($columnsToDrop)) {
+                $table->dropColumn($columnsToDrop);
+            }
         });
     }
 };

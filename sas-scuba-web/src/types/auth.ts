@@ -20,9 +20,14 @@ export type RegisterCredentials = z.infer<typeof registerSchema>;
 
 export interface User {
     id: number;
-    name: string;
+    dive_center_id: number | null;
+    full_name: string;
     email: string;
-    email_verified_at: string | null;
+    phone: string | null;
+    role: string | null;
+    active: boolean | null;
     created_at: string;
     updated_at: string;
+    // Legacy field for backward compatibility
+    name?: string;
 }

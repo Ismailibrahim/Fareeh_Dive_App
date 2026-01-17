@@ -16,14 +16,24 @@ class BookingController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Booking::with(['customer', 'diveCenter']);
+        
+        // Select only needed columns for better performance
+        $query = Booking::select('id', 'dive_center_id', 'customer_id', 'booking_date', 'status', 'number_of_divers', 'notes', 'created_at', 'updated_at')
+            ->with([
+                'customer:id,full_name,email,phone',
+                'diveCenter:id,name'
+            ]);
 
         // Add dive center scoping
         if ($user->dive_center_id) {
             $query->where('dive_center_id', $user->dive_center_id);
         }
 
-        return $query->orderBy('created_at', 'desc')->paginate(20);
+        // Get pagination parameters
+        $perPage = $request->get('per_page', 20);
+        $perPage = min(max($perPage, 1), 100); // Limit between 1 and 100
+
+        return $query->orderBy('created_at', 'desc')->paginate($perPage);
     }
 
     /**
@@ -72,7 +82,9 @@ class BookingController extends Controller
         // Verify booking belongs to user's dive center
         $this->authorizeDiveCenterAccess($booking, 'Unauthorized access to this booking');
         
-        return $booking->load(['customer', 'diveCenter']);
+        // Eager load relationships upfront instead of using load()
+        $booking->load(['customer', 'diveCenter']);
+        return response()->json($booking);
     }
 
     /**
@@ -107,6 +119,12 @@ class BookingController extends Controller
         }
 
         $booking->update($updateData);
+        
+        // Reload relationships if needed
+        if (!$booking->relationLoaded('customer') || !$booking->relationLoaded('diveCenter')) {
+            $booking->load(['customer', 'diveCenter']);
+        }
+        
         return response()->json($booking);
     }
 

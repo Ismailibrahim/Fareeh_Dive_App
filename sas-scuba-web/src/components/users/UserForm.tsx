@@ -26,10 +26,8 @@ const createUserSchema = z.object({
     email: z.string().email("Please enter a valid email address."),
     password: z.string().min(8, "Password must be at least 8 characters."),
     phone: z.string().optional(),
-    role: z.enum(['Admin', 'Instructor', 'DiveMaster', 'Agent'], {
-        required_error: "Role is required",
-    }),
-    active: z.boolean().default(true),
+    role: z.enum(['Admin', 'Instructor', 'DiveMaster', 'Agent']),
+    active: z.boolean(),
 });
 
 const updateUserSchema = z.object({
@@ -37,11 +35,14 @@ const updateUserSchema = z.object({
     email: z.string().email("Please enter a valid email address."),
     password: z.string().min(8, "Password must be at least 8 characters.").optional().or(z.literal("")),
     phone: z.string().optional(),
-    role: z.enum(['Admin', 'Instructor', 'DiveMaster', 'Agent'], {
-        required_error: "Role is required",
-    }),
-    active: z.boolean().default(true),
+    role: z.enum(['Admin', 'Instructor', 'DiveMaster', 'Agent']),
+    active: z.boolean(),
 });
+
+// Form values types
+type CreateUserFormValues = z.infer<typeof createUserSchema>;
+type UpdateUserFormValues = z.infer<typeof updateUserSchema>;
+type UserFormValues = CreateUserFormValues | UpdateUserFormValues;
 
 interface UserFormProps {
     initialData?: User;
@@ -53,7 +54,7 @@ export function UserForm({ initialData, userId }: UserFormProps) {
     const [loading, setLoading] = useState(false);
     const schema = userId ? updateUserSchema : createUserSchema;
 
-    const form = useForm<UserFormData>({
+    const form = useForm<UserFormValues>({
         resolver: zodResolver(schema),
         defaultValues: {
             full_name: initialData?.full_name || "",
@@ -65,15 +66,18 @@ export function UserForm({ initialData, userId }: UserFormProps) {
         },
     });
 
-    async function onSubmit(data: z.infer<typeof createUserSchema> | z.infer<typeof updateUserSchema>) {
+    async function onSubmit(data: UserFormValues) {
         setLoading(true);
         try {
+            // Type guard to ensure password is string for create
+            const passwordValue = userId 
+                ? (data.password && data.password.length > 0 ? data.password : undefined)
+                : (data.password || "");
+            
             const payload: UserFormData = {
                 full_name: data.full_name,
                 email: data.email,
-                password: userId 
-                    ? (data.password && data.password.length > 0 ? data.password : undefined)
-                    : data.password,
+                password: passwordValue as string,
                 phone: data.phone || undefined,
                 role: data.role,
                 active: data.active,

@@ -1,4 +1,5 @@
 import apiClient from "../client";
+import { Customer } from "./customer.service";
 
 export interface CustomerCertification {
     id: number;
@@ -14,6 +15,7 @@ export interface CustomerCertification {
     license_status?: boolean;
     created_at?: string;
     updated_at?: string;
+    customer?: Customer;
 }
 
 export type CustomerCertificationFormData = Omit<CustomerCertification, 'id' | 'created_at' | 'updated_at'>;

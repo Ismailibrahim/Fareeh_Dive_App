@@ -75,6 +75,55 @@ export interface BulkReturnRequest {
     damage_info?: { [equipment_id: number]: DamageInfo };
 }
 
+export interface BulkCreateRequest {
+    items: BookingEquipmentFormData[];
+}
+
+export interface BulkCreateResponse {
+    message: string;
+    success_count: number;
+    failed_count: number;
+    success: BookingEquipment[];
+    failed: Array<{
+        index: number;
+        item: BookingEquipmentFormData;
+        error: string;
+        equipment_item_id?: number;
+        checkout_date?: string;
+        return_date?: string;
+        conflicting_assignments?: Array<{
+            id: number;
+            customer_name: string;
+            checkout_date: string;
+            return_date: string;
+            basket_no?: string;
+            assignment_status: string;
+        }>;
+    }>;
+}
+
+export interface BulkAvailabilityCheckRequest {
+    items: AvailabilityCheckRequest[];
+}
+
+export interface BulkAvailabilityCheckResponse {
+    results: Array<{
+        index: number;
+        equipment_item_id: number;
+        checkout_date: string;
+        return_date: string;
+        available: boolean;
+        conflicting_assignments?: Array<{
+            id: number;
+            customer_name: string;
+            checkout_date: string;
+            return_date: string;
+            basket_no?: string;
+            assignment_status: string;
+        }>;
+    }>;
+}
+
 export const bookingEquipmentService = {
     getAll: async (page = 1) => {
         const response = await apiClient.get<{ data: BookingEquipment[]; meta: any }>(`/api/v1/booking-equipment?page=${page}`);
@@ -112,6 +161,16 @@ export const bookingEquipmentService = {
 
     bulkReturn: async (data: BulkReturnRequest) => {
         const response = await apiClient.post<{ message: string; equipment: BookingEquipment[] }>("/api/v1/booking-equipment/bulk-return", data);
+        return response.data;
+    },
+
+    bulkCreate: async (data: BulkCreateRequest): Promise<BulkCreateResponse> => {
+        const response = await apiClient.post<BulkCreateResponse>("/api/v1/booking-equipment/bulk", data);
+        return response.data;
+    },
+
+    bulkCheckAvailability: async (data: BulkAvailabilityCheckRequest): Promise<BulkAvailabilityCheckResponse> => {
+        const response = await apiClient.post<BulkAvailabilityCheckResponse>("/api/v1/booking-equipment/bulk-check-availability", data);
         return response.data;
     },
 };

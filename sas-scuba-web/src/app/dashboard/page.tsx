@@ -1,8 +1,11 @@
 "use client";
 
+import { lazy, Suspense } from "react";
 import { Header } from "@/components/layout/Header";
-import { StatsGrid } from "@/components/dashboard/StatsGrid";
+import { PageLoader } from "@/components/ui/page-loader";
 import { useEffect, useState } from "react";
+
+const StatsGrid = lazy(() => import("@/components/dashboard/StatsGrid").then(m => ({ default: m.StatsGrid })));
 
 export default function DashboardPage() {
     const [error, setError] = useState<string | null>(null);
@@ -41,7 +44,9 @@ export default function DashboardPage() {
         <div className="flex flex-col min-h-screen">
             <Header title="Dashboard" />
             <div className="p-8 space-y-8">
-                <StatsGrid />
+                <Suspense fallback={<PageLoader variant="grid" rows={4} />}>
+                    <StatsGrid />
+                </Suspense>
 
                 {/* Recent Activity Section placeholder */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">

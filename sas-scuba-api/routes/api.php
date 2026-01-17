@@ -55,6 +55,9 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('booking-dives', \App\Http\Controllers\Api\V1\BookingDiveController::class);
         Route::post('booking-dives/{bookingDive}/complete', [\App\Http\Controllers\Api\V1\BookingDiveController::class, 'complete']);
         Route::get('booking-dives/{bookingDive}/log', [\App\Http\Controllers\Api\V1\BookingDiveController::class, 'log']);
+        Route::apiResource('excursions', \App\Http\Controllers\Api\V1\ExcursionController::class);
+        Route::apiResource('booking-excursions', \App\Http\Controllers\Api\V1\BookingExcursionController::class);
+        Route::post('booking-excursions/{bookingExcursion}/complete', [\App\Http\Controllers\Api\V1\BookingExcursionController::class, 'complete']);
         Route::get('boat-list', [\App\Http\Controllers\Api\V1\BoatListController::class, 'index']);
         Route::apiResource('booking-equipment', \App\Http\Controllers\Api\V1\BookingEquipmentController::class);
         Route::post('booking-equipment/check-availability', [\App\Http\Controllers\Api\V1\BookingEquipmentController::class, 'checkAvailability']);

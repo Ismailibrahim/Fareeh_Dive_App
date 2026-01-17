@@ -34,9 +34,7 @@ import { safeFormatDate, safeParseDate } from "@/lib/utils/date-format";
 const bookingEquipmentSchema = z.object({
     booking_id: z.string().optional(),
     basket_id: z.string().optional(),
-    equipment_source: z.enum(['Center', 'Customer Own'], {
-        required_error: "Equipment source is required",
-    }),
+    equipment_source: z.enum(['Center', 'Customer Own']),
     equipment_item_id: z.string().optional(),
     checkout_date: z.string().optional(),
     return_date: z.string().optional(),
@@ -109,7 +107,7 @@ export function BookingEquipmentForm({
                 setBaskets(basketList);
 
                 // Fetch equipment items (only available ones for Center equipment)
-                const equipmentItemData = await equipmentItemService.getAll(1, undefined, 'Available');
+                const equipmentItemData = await equipmentItemService.getAll({ page: 1, status: 'Available' });
                 const equipmentItemList = Array.isArray(equipmentItemData) ? equipmentItemData : (equipmentItemData as any).data || [];
                 setEquipmentItems(equipmentItemList);
             } catch (error) {
@@ -337,7 +335,7 @@ export function BookingEquipmentForm({
                 }
                 
                 // Scroll to first error
-                const firstError = Object.keys(formErrors).find(key => formErrors[key]);
+                const firstError = Object.keys(formErrors).find(key => formErrors[key as keyof typeof formErrors]);
                 if (firstError) {
                     const element = document.querySelector(`[name="${firstError}"]`) || 
                                    document.querySelector(`[id="${firstError}"]`);
@@ -570,7 +568,7 @@ export function BookingEquipmentForm({
                                     name="customer_equipment_type"
                                     render={({ field }) => {
                                         const standardTypes = ["BCD", "Regulator", "Wetsuit", "Dry Suit", "Mask", "Fins", "Snorkel", "Dive Computer", "Dive Watch", "Torch/Flashlight", "Weight Belt", "Tank", "Camera"];
-                                        const isCustomType = field.value && !standardTypes.includes(field.value);
+                                        const isCustomType = Boolean(field.value && !standardTypes.includes(field.value));
                                         
                                         return (
                                             <FormItem>
@@ -626,7 +624,7 @@ export function BookingEquipmentForm({
                                     name="customer_equipment_type"
                                     render={({ field }) => {
                                         const standardTypes = ["BCD", "Regulator", "Wetsuit", "Dry Suit", "Mask", "Fins", "Snorkel", "Dive Computer", "Dive Watch", "Torch/Flashlight", "Weight Belt", "Tank", "Camera"];
-                                        const isCustomType = field.value && !standardTypes.includes(field.value);
+                                        const isCustomType = Boolean(field.value && !standardTypes.includes(field.value));
                                         
                                         return (
                                             <FormItem>

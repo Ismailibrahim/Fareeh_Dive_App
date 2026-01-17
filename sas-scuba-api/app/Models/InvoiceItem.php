@@ -11,6 +11,7 @@ class InvoiceItem extends Model
         'price_list_item_id',
         'booking_dive_id',
         'booking_equipment_id',
+        'booking_excursion_id',
         'description',
         'quantity',
         'unit_price',
@@ -44,6 +45,11 @@ class InvoiceItem extends Model
     public function bookingEquipment()
     {
         return $this->belongsTo(BookingEquipment::class);
+    }
+
+    public function bookingExcursion()
+    {
+        return $this->belongsTo(BookingExcursion::class);
     }
 }
 

@@ -33,6 +33,15 @@ class QuickStartSeeder extends Seeder
                 'role' => 'Admin',
                 'active' => true,
             ]);
+
+            User::create([
+                'dive_center_id' => $diveCenter->id,
+                'full_name' => 'Ahmed Fareeh',
+                'email' => 'fareeh@outlook.com',
+                'password' => Hash::make('password'),
+                'role' => 'Admin',
+                'active' => true,
+            ]);
         });
         
         $this->command->info('User created: admin@example.com / password');

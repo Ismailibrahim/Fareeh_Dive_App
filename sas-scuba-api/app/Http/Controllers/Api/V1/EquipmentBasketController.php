@@ -15,23 +15,59 @@ class EquipmentBasketController extends Controller
      */
     public function index(Request $request)
     {
-        $user = $request->user();
-        $diveCenterId = $user->dive_center_id;
+        try {
+            $user = $request->user();
+            
+            // Check if user has a dive center assigned
+            if (!$user || !$user->dive_center_id) {
+                Log::warning('EquipmentBasketController::index - User does not have dive_center_id', [
+                    'user_id' => $user->id ?? null,
+                ]);
+                return response()->json([
+                    'message' => 'User does not belong to a dive center'
+                ], 400);
+            }
 
-        $query = EquipmentBasket::with(['customer', 'booking', 'bookingEquipment'])
+            $diveCenterId = $user->dive_center_id;
+
+            // Build query with safe eager loading
+            $query = EquipmentBasket::with([
+                'customer' => function ($query) {
+                    $query->select('id', 'full_name', 'email', 'phone', 'dive_center_id');
+                },
+                'booking' => function ($query) {
+                    $query->select('id', 'booking_no', 'customer_id', 'dive_center_id', 'status');
+                },
+                'bookingEquipment' => function ($query) {
+                    $query->select('id', 'booking_id', 'basket_id', 'equipment_item_id', 'assignment_status', 'equipment_source');
+                }
+            ])
             ->where('dive_center_id', $diveCenterId);
 
-        // Filter by status
-        if ($request->has('status')) {
-            $query->where('status', $request->input('status'));
-        }
+            // Filter by status
+            if ($request->has('status')) {
+                $query->where('status', $request->input('status'));
+            }
 
-        // Filter by customer
-        if ($request->has('customer_id')) {
-            $query->where('customer_id', $request->input('customer_id'));
-        }
+            // Filter by customer
+            if ($request->has('customer_id')) {
+                $query->where('customer_id', $request->input('customer_id'));
+            }
 
-        return $query->orderBy('created_at', 'desc')->paginate(20);
+            return $query->orderBy('created_at', 'desc')->paginate(20);
+            
+        } catch (\Exception $e) {
+            Log::error('EquipmentBasketController::index - Error fetching equipment baskets', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => $request->user()->id ?? null,
+            ]);
+            
+            return response()->json([
+                'message' => 'Failed to fetch equipment baskets',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while fetching equipment baskets'
+            ], 500);
+        }
     }
 
     /**

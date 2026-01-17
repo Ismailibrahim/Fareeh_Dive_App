@@ -34,7 +34,7 @@ import { useEffect } from "react";
 const customerSchema = z.object({
     full_name: z.string().min(2, "Name must be at least 2 characters."),
     // Handle empty string or valid email
-    email: z.string().email().or(z.literal("")),
+    email: z.string().email().or(z.literal("")).optional(),
     phone: z.string().optional(),
     address: z.string().optional(),
     city: z.string().optional(),
@@ -45,6 +45,9 @@ const customerSchema = z.object({
     gender: z.string().optional(),
     date_of_birth: z.string().optional(),
 });
+
+// Form values type (matches schema)
+type CustomerFormValues = z.infer<typeof customerSchema>;
 
 interface CustomerDialogProps {
     onSuccess: () => void;
@@ -86,7 +89,7 @@ export function CustomerDialog({ onSuccess }: CustomerDialogProps) {
         fetchCountries();
     }, []);
 
-    const form = useForm<CustomerFormData>({
+    const form = useForm<CustomerFormValues>({
         resolver: zodResolver(customerSchema),
         defaultValues: {
             full_name: "",
@@ -103,10 +106,24 @@ export function CustomerDialog({ onSuccess }: CustomerDialogProps) {
         },
     });
 
-    async function onSubmit(data: CustomerFormData) {
+    async function onSubmit(data: CustomerFormValues) {
         setLoading(true);
         try {
-            await customerService.create(data);
+            // Transform form data to API format
+            const payload: CustomerFormData = {
+                full_name: data.full_name,
+                email: data.email && data.email !== "" ? data.email : undefined,
+                phone: data.phone || undefined,
+                address: data.address || undefined,
+                city: data.city || undefined,
+                zip_code: data.zip_code || undefined,
+                country: data.country || undefined,
+                passport_no: data.passport_no || undefined,
+                nationality: data.nationality || undefined,
+                gender: data.gender || undefined,
+                date_of_birth: data.date_of_birth || undefined,
+            };
+            await customerService.create(payload);
             setOpen(false);
             form.reset();
             onSuccess();

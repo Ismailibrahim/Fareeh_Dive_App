@@ -1,6 +1,6 @@
 import apiClient from "../client";
 import { Customer } from "./customer.service";
-import { PriceListItem } from "./price-list-item.service";
+import { PriceListItem } from "./price-list.service";
 import { Booking } from "./booking.service";
 import { BookingDive } from "./booking-dive.service";
 

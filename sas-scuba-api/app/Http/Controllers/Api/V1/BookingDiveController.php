@@ -351,7 +351,7 @@ class BookingDiveController extends Controller
         }
         $this->authorizeDiveCenterAccess($bookingDive->booking, 'Unauthorized access to this dive');
         
-        $bookingDive->load(['booking.customer', 'diveSite', 'boat', 'priceListItem', 'bookingInstructors.user']);
+        $bookingDive->load(['booking.customer', 'booking.diveGroup', 'diveSite', 'boat', 'priceListItem', 'bookingInstructors.user']);
         return $bookingDive;
     }
 

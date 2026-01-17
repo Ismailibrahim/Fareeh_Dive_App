@@ -22,6 +22,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { bookingDiveService, BookingDive } from "@/lib/api/services/booking-dive.service";
 import { useRouter } from "next/navigation";
 import { Plus, Search, MoreHorizontal, Eye, Calendar, Waves, Ship, Clock, Gauge } from "lucide-react";
@@ -148,11 +149,23 @@ export default function DivesPage() {
                         </TableHeader>
                         <TableBody>
                             {loading ? (
-                                <TableRow>
-                                    <TableCell colSpan={9} className="h-24 text-center">
-                                        Loading...
-                                    </TableCell>
-                                </TableRow>
+                                <>
+                                    {Array.from({ length: 5 }).map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                            <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                                            <TableCell className="text-right">
+                                                <Skeleton className="h-8 w-8 ml-auto" />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </>
                             ) : filteredDives.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={9} className="h-24 text-center">
@@ -256,11 +269,25 @@ export default function DivesPage() {
                 {/* Mobile Card View */}
                 <div className="grid grid-cols-1 gap-4 md:hidden">
                     {loading ? (
-                        <Card>
-                            <CardContent className="pt-6">
-                                <p className="text-center text-muted-foreground">Loading...</p>
-                            </CardContent>
-                        </Card>
+                        <>
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <Card key={i}>
+                                    <CardHeader>
+                                        <div className="flex items-start justify-between">
+                                            <div className="space-y-2 flex-1">
+                                                <Skeleton className="h-5 w-32" />
+                                                <Skeleton className="h-4 w-48" />
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                        <Skeleton className="h-16" />
+                                        <Skeleton className="h-16" />
+                                        <Skeleton className="h-10" />
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </>
                     ) : filteredDives.length === 0 ? (
                         <Card>
                             <CardContent className="py-8 text-center">

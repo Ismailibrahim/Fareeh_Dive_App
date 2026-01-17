@@ -6,6 +6,8 @@ import { Header } from "@/components/layout/Header";
 import { EquipmentItem } from "@/lib/api/services/equipment-item.service";
 import { Pagination } from "@/components/ui/pagination";
 import { useEquipmentItems, useDeleteEquipmentItem } from "@/lib/hooks/use-equipment-items";
+import { useEquipment } from "@/lib/hooks/use-equipment";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
     Table,
     TableBody,
@@ -16,7 +18,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, MoreHorizontal, Package, Plus, Calendar, AlertTriangle, Layers } from "lucide-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Search, MoreHorizontal, Package, Plus, Calendar, AlertTriangle, Layers, RotateCw, Filter } from "lucide-react";
 import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
 import Image from "next/image";
@@ -29,6 +32,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -44,10 +48,18 @@ export default function EquipmentItemsPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+    const [selectedEquipmentId, setSelectedEquipmentId] = useState<string>("all");
 
     // Delete state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<EquipmentItem | null>(null);
+
+    // Fetch equipment list for filter dropdown
+    const { data: equipmentData } = useEquipment({ per_page: 1000 });
+    const equipmentList = useMemo(() => {
+        if (!equipmentData) return [];
+        return equipmentData.data || [];
+    }, [equipmentData]);
 
     // Debounce search term (500ms delay)
     const debouncedSearch = useDebouncedCallback((value: string) => {
@@ -56,10 +68,11 @@ export default function EquipmentItemsPage() {
     }, 500);
 
     // Fetch equipment items using React Query
-    const { data: itemsData, isLoading, error } = useEquipmentItems({
+    const { data: itemsData, isLoading, error, refetch, isRefetching } = useEquipmentItems({
         page: currentPage,
         per_page: 20,
         search: debouncedSearchTerm || undefined,
+        equipment_id: selectedEquipmentId && selectedEquipmentId !== "all" ? Number(selectedEquipmentId) : undefined,
     });
 
     // Delete mutation
@@ -78,6 +91,8 @@ export default function EquipmentItemsPage() {
                 per_page: 20,
                 last_page: 1,
                 current_page: 1,
+                from: 0,
+                to: 0,
             };
         }
         return {
@@ -85,6 +100,8 @@ export default function EquipmentItemsPage() {
             per_page: itemsData.per_page || 20,
             last_page: itemsData.last_page || 1,
             current_page: itemsData.current_page || currentPage,
+            from: itemsData.from || 0,
+            to: itemsData.to || 0,
         };
     }, [itemsData, currentPage]);
 
@@ -111,6 +128,15 @@ export default function EquipmentItemsPage() {
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
+    };
+
+    const handleRefresh = () => {
+        refetch();
+    };
+
+    const handleEquipmentFilterChange = (value: string) => {
+        setSelectedEquipmentId(value);
+        setCurrentPage(1); // Reset to first page when filter changes
     };
 
     const getStatusVariant = (status: string) => {
@@ -155,6 +181,31 @@ export default function EquipmentItemsPage() {
                             onChange={(e) => handleSearchChange(e.target.value)}
                         />
                     </div>
+                    <div className="relative">
+                        <Filter className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
+                        <Select value={selectedEquipmentId} onValueChange={handleEquipmentFilterChange}>
+                            <SelectTrigger className="w-[220px] pl-9">
+                                <SelectValue placeholder="All Equipment" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Equipment</SelectItem>
+                                {equipmentList.map((equipment) => (
+                                    <SelectItem key={equipment.id} value={String(equipment.id)}>
+                                        {equipment.name} {equipment.category ? `(${equipment.category})` : ''}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <Button
+                        variant="outline"
+                        onClick={handleRefresh}
+                        disabled={isLoading || isRefetching}
+                        title="Refresh table"
+                    >
+                        <RotateCw className={`mr-2 h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
+                        Refresh
+                    </Button>
                 </div>
                 <div className="rounded-md border hidden md:block">
                     <Table>
@@ -175,11 +226,27 @@ export default function EquipmentItemsPage() {
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <TableRow>
-                                    <TableCell colSpan={11} className="h-24 text-center">
-                                        Loading...
-                                    </TableCell>
-                                </TableRow>
+                                <>
+                                    {Array.from({ length: 5 }).map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell>
+                                                <Skeleton className="h-12 w-12 rounded" />
+                                            </TableCell>
+                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                                            <TableCell className="text-right">
+                                                <Skeleton className="h-8 w-8 ml-auto" />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </>
                             ) : error ? (
                                 <TableRow>
                                     <TableCell colSpan={11} className="h-24 text-center text-red-600">
@@ -292,25 +359,48 @@ export default function EquipmentItemsPage() {
                 </div>
 
                 {/* Pagination */}
-                {pagination.last_page > 1 && (
-                    <div className="flex justify-center">
-                        <Pagination
-                            currentPage={pagination.current_page}
-                            totalPages={pagination.last_page}
-                            onPageChange={(page) => {
-                                setCurrentPage(page);
-                                handlePageChange(page);
-                            }}
-                            itemsPerPage={pagination.per_page}
-                            totalItems={pagination.total}
-                        />
+                {pagination.total > 0 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-4 mt-4">
+                        <div className="text-sm text-muted-foreground">
+                            Showing <span className="font-medium">{pagination.from || 0}</span> to <span className="font-medium">{pagination.to || 0}</span> of <span className="font-medium">{pagination.total}</span> items
+                        </div>
+                        {pagination.last_page > 1 && (
+                            <Pagination
+                                currentPage={pagination.current_page}
+                                totalPages={pagination.last_page}
+                                onPageChange={(page) => {
+                                    setCurrentPage(page);
+                                    handlePageChange(page);
+                                }}
+                                itemsPerPage={pagination.per_page}
+                                totalItems={pagination.total}
+                            />
+                        )}
                     </div>
                 )}
 
                 {/* Mobile Card View */}
                 <div className="grid grid-cols-1 gap-4 md:hidden">
                     {isLoading ? (
-                        <div className="text-center p-4">Loading...</div>
+                        <>
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <Card key={i}>
+                                    <CardHeader>
+                                        <div className="flex items-start justify-between">
+                                            <div className="space-y-2 flex-1">
+                                                <Skeleton className="h-5 w-32" />
+                                                <Skeleton className="h-4 w-48" />
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                        <Skeleton className="h-16" />
+                                        <Skeleton className="h-16" />
+                                        <Skeleton className="h-10" />
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </>
                     ) : error ? (
                         <div className="text-center p-4 border rounded-md bg-red-50 text-red-600">
                             Error loading equipment items. Please try again.
@@ -413,6 +503,26 @@ export default function EquipmentItemsPage() {
                                 </div>
                             </div>
                         ))
+                    )}
+                    {/* Mobile Pagination */}
+                    {pagination.total > 0 && (
+                        <div className="flex flex-col items-center gap-4 mt-4 pt-4 border-t">
+                            <div className="text-sm text-muted-foreground text-center">
+                                Showing <span className="font-medium">{pagination.from || 0}</span> to <span className="font-medium">{pagination.to || 0}</span> of <span className="font-medium">{pagination.total}</span> items
+                            </div>
+                            {pagination.last_page > 1 && (
+                                <Pagination
+                                    currentPage={pagination.current_page}
+                                    totalPages={pagination.last_page}
+                                    onPageChange={(page) => {
+                                        setCurrentPage(page);
+                                        handlePageChange(page);
+                                    }}
+                                    itemsPerPage={pagination.per_page}
+                                    totalItems={pagination.total}
+                                />
+                            )}
+                        </div>
                     )}
                 </div>
             </div>

@@ -23,10 +23,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { User, Mail, Phone, CreditCard, Flag, MapPin, Globe, Plane } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
+import { safeParseDate } from "@/lib/utils/date-format";
 
 const customerSchema = z.object({
     full_name: z.string().min(2, "Name must be at least 2 characters."),
-    email: z.string().email().or(z.literal("")),
+    email: z.string().email().or(z.literal("")).optional(),
     phone: z.string().optional(),
     address: z.string().optional(),
     city: z.string().optional(),
@@ -38,8 +39,12 @@ const customerSchema = z.object({
     date_of_birth: z.string().optional(),
     departure_date: z.string().optional(),
     departure_flight: z.string().optional(),
+    departure_flight_time: z.string().optional(),
     departure_to: z.string().optional(),
 });
+
+// Form values type (matches schema)
+type CustomerFormValues = z.infer<typeof customerSchema>;
 
 interface CustomerFormProps {
     initialData?: Customer;
@@ -82,7 +87,18 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
         fetchCountries();
     }, []);
 
-    const form = useForm<CustomerFormData>({
+    // Helper function to convert date string to YYYY-MM-DD format
+    const formatDateForPicker = (dateString: string | undefined): string => {
+        if (!dateString) return "";
+        const date = safeParseDate(dateString);
+        if (!date) return "";
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const form = useForm<CustomerFormValues>({
         resolver: zodResolver(customerSchema),
         defaultValues: {
             full_name: initialData?.full_name || "",
@@ -95,22 +111,38 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
             passport_no: initialData?.passport_no || "",
             nationality: initialData?.nationality || "",
             gender: initialData?.gender || "",
-            date_of_birth: initialData?.date_of_birth || "",
-            departure_date: initialData?.departure_date || "",
+            date_of_birth: formatDateForPicker(initialData?.date_of_birth),
+            departure_date: formatDateForPicker(initialData?.departure_date),
             departure_flight: initialData?.departure_flight || "",
+            departure_flight_time: initialData?.departure_flight_time || "",
             departure_to: initialData?.departure_to || "",
         },
     });
 
-    async function onSubmit(data: CustomerFormData) {
+    async function onSubmit(data: CustomerFormValues) {
         setLoading(true);
         try {
+            // Transform form data to API format
+            const payload: CustomerFormData = {
+                full_name: data.full_name,
+                email: data.email && data.email !== "" ? data.email : undefined,
+                phone: data.phone || undefined,
+                address: data.address || undefined,
+                city: data.city || undefined,
+                zip_code: data.zip_code || undefined,
+                country: data.country || undefined,
+                passport_no: data.passport_no || undefined,
+                nationality: data.nationality || undefined,
+                gender: data.gender || undefined,
+                date_of_birth: data.date_of_birth || undefined,
+            };
+            
             if (customerId) {
-                await customerService.update(customerId, data);
+                await customerService.update(Number(customerId), payload);
                 router.push("/dashboard/customers");
                 router.refresh();
             } else {
-                const newCustomer = await customerService.create(data);
+                const newCustomer = await customerService.create(payload);
                 router.push(`/dashboard/customers/${newCustomer.id}`);
                 router.refresh();
             }
@@ -455,6 +487,19 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
                                             <Plane className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                             <Input placeholder="e.g., AA123" className="pl-9" {...field} />
                                         </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="departure_flight_time"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Flight Time</FormLabel>
+                                    <FormControl>
+                                        <Input type="time" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

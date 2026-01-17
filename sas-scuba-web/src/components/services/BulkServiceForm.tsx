@@ -42,10 +42,13 @@ const bulkServiceSchema = z.object({
     service_type: z.string().optional(),
     technician: z.string().optional(),
     service_provider: z.string().optional(),
-    cost: z.string().optional().transform((val) => val ? parseFloat(val) : undefined),
+    cost: z.string().optional(),
     notes: z.string().optional(),
     next_service_due_date: z.string().optional(),
 });
+
+// Form values type (matches schema)
+type BulkServiceFormValues = z.infer<typeof bulkServiceSchema>;
 
 interface BulkServiceFormProps {
     onSuccess?: () => void;
@@ -60,7 +63,7 @@ export function BulkServiceForm({ onSuccess }: BulkServiceFormProps) {
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    const form = useForm<z.infer<typeof bulkServiceSchema>>({
+    const form = useForm<BulkServiceFormValues>({
         resolver: zodResolver(bulkServiceSchema),
         defaultValues: {
             equipment_item_ids: [],
@@ -145,18 +148,18 @@ export function BulkServiceForm({ onSuccess }: BulkServiceFormProps) {
         }
     };
 
-    async function onSubmit(data: z.infer<typeof bulkServiceSchema>) {
+    async function onSubmit(data: BulkServiceFormValues) {
         setSubmitting(true);
         try {
             const payload: BulkServiceFormData = {
                 equipment_item_ids: data.equipment_item_ids,
                 service_date: data.service_date,
-                service_type: data.service_type || undefined,
-                technician: data.technician || undefined,
-                service_provider: data.service_provider || undefined,
-                cost: data.cost || undefined,
-                notes: data.notes || undefined,
-                next_service_due_date: data.next_service_due_date || undefined,
+                service_type: data.service_type && data.service_type !== "" ? data.service_type : undefined,
+                technician: data.technician && data.technician !== "" ? data.technician : undefined,
+                service_provider: data.service_provider && data.service_provider !== "" ? data.service_provider : undefined,
+                cost: data.cost && data.cost !== "" ? parseFloat(data.cost) : undefined,
+                notes: data.notes && data.notes !== "" ? data.notes : undefined,
+                next_service_due_date: data.next_service_due_date && data.next_service_due_date !== "" ? data.next_service_due_date : undefined,
             };
 
             const response = await equipmentServiceHistoryService.bulkCreate(payload);

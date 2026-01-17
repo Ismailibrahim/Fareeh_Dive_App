@@ -19,6 +19,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Cache Fallback Configuration
+    |--------------------------------------------------------------------------
+    |
+    | If Redis is configured but unavailable, the application will
+    | automatically fallback to database cache. This ensures the app
+    | continues to work even if Redis server is not running.
+    |
+    */
+
+    /*
+    |--------------------------------------------------------------------------
     | Cache Stores
     |--------------------------------------------------------------------------
     |

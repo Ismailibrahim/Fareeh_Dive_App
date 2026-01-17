@@ -19,18 +19,26 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [
+    'allowed_origins' => array_filter([
         env('FRONTEND_URL', 'http://localhost:3000'),
-        'http://127.0.0.1:3000'
-    ],
+        env('APP_URL', null),
+        // Support multiple origins from environment variable (comma-separated)
+        ...(env('CORS_ALLOWED_ORIGINS') ? explode(',', env('CORS_ALLOWED_ORIGINS')) : []),
+    ]),
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        // Allow any subdomain of the main domain
+        env('CORS_ALLOWED_ORIGIN_PATTERN', null),
+    ],
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    'exposed_headers' => [
+        'X-XSRF-TOKEN',
+        'Authorization',
+    ],
 
-    'max_age' => 0,
+    'max_age' => env('CORS_MAX_AGE', 86400), // 24 hours default
 
     'supports_credentials' => true,
 

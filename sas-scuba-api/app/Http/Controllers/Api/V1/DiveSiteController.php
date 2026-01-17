@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\DiveSite;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class DiveSiteController extends Controller
 {
@@ -16,8 +17,16 @@ class DiveSiteController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        if ($user->dive_center_id) {
-            return DiveSite::where('dive_center_id', $user->dive_center_id)->paginate(20);
+        $diveCenterId = $user->dive_center_id;
+        
+        if ($diveCenterId) {
+            // Cache dive sites for 30 minutes (1800 seconds)
+            $cacheKey = "dive_sites_{$diveCenterId}";
+            return Cache::remember($cacheKey, 1800, function () use ($diveCenterId) {
+                return DiveSite::where('dive_center_id', $diveCenterId)
+                    ->orderBy('name')
+                    ->paginate(20);
+            });
         }
         return DiveSite::paginate(20);
     }
@@ -42,6 +51,10 @@ class DiveSiteController extends Controller
         ]);
 
         $diveSite = DiveSite::create($validated);
+        
+        // Clear dive sites cache for this dive center
+        Cache::forget("dive_sites_{$diveSite->dive_center_id}");
+        
         return response()->json($diveSite, 201);
     }
 
@@ -76,6 +89,10 @@ class DiveSiteController extends Controller
         ]);
 
         $diveSite->update($validated);
+        
+        // Clear dive sites cache for this dive center
+        Cache::forget("dive_sites_{$diveSite->dive_center_id}");
+        
         return response()->json($diveSite);
     }
 
@@ -87,7 +104,12 @@ class DiveSiteController extends Controller
         // Verify dive site belongs to user's dive center
         $this->authorizeDiveCenterAccess($diveSite, 'Unauthorized access to this dive site');
         
+        $diveCenterId = $diveSite->dive_center_id;
         $diveSite->delete();
+        
+        // Clear dive sites cache for this dive center
+        Cache::forget("dive_sites_{$diveCenterId}");
+        
         return response()->noContent();
     }
 }

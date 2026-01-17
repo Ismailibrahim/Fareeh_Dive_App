@@ -27,6 +27,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -160,14 +161,20 @@ export default function EquipmentPage() {
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                                        <div className="flex flex-col items-center justify-center gap-2">
-                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                                            <span>Loading equipment...</span>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
+                                <>
+                                    {Array.from({ length: 5 }).map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                            <TableCell className="text-right">
+                                                <Skeleton className="h-8 w-8 ml-auto" />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </>
                             ) : error ? (
                                 <TableRow>
                                     <TableCell colSpan={6} className="h-24 text-center text-red-600">
@@ -274,7 +281,25 @@ export default function EquipmentPage() {
                 {/* Mobile Card View */}
                 <div className="grid grid-cols-1 gap-4 md:hidden">
                     {isLoading ? (
-                        <div className="text-center p-4">Loading...</div>
+                        <>
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <Card key={i}>
+                                    <CardHeader>
+                                        <div className="flex items-start justify-between">
+                                            <div className="space-y-2 flex-1">
+                                                <Skeleton className="h-5 w-32" />
+                                                <Skeleton className="h-4 w-48" />
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                        <Skeleton className="h-16" />
+                                        <Skeleton className="h-16" />
+                                        <Skeleton className="h-10" />
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </>
                     ) : error ? (
                         <div className="text-center p-4 border rounded-md bg-red-50 text-red-600">
                             Error loading equipment. Please try again.

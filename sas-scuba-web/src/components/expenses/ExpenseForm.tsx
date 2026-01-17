@@ -32,7 +32,7 @@ import { safeParseDate } from "@/lib/utils/date-format";
 const expenseSchema = z.object({
     supplier_id: z.number().min(1, "Supplier is required"),
     expense_category_id: z.number().min(1, "Expense category is required"),
-    expense_date: z.date({ required_error: "Expense date is required" }),
+    expense_date: z.date(),
     description: z.string().min(1, "Description is required").max(255, "Description must be less than 255 characters"),
     amount: z.number().min(0.01, "Amount must be greater than 0"),
     currency: z.string().length(3, "Currency must be 3 characters"),

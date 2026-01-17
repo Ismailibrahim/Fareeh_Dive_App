@@ -1,5 +1,5 @@
 import apiClient from "../client";
-import { PriceListItem, PriceListItemFormData } from "./price-list.service";
+import { PriceListItem, PriceListItemFormData, PriceListItemTier, PriceListItemTierFormData, PriceSuggestion } from "./price-list.service";
 
 export interface PriceListItemFilters {
     service_type?: string;
@@ -43,6 +43,42 @@ export const priceListItemService = {
     bulkUpdate: async (items: Array<{ id: number } & Partial<PriceListItemFormData>>) => {
         const response = await apiClient.post<{ data: PriceListItem[] }>("/api/v1/price-list-items/bulk", { items });
         return response.data;
+    },
+
+    getPriceSuggestions: async (diveCount: number, serviceType: string, customerId?: number) => {
+        const params = new URLSearchParams();
+        params.append('dive_count', diveCount.toString());
+        params.append('service_type', serviceType);
+        if (customerId) {
+            params.append('customer_id', customerId.toString());
+        }
+        const response = await apiClient.get<{
+            dive_count: number;
+            service_type: string;
+            customer_type: string | null;
+            suggestions: PriceSuggestion[];
+        }>(`/api/v1/price-list-items/suggest-price?${params.toString()}`);
+        return response.data;
+    },
+
+    // Tier management methods
+    getTiers: async (itemId: number | string) => {
+        const response = await apiClient.get<PriceListItemTier[]>(`/api/v1/price-list-items/${itemId}/tiers`);
+        return response.data;
+    },
+
+    createTier: async (itemId: number | string, data: PriceListItemTierFormData) => {
+        const response = await apiClient.post<PriceListItemTier>(`/api/v1/price-list-items/${itemId}/tiers`, data);
+        return response.data;
+    },
+
+    updateTier: async (itemId: number | string, tierId: number | string, data: Partial<PriceListItemTierFormData>) => {
+        const response = await apiClient.put<PriceListItemTier>(`/api/v1/price-list-items/${itemId}/tiers/${tierId}`, data);
+        return response.data;
+    },
+
+    deleteTier: async (itemId: number | string, tierId: number | string) => {
+        await apiClient.delete(`/api/v1/price-list-items/${itemId}/tiers/${tierId}`);
     },
 };
 

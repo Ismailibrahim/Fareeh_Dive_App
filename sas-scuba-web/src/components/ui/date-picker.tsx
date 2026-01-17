@@ -82,11 +82,41 @@ export function DatePicker({
         }
     }, [dateValue, open]);
 
+    // Sync tempValue with calendar state value when popover is open
+    // This ensures year changes are reflected in tempValue before Apply is clicked
+    React.useEffect(() => {
+        if (!open) return;
+        
+        // Use requestAnimationFrame to check for state changes without polling
+        const checkState = () => {
+            if (calendarStateRef.current?.getValue) {
+                const stateValue = calendarStateRef.current.getValue();
+                if (stateValue !== null && stateValue !== undefined) {
+                    // Only update if the value is different to avoid unnecessary re-renders
+                    if (!tempValue || tempValue.compare(stateValue) !== 0) {
+                        setTempValue(stateValue);
+                    }
+                }
+            }
+        };
+        
+        // Check immediately and then on next frame
+        checkState();
+        const rafId = requestAnimationFrame(checkState);
+        
+        return () => cancelAnimationFrame(rafId);
+    }, [open, tempValue]);
+
     // Ref to get the current calendar state value
     const calendarStateRef = React.useRef<{ getValue: () => CalendarDate | null | undefined } | null>(null);
 
-    const handleCalendarChange = (selectedDate: CalendarDate | null | undefined) => {
-        setTempValue(selectedDate || undefined);
+    const handleCalendarChange = (selectedDate: any) => {
+        // Convert DateValue to CalendarDate if needed
+        if (selectedDate && 'year' in selectedDate && 'month' in selectedDate && 'day' in selectedDate) {
+            setTempValue(selectedDate as CalendarDate);
+        } else {
+            setTempValue(selectedDate || undefined);
+        }
     };
 
     const handleApply = () => {

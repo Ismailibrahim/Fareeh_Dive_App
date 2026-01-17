@@ -137,8 +137,8 @@ export default function InvoiceDetailPage() {
     
     // Get invoice discount
     const invoiceDiscountRaw = invoice?.discount;
-    const invoiceDiscount = (invoiceDiscountRaw !== null && invoiceDiscountRaw !== undefined && invoiceDiscountRaw !== '' && invoiceDiscountRaw !== 0) 
-        ? Number(invoiceDiscountRaw) 
+    const invoiceDiscount = (invoiceDiscountRaw !== null && invoiceDiscountRaw !== undefined && invoiceDiscountRaw !== 0)
+        ? invoiceDiscountRaw
         : 0;
     
     // Total discount sum (item discounts + invoice discount)

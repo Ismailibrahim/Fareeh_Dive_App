@@ -64,7 +64,7 @@ export default function EditCustomerPage() {
                     <EmergencyContactsSection customerId={id} />
                     
                     {/* Certifications Section */}
-                    <CustomerCertificationsSection customerId={id} />
+                    <CustomerCertificationsSection customerId={id} customer={customer} />
                 </div>
             </div>
         </div>

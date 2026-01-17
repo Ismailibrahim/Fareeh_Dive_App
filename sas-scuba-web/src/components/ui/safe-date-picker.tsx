@@ -6,7 +6,7 @@ import { safeParseDate } from "@/lib/utils/date-format";
 import { cn } from "@/lib/utils";
 
 interface SafeDatePickerProps {
-    selected?: Date | null | undefined;
+    selected?: Date | string | null | undefined;
     onChange: (date: Date | null) => void;
     [key: string]: any; // Allow all other DatePicker props
 }
@@ -30,9 +30,13 @@ export function SafeDatePicker({ selected, onChange, className, ...props }: Safe
         }
         
         // If it's a string, parse it safely
-        if (typeof selected === "string" && selected.trim()) {
-            const parsed = safeParseDate(selected);
-            return parsed;
+        if (typeof selected === "string") {
+            const trimmed = selected.trim();
+            if (trimmed) {
+                const parsed = safeParseDate(trimmed);
+                return parsed;
+            }
+            return null;
         }
         
         // For any other type, return null

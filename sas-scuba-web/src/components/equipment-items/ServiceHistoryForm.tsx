@@ -26,12 +26,15 @@ const serviceHistorySchema = z.object({
     service_type: z.string().optional(),
     technician: z.string().optional(),
     service_provider: z.string().optional(),
-    cost: z.string().optional().transform((val) => val ? parseFloat(val) : undefined),
+    cost: z.string().optional(),
     notes: z.string().optional(),
     parts_replaced: z.string().optional(),
     warranty_info: z.string().optional(),
     next_service_due_date: z.string().optional(),
 });
+
+// Form values type (matches schema)
+type ServiceHistoryFormValues = z.infer<typeof serviceHistorySchema>;
 
 interface ServiceHistoryFormProps {
     equipmentItemId: string | number;
@@ -52,7 +55,7 @@ export function ServiceHistoryForm({
 }: ServiceHistoryFormProps) {
     const [loading, setLoading] = useState(false);
 
-    const form = useForm<EquipmentServiceHistoryFormData>({
+    const form = useForm<ServiceHistoryFormValues>({
         resolver: zodResolver(serviceHistorySchema),
         defaultValues: {
             service_date: initialData?.service_date ? initialData.service_date.split('T')[0] : new Date().toISOString().split('T')[0],
@@ -79,25 +82,25 @@ export function ServiceHistoryForm({
         }
     }, [serviceDate, serviceIntervalDays, form]);
 
-    async function onSubmit(data: z.infer<typeof serviceHistorySchema>) {
+    async function onSubmit(data: ServiceHistoryFormValues) {
         setLoading(true);
         try {
             const payload: EquipmentServiceHistoryFormData = {
                 service_date: data.service_date,
-                service_type: data.service_type || undefined,
-                technician: data.technician || undefined,
-                service_provider: data.service_provider || undefined,
-                cost: data.cost || undefined,
-                notes: data.notes || undefined,
-                parts_replaced: data.parts_replaced || undefined,
-                warranty_info: data.warranty_info || undefined,
-                next_service_due_date: data.next_service_due_date || undefined,
+                service_type: data.service_type && data.service_type !== "" ? data.service_type : undefined,
+                technician: data.technician && data.technician !== "" ? data.technician : undefined,
+                service_provider: data.service_provider && data.service_provider !== "" ? data.service_provider : undefined,
+                cost: data.cost && data.cost !== "" ? parseFloat(data.cost) : undefined,
+                notes: data.notes && data.notes !== "" ? data.notes : undefined,
+                parts_replaced: data.parts_replaced && data.parts_replaced !== "" ? data.parts_replaced : undefined,
+                warranty_info: data.warranty_info && data.warranty_info !== "" ? data.warranty_info : undefined,
+                next_service_due_date: data.next_service_due_date && data.next_service_due_date !== "" ? data.next_service_due_date : undefined,
             };
 
             if (serviceHistoryId) {
-                await equipmentServiceHistoryService.update(equipmentItemId, serviceHistoryId, payload);
+                await equipmentServiceHistoryService.update(Number(equipmentItemId), Number(serviceHistoryId), payload);
             } else {
-                await equipmentServiceHistoryService.create(equipmentItemId, payload);
+                await equipmentServiceHistoryService.create(Number(equipmentItemId), payload);
             }
             onSuccess();
         } catch (error) {

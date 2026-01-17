@@ -33,13 +33,13 @@ const certificationSchema = z.object({
     customer_id: z.string().min(1, "Customer is required"),
     certification_name: z.string().min(2, "Certification name is required"),
     certification_no: z.string().optional(),
-    certification_date: z.date({ required_error: "Date is required" }),
+    certification_date: z.date(),
     last_dive_date: z.date().optional(),
     no_of_dives: z.number().int().min(0).optional(),
     agency: z.string().optional(),
     instructor: z.string().optional(),
     file_url: z.string().optional(),
-    license_status: z.boolean().default(true),
+    license_status: z.boolean(),
 });
 
 type CertificationFormValues = z.infer<typeof certificationSchema>;

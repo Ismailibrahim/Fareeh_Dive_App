@@ -46,11 +46,36 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('payments')) {
+            return;
+        }
+
         Schema::table('payments', function (Blueprint $table) {
-            $table->dropForeign(['payment_method_id']);
-            $table->dropIndex(['payment_method_id']);
-            $table->dropIndex(['method_type']);
-            $table->dropColumn([
+            // Drop foreign key if it exists
+            if (Schema::hasColumn('payments', 'payment_method_id')) {
+                try {
+                    $table->dropForeign(['payment_method_id']);
+                } catch (\Exception $e) {
+                    // Foreign key might not exist, continue
+                }
+            }
+            
+            // Drop indexes if they exist
+            try {
+                $table->dropIndex(['payment_method_id']);
+            } catch (\Exception $e) {
+                // Index might not exist, continue
+            }
+            
+            try {
+                $table->dropIndex(['method_type']);
+            } catch (\Exception $e) {
+                // Index might not exist, continue
+            }
+            
+            // Drop columns if they exist
+            $columnsToDrop = [];
+            $columns = [
                 'payment_method_id',
                 'method_type',
                 'method_subtype',
@@ -63,7 +88,17 @@ return new class extends Migration
                 'reference_number',
                 'wallet_type',
                 'currency',
-            ]);
+            ];
+            
+            foreach ($columns as $column) {
+                if (Schema::hasColumn('payments', $column)) {
+                    $columnsToDrop[] = $column;
+                }
+            }
+            
+            if (!empty($columnsToDrop)) {
+                $table->dropColumn($columnsToDrop);
+            }
         });
     }
 };

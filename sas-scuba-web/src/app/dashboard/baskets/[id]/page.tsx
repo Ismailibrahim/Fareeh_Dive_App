@@ -7,12 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { equipmentBasketService, EquipmentBasket } from "@/lib/api/services/equipment-basket.service";
 import { bookingEquipmentService } from "@/lib/api/services/booking-equipment.service";
-import { ShoppingBasket, Calendar, User, Package, Plus, RotateCcw, Layers, ArrowLeft } from "lucide-react";
+import { ShoppingBasket, Calendar, User, Package, Plus, RotateCcw, Layers, ArrowLeft, Printer } from "lucide-react";
 import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { BulkAddEquipmentDialog } from "@/components/booking-equipment/BulkAddEquipmentDialog";
 import { EquipmentReturnDialog } from "@/components/booking-equipment/EquipmentReturnDialog";
+import { EquipmentTemplates } from "@/components/booking-equipment/EquipmentTemplates";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
@@ -192,12 +193,21 @@ export default function BasketDetailPage() {
                             </p>
                         </div>
                     </div>
-                    {basket.status === 'Active' && (
-                        <Button onClick={handleReturnBasket} variant="outline">
-                            <RotateCcw className="h-4 w-4 mr-2" />
-                            Return Basket
+                    <div className="flex gap-2">
+                        <Button 
+                            onClick={() => window.open(`/dashboard/baskets/${basketId}/print`, '_blank')}
+                            variant="outline"
+                        >
+                            <Printer className="h-4 w-4 mr-2" />
+                            Print Receipt
                         </Button>
-                    )}
+                        {basket.status === 'Active' && (
+                            <Button onClick={handleReturnBasket} variant="outline">
+                                <RotateCcw className="h-4 w-4 mr-2" />
+                                Return Basket
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
             {/* Basket Summary */}
@@ -349,6 +359,19 @@ export default function BasketDetailPage() {
                     </div>
                 )}
                 <CardContent>
+                    {/* Equipment Templates - Show when basket is active */}
+                    {basket.status === 'Active' && (
+                        <div className="mb-6 pb-6 border-b">
+                            <EquipmentTemplates
+                                basketId={basket.id}
+                                checkoutDate={basket.checkout_date || new Date().toISOString().split('T')[0]}
+                                returnDate={basket.expected_return_date || undefined}
+                                bookingId={basket.booking_id}
+                                onSuccess={loadBasket}
+                            />
+                        </div>
+                    )}
+                    
                     {!basket.booking_equipment || basket.booking_equipment.length === 0 ? (
                         <div className="text-center py-8">
                             <p className="text-muted-foreground mb-4">No equipment assigned</p>
@@ -425,6 +448,20 @@ export default function BasketDetailPage() {
                                                         </Badge>
                                                     )}
                                                 </div>
+                                                {equipment.equipment_source === 'Center' && equipment.equipment_item && (equipment.equipment_item.serial_no || equipment.equipment_item.inventory_code) && (
+                                                    <div className="flex items-center gap-2 mb-1 mt-1">
+                                                        {equipment.equipment_item.serial_no && (
+                                                            <Badge variant="outline" className="font-mono text-xs">
+                                                                SN: {equipment.equipment_item.serial_no}
+                                                            </Badge>
+                                                        )}
+                                                        {equipment.equipment_item.inventory_code && (
+                                                            <Badge variant="outline" className="font-mono text-xs">
+                                                                Code: {equipment.equipment_item.inventory_code}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                )}
                                                 <p className="text-sm text-muted-foreground">
                                                     {equipment.checkout_date && `Checkout: ${safeFormatDate(equipment.checkout_date, "MMM d, yyyy", "N/A")}`}
                                                     {equipment.checkout_date && equipment.return_date && ' • '}

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { invoiceService, Invoice } from "@/lib/api/services/invoice.service";
 import { CreateInvoiceDialog } from "@/components/invoices/CreateInvoiceDialog";
-import { FileText, MoreHorizontal, Eye, Calendar, Plus } from "lucide-react";
+import { FileText, MoreHorizontal, Eye, Calendar, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { safeFormatDate } from "@/lib/utils/date-format";
 import {
@@ -34,6 +34,18 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useDeleteInvoice } from "@/lib/hooks/use-invoices";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function InvoicesPage() {
     const router = useRouter();
@@ -41,6 +53,9 @@ export default function InvoicesPage() {
     const [loading, setLoading] = useState(true);
     const [filters, setFilters] = useState<{ status?: string; invoice_type?: string }>({});
     const [showCreateDialog, setShowCreateDialog] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
+    const deleteInvoice = useDeleteInvoice();
 
     useEffect(() => {
         loadInvoices();
@@ -71,6 +86,25 @@ export default function InvoicesPage() {
                 return 'destructive';
             default:
                 return 'outline';
+        }
+    };
+
+    const handleDeleteClick = (invoice: Invoice) => {
+        setInvoiceToDelete(invoice);
+        setDeleteDialogOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!invoiceToDelete) return;
+
+        try {
+            await deleteInvoice.mutateAsync(invoiceToDelete.id);
+            setDeleteDialogOpen(false);
+            setInvoiceToDelete(null);
+            loadInvoices(); // Refresh the list
+        } catch (error: any) {
+            console.error("Failed to delete invoice", error);
+            alert(error?.response?.data?.message || "Failed to delete invoice. It may have payments associated with it.");
         }
     };
 
@@ -137,11 +171,23 @@ export default function InvoicesPage() {
                         </TableHeader>
                         <TableBody>
                             {loading ? (
-                                <TableRow>
-                                    <TableCell colSpan={9} className="h-24 text-center">
-                                        Loading...
-                                    </TableCell>
-                                </TableRow>
+                                <>
+                                    {Array.from({ length: 5 }).map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                                            <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                            <TableCell className="text-right">
+                                                <Skeleton className="h-8 w-8 ml-auto" />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </>
                             ) : invoices.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={9} className="h-24 text-center">
@@ -232,6 +278,21 @@ export default function InvoicesPage() {
                                                             <Eye className="mr-2 h-4 w-4" />
                                                             View Details
                                                         </DropdownMenuItem>
+                                                        {totalPaid === 0 && (
+                                                            <>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        handleDeleteClick(invoice);
+                                                                    }}
+                                                                    className="text-red-600 cursor-pointer focus:bg-red-50 focus:text-red-600"
+                                                                >
+                                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                                    Delete
+                                                                </DropdownMenuItem>
+                                                            </>
+                                                        )}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </TableCell>
@@ -246,11 +307,32 @@ export default function InvoicesPage() {
                 {/* Mobile Card View */}
                 <div className="grid grid-cols-1 gap-4 md:hidden">
                     {loading ? (
-                        <Card>
-                            <CardContent className="pt-6">
-                                <p className="text-center text-muted-foreground">Loading...</p>
-                            </CardContent>
-                        </Card>
+                        <>
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <Card key={i}>
+                                    <CardHeader>
+                                        <div className="flex items-start justify-between">
+                                            <div className="space-y-2 flex-1">
+                                                <Skeleton className="h-5 w-32" />
+                                                <div className="flex gap-2">
+                                                    <Skeleton className="h-6 w-20" />
+                                                    <Skeleton className="h-6 w-16" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                        <Skeleton className="h-16" />
+                                        <Skeleton className="h-16" />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <Skeleton className="h-16" />
+                                            <Skeleton className="h-16" />
+                                        </div>
+                                        <Skeleton className="h-10" />
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </>
                     ) : invoices.length === 0 ? (
                         <Card>
                             <CardContent className="py-8 text-center">
@@ -325,13 +407,22 @@ export default function InvoicesPage() {
                                                 </p>
                                             </div>
                                         )}
-                                        <div className="pt-2">
-                                            <Link href={`/dashboard/invoices/${invoice.id}`}>
+                                        <div className="pt-2 flex gap-2">
+                                            <Link href={`/dashboard/invoices/${invoice.id}`} className="flex-1">
                                                 <Button variant="outline" className="w-full">
                                                     <Eye className="mr-2 h-4 w-4" />
                                                     View Details
                                                 </Button>
                                             </Link>
+                                            {totalPaid === 0 && (
+                                                <Button
+                                                    variant="outline"
+                                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                    onClick={() => handleDeleteClick(invoice)}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -348,6 +439,35 @@ export default function InvoicesPage() {
                         loadInvoices();
                     }}
                 />
+
+                {/* Delete Confirmation Dialog */}
+                <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete the invoice
+                                {invoiceToDelete && (
+                                    <> <strong>{invoiceToDelete.invoice_no || `#${invoiceToDelete.id}`}</strong></>
+                                )}
+                                {invoiceToDelete?.booking?.customer?.full_name && (
+                                    <> for {invoiceToDelete.booking.customer.full_name}</>
+                                )}
+                                .
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={deleteInvoice.isPending}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={confirmDelete}
+                                disabled={deleteInvoice.isPending}
+                                className="bg-red-600 hover:bg-red-700"
+                            >
+                                {deleteInvoice.isPending ? "Deleting..." : "Delete"}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
         </div>
     );

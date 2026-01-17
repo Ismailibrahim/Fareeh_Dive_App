@@ -316,7 +316,7 @@ export function DiveLogForm({ initialData, diveLogId }: DiveLogFormProps) {
                                     }}
                                 />
 
-                                {selectedCustomer && (selectedCustomer.departure_date || selectedCustomer.departure_flight || selectedCustomer.departure_to) && (
+                                {selectedCustomer && (selectedCustomer.departure_date || selectedCustomer.departure_flight || selectedCustomer.departure_flight_time || selectedCustomer.departure_to) && (
                                     <div className="border rounded-lg p-4 bg-muted/50 flex flex-col">
                                         <div className="flex items-center gap-2 mb-3">
                                             <Plane className="h-4 w-4 text-primary" />
@@ -337,6 +337,13 @@ export function DiveLogForm({ initialData, diveLogId }: DiveLogFormProps) {
                                                     <Plane className="h-3 w-3 text-muted-foreground" />
                                                     <span className="text-muted-foreground">Flight:</span>
                                                     <span className="font-medium">{selectedCustomer.departure_flight}</span>
+                                                </div>
+                                            )}
+                                            {selectedCustomer.departure_flight_time && (
+                                                <div className="flex items-center gap-2">
+                                                    <CalendarIcon className="h-3 w-3 text-muted-foreground" />
+                                                    <span className="text-muted-foreground">Time:</span>
+                                                    <span className="font-medium">{selectedCustomer.departure_flight_time}</span>
                                                 </div>
                                             )}
                                             {selectedCustomer.departure_to && (

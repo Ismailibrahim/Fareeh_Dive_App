@@ -75,11 +75,36 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('booking_equipment')) {
+            return;
+        }
+
         Schema::table('booking_equipment', function (Blueprint $table) {
-            $table->dropForeign(['basket_id']);
-            $table->dropIndex('beq_avail_idx');
-            $table->dropIndex(['basket_id']);
-            $table->dropColumn([
+            // Drop foreign key if it exists
+            if (Schema::hasColumn('booking_equipment', 'basket_id')) {
+                try {
+                    $table->dropForeign(['basket_id']);
+                } catch (\Exception $e) {
+                    // Foreign key might not exist, continue
+                }
+            }
+            
+            // Drop indexes if they exist
+            try {
+                $table->dropIndex('beq_avail_idx');
+            } catch (\Exception $e) {
+                // Index might not exist, continue
+            }
+            
+            try {
+                $table->dropIndex(['basket_id']);
+            } catch (\Exception $e) {
+                // Index might not exist, continue
+            }
+            
+            // Drop columns if they exist
+            $columnsToDrop = [];
+            $columns = [
                 'basket_id',
                 'checkout_date',
                 'return_date',
@@ -90,7 +115,17 @@ return new class extends Migration
                 'customer_equipment_serial',
                 'customer_equipment_notes',
                 'assignment_status',
-            ]);
+            ];
+            
+            foreach ($columns as $column) {
+                if (Schema::hasColumn('booking_equipment', $column)) {
+                    $columnsToDrop[] = $column;
+                }
+            }
+            
+            if (!empty($columnsToDrop)) {
+                $table->dropColumn($columnsToDrop);
+            }
         });
     }
 };

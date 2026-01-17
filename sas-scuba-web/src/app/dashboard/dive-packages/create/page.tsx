@@ -19,7 +19,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { divePackageService, DivePackageFormData } from "@/lib/api/services/dive-package.service";
 import { customerService, Customer } from "@/lib/api/services/customer.service";
-import { priceListItemService, PriceListItem } from "@/lib/api/services/price-list-item.service";
+import { priceListItemService } from "@/lib/api/services/price-list-item.service";
+import { PriceListItem } from "@/lib/api/services/price-list.service";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +39,9 @@ const packageSchema = z.object({
     create_bookings_now: z.boolean().optional(),
     notes: z.string().optional(),
 });
+
+// Form values type (strings from form inputs)
+type PackageFormValues = z.infer<typeof packageSchema>;
 
 export default function CreateDivePackagePage() {
     const router = useRouter();
@@ -62,7 +66,7 @@ export default function CreateDivePackagePage() {
         fetchData();
     }, []);
 
-    const form = useForm<DivePackageFormData>({
+    const form = useForm<PackageFormValues>({
         resolver: zodResolver(packageSchema),
         defaultValues: {
             customer_id: "",
@@ -107,7 +111,7 @@ export default function CreateDivePackagePage() {
         return date.toISOString().split('T')[0];
     };
 
-    async function onSubmit(data: z.infer<typeof packageSchema>) {
+    async function onSubmit(data: PackageFormValues) {
         setLoading(true);
         try {
             const payload: DivePackageFormData = {

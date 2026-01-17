@@ -54,6 +54,11 @@ class Booking extends Model
         return $this->hasMany(BookingEquipment::class);
     }
 
+    public function bookingExcursions()
+    {
+        return $this->hasMany(BookingExcursion::class);
+    }
+
     public function divePackage()
     {
         return $this->belongsTo(DivePackage::class);

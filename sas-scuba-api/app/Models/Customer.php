@@ -21,7 +21,13 @@ class Customer extends Model
         'nationality',
         'departure_date',
         'departure_flight',
+        'departure_flight_time',
         'departure_to',
+    ];
+
+    protected $casts = [
+        'date_of_birth' => 'date',
+        'departure_date' => 'date',
     ];
 
     public function emergencyContacts()
@@ -47,6 +53,11 @@ class Customer extends Model
     public function accommodation()
     {
         return $this->hasOne(CustomerAccommodation::class);
+    }
+
+    public function certification()
+    {
+        return $this->hasOne(CustomerCertification::class);
     }
 
     public function diveGroups()

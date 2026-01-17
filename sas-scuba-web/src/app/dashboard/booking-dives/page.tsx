@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, MoreHorizontal, Calendar, Plus, MapPin, Ship, Clock } from "lucide-react";
+import { Search, MoreHorizontal, Calendar, Plus, MapPin, Ship, Clock, Users, Eye } from "lucide-react";
 import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
 import {
@@ -25,6 +25,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -92,6 +93,7 @@ export default function BookingDivesPage() {
 
     const filteredBookingDives = bookingDives.filter(bookingDive =>
         bookingDive.booking?.customer?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        bookingDive.booking?.dive_group?.group_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         bookingDive.dive_site?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         bookingDive.boat?.name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -128,6 +130,7 @@ export default function BookingDivesPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Booking</TableHead>
+                                <TableHead>Group</TableHead>
                                 <TableHead>Dive Site</TableHead>
                                 <TableHead>Boat</TableHead>
                                 <TableHead>Dive Date</TableHead>
@@ -137,14 +140,24 @@ export default function BookingDivesPage() {
                         </TableHeader>
                         <TableBody>
                             {loading ? (
-                                <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center">
-                                        Loading...
-                                    </TableCell>
-                                </TableRow>
+                                <>
+                                    {Array.from({ length: 5 }).map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                                            <TableCell className="text-right">
+                                                <Skeleton className="h-8 w-8 ml-auto" />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </>
                             ) : filteredBookingDives.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center">
+                                    <TableCell colSpan={7} className="h-24 text-center">
                                         No booking dives found.
                                     </TableCell>
                                 </TableRow>
@@ -156,6 +169,16 @@ export default function BookingDivesPage() {
                                                 <Calendar className="h-4 w-4 text-muted-foreground" />
                                                 {bookingDive.booking?.customer?.full_name || `Booking #${bookingDive.booking_id}`}
                                             </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {bookingDive.booking?.dive_group ? (
+                                                <div className="flex items-center gap-2">
+                                                    <Users className="h-4 w-4 text-muted-foreground" />
+                                                    {bookingDive.booking.dive_group.group_name}
+                                                </div>
+                                            ) : (
+                                                "-"
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex items-center gap-2">
@@ -202,6 +225,12 @@ export default function BookingDivesPage() {
                                                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem asChild>
+                                                        <Link href={`/dashboard/booking-dives/${bookingDive.id}`}>
+                                                            <Eye className="h-4 w-4 mr-2" />
+                                                            View Details
+                                                        </Link>
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem asChild>
                                                         <Link href={`/dashboard/booking-dives/${bookingDive.id}/edit`}>
                                                             Edit
                                                         </Link>
@@ -225,11 +254,25 @@ export default function BookingDivesPage() {
                 {/* Mobile Card View */}
                 <div className="grid grid-cols-1 gap-4 md:hidden">
                     {loading ? (
-                        <Card>
-                            <CardContent className="pt-6">
-                                <p className="text-center text-muted-foreground">Loading...</p>
-                            </CardContent>
-                        </Card>
+                        <>
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <Card key={i}>
+                                    <CardHeader>
+                                        <div className="flex items-start justify-between">
+                                            <div className="space-y-2 flex-1">
+                                                <Skeleton className="h-5 w-32" />
+                                                <Skeleton className="h-4 w-48" />
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                        <Skeleton className="h-16" />
+                                        <Skeleton className="h-16" />
+                                        <Skeleton className="h-10" />
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </>
                     ) : filteredBookingDives.length === 0 ? (
                         <Card>
                             <CardContent className="pt-6">
@@ -251,6 +294,15 @@ export default function BookingDivesPage() {
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-3">
+                                    {bookingDive.booking?.dive_group && (
+                                        <div>
+                                            <CardDescription className="flex items-center gap-2 mb-1">
+                                                <Users className="h-4 w-4" />
+                                                Group
+                                            </CardDescription>
+                                            <p>{bookingDive.booking.dive_group.group_name}</p>
+                                        </div>
+                                    )}
                                     {bookingDive.dive_site && (
                                         <div>
                                             <CardDescription className="flex items-center gap-2 mb-1">
@@ -288,6 +340,12 @@ export default function BookingDivesPage() {
                                         </div>
                                     )}
                                     <div className="flex gap-2 pt-2">
+                                        <Link href={`/dashboard/booking-dives/${bookingDive.id}`} className="flex-1">
+                                            <Button variant="outline" className="w-full" size="sm">
+                                                <Eye className="h-4 w-4 mr-2" />
+                                                View Details
+                                            </Button>
+                                        </Link>
                                         <Link href={`/dashboard/booking-dives/${bookingDive.id}/edit`} className="flex-1">
                                             <Button variant="outline" className="w-full" size="sm">
                                                 Edit

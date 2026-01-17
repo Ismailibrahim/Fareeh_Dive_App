@@ -231,16 +231,26 @@ class BookingEquipmentController extends Controller
         $user = $request->user();
         $diveCenterId = $user->dive_center_id;
 
+        // Eager load relationships upfront for better performance
+        $bookingEquipment->load(['booking', 'basket']);
+
         // Verify equipment belongs to user's dive center
         if ($diveCenterId) {
-            $bookingEquipment->load('booking');
-            if ($bookingEquipment->booking && $bookingEquipment->booking->dive_center_id !== $diveCenterId) {
+            $belongsToDiveCenter = false;
+            if ($bookingEquipment->booking && $bookingEquipment->booking->dive_center_id === $diveCenterId) {
+                $belongsToDiveCenter = true;
+            } elseif ($bookingEquipment->basket && $bookingEquipment->basket->dive_center_id === $diveCenterId) {
+                $belongsToDiveCenter = true;
+            }
+            
+            if (!$belongsToDiveCenter) {
                 return response()->json(['message' => 'Equipment not found'], 404);
             }
         }
 
-        $bookingEquipment->load(['booking.customer', 'equipmentItem.equipment', 'basket']);
-        return $bookingEquipment;
+        // Load remaining relationships
+        $bookingEquipment->load(['booking.customer', 'equipmentItem.equipment']);
+        return response()->json($bookingEquipment);
     }
 
     /**
@@ -375,7 +385,21 @@ class BookingEquipmentController extends Controller
                 }
             }
             
-            $bookingEquipment->load(['booking.customer', 'equipmentItem.equipment', 'basket']);
+            // Eager load relationships upfront instead of using load() after update
+            $relations = [];
+            if ($bookingEquipment->booking_id) {
+                $relations[] = 'booking.customer';
+            }
+            if ($bookingEquipment->equipment_item_id) {
+                $relations[] = 'equipmentItem.equipment';
+            }
+            if ($bookingEquipment->basket_id) {
+                $relations[] = 'basket';
+            }
+            
+            if (!empty($relations)) {
+                $bookingEquipment->load($relations);
+            }
             
             return response()->json($bookingEquipment);
         } catch (\Exception $e) {
@@ -726,6 +750,297 @@ class BookingEquipmentController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Bulk create multiple booking equipment items
+     */
+    public function bulkStore(Request $request)
+    {
+        $user = $request->user();
+        $diveCenterId = $user->dive_center_id;
+
+        $validated = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.booking_id' => 'nullable|exists:bookings,id',
+            'items.*.basket_id' => 'nullable|exists:equipment_baskets,id',
+            'items.*.equipment_item_id' => 'nullable|exists:equipment_items,id',
+            'items.*.price' => 'nullable|numeric|min:0',
+            'items.*.equipment_source' => 'nullable|in:Center,Customer Own',
+            'items.*.checkout_date' => 'nullable|date',
+            'items.*.return_date' => 'nullable|date',
+            'items.*.customer_equipment_type' => 'nullable|string|max:255',
+            'items.*.customer_equipment_brand' => 'nullable|string|max:255',
+            'items.*.customer_equipment_model' => 'nullable|string|max:255',
+            'items.*.customer_equipment_serial' => 'nullable|string|max:255',
+            'items.*.customer_equipment_notes' => 'nullable|string',
+        ]);
+
+        \Illuminate\Support\Facades\DB::beginTransaction();
+        try {
+            $successItems = [];
+            $failedItems = [];
+            $availabilityService = new EquipmentAvailabilityService();
+
+            foreach ($validated['items'] as $index => $item) {
+                try {
+                    // Validate that either booking_id or basket_id is provided
+                    if (empty($item['booking_id']) && empty($item['basket_id'])) {
+                        $failedItems[] = [
+                            'index' => $index,
+                            'item' => $item,
+                            'error' => 'Either booking_id or basket_id must be provided'
+                        ];
+                        continue;
+                    }
+
+                    // Validate equipment_source and equipment_item_id
+                    $equipmentSource = $item['equipment_source'] ?? 'Center';
+                    if ($equipmentSource === 'Center' && empty($item['equipment_item_id'])) {
+                        $failedItems[] = [
+                            'index' => $index,
+                            'item' => $item,
+                            'error' => 'equipment_item_id is required for center equipment'
+                        ];
+                        continue;
+                    }
+
+                    // Verify basket belongs to dive center if provided
+                    if (!empty($item['basket_id'])) {
+                        $basket = \App\Models\EquipmentBasket::where('id', $item['basket_id'])
+                            ->where('dive_center_id', $diveCenterId)
+                            ->first();
+                        
+                        if (!$basket) {
+                            $failedItems[] = [
+                                'index' => $index,
+                                'item' => $item,
+                                'error' => 'Basket not found or does not belong to your dive center'
+                            ];
+                            continue;
+                        }
+
+                        // Use basket's booking_id if not provided
+                        if (empty($item['booking_id']) && $basket->booking_id) {
+                            $item['booking_id'] = $basket->booking_id;
+                        }
+                    }
+
+                    // Verify booking belongs to dive center if provided
+                    if (!empty($item['booking_id'])) {
+                        $booking = \App\Models\Booking::where('id', $item['booking_id'])
+                            ->where('dive_center_id', $diveCenterId)
+                            ->first();
+                        
+                        if (!$booking) {
+                            $failedItems[] = [
+                                'index' => $index,
+                                'item' => $item,
+                                'error' => 'Booking not found or does not belong to your dive center'
+                            ];
+                            continue;
+                        }
+                    }
+
+                    // Prepare data
+                    $data = array_merge([
+                        'price' => $item['price'] ?? 0,
+                        'equipment_source' => $equipmentSource,
+                        'assignment_status' => 'Pending',
+                    ], $item);
+
+                    // If equipment_source is 'Customer Own', equipment_item_id should be null
+                    if ($data['equipment_source'] === 'Customer Own') {
+                        $data['equipment_item_id'] = null;
+                    }
+
+                    // Check availability for Center equipment
+                    if ($data['equipment_source'] === 'Center' && !empty($data['equipment_item_id'])) {
+                        $checkoutDate = $data['checkout_date'] ?? now()->toDateString();
+                        $returnDate = $data['return_date'] ?? \Carbon\Carbon::parse($checkoutDate)->addDay()->toDateString();
+                        
+                        if (empty($data['checkout_date'])) {
+                            $data['checkout_date'] = $checkoutDate;
+                        }
+                        if (empty($data['return_date'])) {
+                            $data['return_date'] = $returnDate;
+                        }
+                        
+                        $isAvailable = $availabilityService->isAvailable(
+                            $data['equipment_item_id'],
+                            $checkoutDate,
+                            $returnDate
+                        );
+                        
+                        if (!$isAvailable) {
+                            $conflicts = $availabilityService->getConflicts(
+                                $data['equipment_item_id'],
+                                $checkoutDate,
+                                $returnDate
+                            );
+                            
+                            $conflictDetails = $conflicts->map(function ($conflict) {
+                                $customerName = 'Unknown';
+                                $basketNo = null;
+                                
+                                if ($conflict->basket && $conflict->basket->customer) {
+                                    $customerName = $conflict->basket->customer->full_name ?? 'Unknown';
+                                    $basketNo = $conflict->basket->basket_no;
+                                } elseif ($conflict->booking && $conflict->booking->customer) {
+                                    $customerName = $conflict->booking->customer->full_name ?? 'Unknown';
+                                }
+                                
+                                return [
+                                    'id' => $conflict->id,
+                                    'customer_name' => $customerName,
+                                    'checkout_date' => $conflict->checkout_date ? $conflict->checkout_date->format('Y-m-d') : null,
+                                    'return_date' => $conflict->return_date ? $conflict->return_date->format('Y-m-d') : null,
+                                    'basket_no' => $basketNo,
+                                    'assignment_status' => $conflict->assignment_status,
+                                ];
+                            });
+                            
+                            $failedItems[] = [
+                                'index' => $index,
+                                'item' => $item,
+                                'error' => 'Equipment is not available for the requested dates',
+                                'equipment_item_id' => $data['equipment_item_id'],
+                                'checkout_date' => $checkoutDate,
+                                'return_date' => $returnDate,
+                                'conflicting_assignments' => $conflictDetails,
+                            ];
+                            continue;
+                        }
+                    }
+
+                    // Create the booking equipment
+                    $bookingEquipment = BookingEquipment::create($data);
+                    
+                    // Update equipment item status if needed
+                    if ($bookingEquipment->equipment_source === 'Center' && 
+                        $bookingEquipment->equipment_item_id && 
+                        $bookingEquipment->assignment_status === 'Checked Out') {
+                        $equipmentItem = \App\Models\EquipmentItem::find($bookingEquipment->equipment_item_id);
+                        if ($equipmentItem) {
+                            $equipmentItem->update(['status' => 'Rented']);
+                        }
+                    }
+                    
+                    // Load relationships
+                    $loadRelations = [];
+                    if ($bookingEquipment->booking_id) {
+                        $loadRelations[] = 'booking.customer';
+                    }
+                    if ($bookingEquipment->equipment_item_id) {
+                        $loadRelations[] = 'equipmentItem.equipment';
+                    }
+                    if ($bookingEquipment->basket_id) {
+                        $loadRelations[] = 'basket';
+                    }
+                    
+                    if (!empty($loadRelations)) {
+                        $bookingEquipment->load($loadRelations);
+                    }
+                    
+                    $successItems[] = $bookingEquipment;
+                } catch (\Exception $e) {
+                    $failedItems[] = [
+                        'index' => $index,
+                        'item' => $item,
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
+
+            \Illuminate\Support\Facades\DB::commit();
+
+            return response()->json([
+                'message' => 'Bulk create completed',
+                'success_count' => count($successItems),
+                'failed_count' => count($failedItems),
+                'success' => $successItems,
+                'failed' => $failedItems,
+            ], count($successItems) > 0 ? 201 : 422);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            \Illuminate\Support\Facades\Log::error('Error in bulkStore: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json([
+                'message' => 'Failed to create booking equipment items',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Bulk check availability for multiple equipment items
+     */
+    public function bulkCheckAvailability(Request $request)
+    {
+        $validated = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.equipment_item_id' => 'required|exists:equipment_items,id',
+            'items.*.checkout_date' => 'required|date',
+            'items.*.return_date' => 'required|date|after:items.*.checkout_date',
+        ]);
+
+        $availabilityService = new EquipmentAvailabilityService();
+        $results = [];
+
+        foreach ($validated['items'] as $index => $item) {
+            $isAvailable = $availabilityService->isAvailable(
+                $item['equipment_item_id'],
+                $item['checkout_date'],
+                $item['return_date']
+            );
+
+            $result = [
+                'index' => $index,
+                'equipment_item_id' => $item['equipment_item_id'],
+                'checkout_date' => $item['checkout_date'],
+                'return_date' => $item['return_date'],
+                'available' => $isAvailable,
+            ];
+
+            if (!$isAvailable) {
+                $conflicts = $availabilityService->getConflicts(
+                    $item['equipment_item_id'],
+                    $item['checkout_date'],
+                    $item['return_date']
+                );
+
+                $conflictDetails = $conflicts->map(function ($conflict) {
+                    $customerName = 'Unknown';
+                    $basketNo = null;
+                    
+                    if ($conflict->basket && $conflict->basket->customer) {
+                        $customerName = $conflict->basket->customer->full_name ?? 'Unknown';
+                        $basketNo = $conflict->basket->basket_no;
+                    } elseif ($conflict->booking && $conflict->booking->customer) {
+                        $customerName = $conflict->booking->customer->full_name ?? 'Unknown';
+                    }
+                    
+                    return [
+                        'id' => $conflict->id,
+                        'customer_name' => $customerName,
+                        'checkout_date' => $conflict->checkout_date ? $conflict->checkout_date->format('Y-m-d') : null,
+                        'return_date' => $conflict->return_date ? $conflict->return_date->format('Y-m-d') : null,
+                        'basket_no' => $basketNo,
+                        'assignment_status' => $conflict->assignment_status,
+                    ];
+                });
+
+                $result['conflicting_assignments'] = $conflictDetails;
+            }
+
+            $results[] = $result;
+        }
+
+        return response()->json([
+            'results' => $results
+        ]);
     }
 }
 

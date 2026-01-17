@@ -119,6 +119,7 @@ class CustomerPreRegistrationController extends Controller
             'customer.nationality' => 'nullable|string',
             'customer.departure_date' => 'nullable|date',
             'customer.departure_flight' => 'nullable|string|max:100',
+            'customer.departure_flight_time' => 'nullable|string|regex:/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/',
             'customer.departure_to' => 'nullable|string|max:255',
             
             'emergency_contacts' => 'nullable|array',
@@ -289,6 +290,7 @@ class CustomerPreRegistrationController extends Controller
                 'nationality' => $submission->customer_data['nationality'] ?? null,
                 'departure_date' => $submission->customer_data['departure_date'] ?? null,
                 'departure_flight' => $submission->customer_data['departure_flight'] ?? null,
+                'departure_flight_time' => $submission->customer_data['departure_flight_time'] ?? null,
                 'departure_to' => $submission->customer_data['departure_to'] ?? null,
             ]);
 

@@ -109,6 +109,35 @@ export const equipmentItemService = {
         }
         
         return results;
+    },
+
+    findAvailableByEquipmentType: async (params: {
+        equipment_ids: number[];
+        checkout_date: string;
+        return_date: string;
+    }): Promise<{
+        checkout_date: string;
+        return_date: string;
+        results: Array<{
+            equipment_id: number;
+            equipment_name: string;
+            available_items: EquipmentItem[];
+            available_count: number;
+            total_items: number;
+        }>;
+    }> => {
+        const response = await apiClient.post("/api/v1/equipment-items/find-available-by-type", params);
+        return response.data;
+    },
+
+    getAssignmentHistory: async (id: string | number): Promise<{
+        equipment_item: EquipmentItem;
+        assignments: any[];
+        total_assignments: number;
+        active_assignments: number;
+    }> => {
+        const response = await apiClient.get(`/api/v1/equipment-items/${id}/assignment-history`);
+        return response.data;
     }
 };
 

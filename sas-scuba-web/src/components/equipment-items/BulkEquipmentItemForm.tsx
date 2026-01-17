@@ -37,13 +37,11 @@ import { Progress } from "@/components/ui/progress";
 
 const templateSchema = z.object({
     equipment_id: z.string().min(1, "Equipment is required"),
-    location_id: z.string().optional().transform((val) => val === "" ? undefined : val),
-    status: z.enum(['Available', 'Rented', 'Maintenance'], {
-        required_error: "Status is required",
-    }),
+    location_id: z.string().optional().or(z.literal("")),
+    status: z.enum(['Available', 'Rented', 'Maintenance']),
     purchase_date: z.string().optional(),
     requires_service: z.boolean().optional(),
-    service_interval_days: z.string().optional().transform((val) => val ? parseInt(val) : undefined),
+    service_interval_days: z.string().optional(),
     last_service_date: z.string().optional(),
     next_service_date: z.string().optional(),
 });
@@ -265,19 +263,19 @@ export function BulkEquipmentItemForm() {
             const itemsToCreate: EquipmentItemFormData[] = data.items.map((item) => {
                 const payload: EquipmentItemFormData = {
                     equipment_id: parseInt(data.template.equipment_id),
-                    location_id: data.template.location_id ? parseInt(data.template.location_id) : undefined,
-                    size: item.size || undefined,
-                    serial_no: item.serial_no || undefined,
-                    inventory_code: item.inventory_code || undefined,
-                    brand: item.brand || undefined,
-                    color: item.color || undefined,
-                    image_url: item.image_url || undefined,
+                    location_id: data.template.location_id && data.template.location_id !== "" ? parseInt(data.template.location_id) : undefined,
+                    size: item.size && item.size !== "" ? item.size : undefined,
+                    serial_no: item.serial_no && item.serial_no !== "" ? item.serial_no : undefined,
+                    inventory_code: item.inventory_code && item.inventory_code !== "" ? item.inventory_code : undefined,
+                    brand: item.brand && item.brand !== "" ? item.brand : undefined,
+                    color: item.color && item.color !== "" ? item.color : undefined,
+                    image_url: item.image_url && item.image_url !== "" ? item.image_url : undefined,
                     status: data.template.status,
-                    purchase_date: data.template.purchase_date || undefined,
+                    purchase_date: data.template.purchase_date && data.template.purchase_date !== "" ? data.template.purchase_date : undefined,
                     requires_service: data.template.requires_service || false,
-                    service_interval_days: data.template.service_interval_days || undefined,
-                    last_service_date: data.template.last_service_date || undefined,
-                    next_service_date: data.template.next_service_date || undefined,
+                    service_interval_days: data.template.service_interval_days && data.template.service_interval_days !== "" ? parseInt(data.template.service_interval_days) : undefined,
+                    last_service_date: data.template.last_service_date && data.template.last_service_date !== "" ? data.template.last_service_date : undefined,
+                    next_service_date: data.template.next_service_date && data.template.next_service_date !== "" ? data.template.next_service_date : undefined,
                 };
                 return payload;
             });

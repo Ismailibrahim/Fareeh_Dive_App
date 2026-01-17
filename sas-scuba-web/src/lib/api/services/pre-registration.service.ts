@@ -43,6 +43,10 @@ export interface PreRegistrationSubmissionDetail extends PreRegistrationSubmissi
         date_of_birth?: string;
         gender?: string;
         nationality?: string;
+        departure_date?: string;
+        departure_flight?: string;
+        departure_flight_time?: string;
+        departure_to?: string;
     };
     emergency_contacts_data?: Array<{
         name?: string;
@@ -94,6 +98,10 @@ export interface PreRegistrationFormData {
         date_of_birth?: string;
         gender?: string;
         nationality?: string;
+        departure_date?: string;
+        departure_flight?: string;
+        departure_flight_time?: string;
+        departure_to?: string;
     };
     emergency_contacts?: Array<{
         name?: string;

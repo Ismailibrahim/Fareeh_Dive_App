@@ -21,12 +21,16 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Waves, User as UserIcon, Shield } from "lucide-react";
+import { safeFormatDate } from "@/lib/utils/date-format";
 
 const bookingInstructorSchema = z.object({
     booking_dive_id: z.string().min(1, "Booking dive is required"),
     user_id: z.string().min(1, "Instructor is required"),
     role: z.string().optional().or(z.literal("")),
 });
+
+// Form values type (strings from form inputs)
+type BookingInstructorFormValues = z.infer<typeof bookingInstructorSchema>;
 
 interface BookingInstructorFormProps {
     initialData?: BookingInstructor;
@@ -61,7 +65,7 @@ export function BookingInstructorForm({ initialData, bookingInstructorId }: Book
         fetchData();
     }, []);
 
-    const form = useForm<BookingInstructorFormData>({
+    const form = useForm<BookingInstructorFormValues>({
         resolver: zodResolver(bookingInstructorSchema),
         defaultValues: {
             booking_dive_id: initialData?.booking_dive_id ? String(initialData.booking_dive_id) : "",
@@ -70,7 +74,7 @@ export function BookingInstructorForm({ initialData, bookingInstructorId }: Book
         },
     });
 
-    async function onSubmit(data: z.infer<typeof bookingInstructorSchema>) {
+    async function onSubmit(data: BookingInstructorFormValues) {
         setLoading(true);
         try {
             const payload: BookingInstructorFormData = {

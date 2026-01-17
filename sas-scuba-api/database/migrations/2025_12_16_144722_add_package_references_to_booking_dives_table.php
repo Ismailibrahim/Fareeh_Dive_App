@@ -24,9 +24,33 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('booking_dives')) {
+            return;
+        }
+
         Schema::table('booking_dives', function (Blueprint $table) {
-            $table->dropForeign(['dive_package_id']);
-            $table->dropColumn(['dive_package_id', 'is_package_dive', 'package_dive_number']);
+            $columnsToDrop = [];
+            
+            if (Schema::hasColumn('booking_dives', 'dive_package_id')) {
+                try {
+                    $table->dropForeign(['dive_package_id']);
+                } catch (\Exception $e) {
+                    // Foreign key might not exist, continue
+                }
+                $columnsToDrop[] = 'dive_package_id';
+            }
+            
+            if (Schema::hasColumn('booking_dives', 'is_package_dive')) {
+                $columnsToDrop[] = 'is_package_dive';
+            }
+            
+            if (Schema::hasColumn('booking_dives', 'package_dive_number')) {
+                $columnsToDrop[] = 'package_dive_number';
+            }
+            
+            if (!empty($columnsToDrop)) {
+                $table->dropColumn($columnsToDrop);
+            }
         });
     }
 };

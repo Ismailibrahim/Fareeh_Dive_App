@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DiveCenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class DiveCenterController extends Controller
 {
@@ -15,7 +16,14 @@ class DiveCenterController extends Controller
     public function show(Request $request)
     {
         $user = $request->user();
-        return response()->json($user->diveCenter);
+        $diveCenterId = $user->dive_center_id;
+        
+        // Cache dive center data for 5 minutes
+        $diveCenter = Cache::remember("dive_center.{$diveCenterId}", 300, function () use ($user) {
+            return $user->diveCenter;
+        });
+        
+        return response()->json($diveCenter);
     }
 
     /**
@@ -68,6 +76,9 @@ class DiveCenterController extends Controller
         }
 
         $diveCenter->update($updateData);
+        
+        // Clear cache when dive center is updated
+        Cache::forget("dive_center.{$diveCenter->id}");
 
         return response()->json([
             'message' => 'Dive Center settings updated successfully.',

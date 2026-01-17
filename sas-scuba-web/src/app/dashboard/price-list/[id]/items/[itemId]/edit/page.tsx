@@ -22,12 +22,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { priceListItemService, PriceListItem } from "@/lib/api/services/price-list-item.service";
+import { priceListItemService } from "@/lib/api/services/price-list-item.service";
+import { PriceListItem } from "@/lib/api/services/price-list.service";
 import { priceListService } from "@/lib/api/services/price-list.service";
 import { serviceTypeService, ServiceType } from "@/lib/api/services/service-type.service";
 import { equipmentItemService, EquipmentItem } from "@/lib/api/services/equipment-item.service";
 import { unitService, Unit } from "@/lib/api/services/unit.service";
-import { Tag, DollarSign, Package } from "lucide-react";
+import { Tag, DollarSign, Package, Calendar } from "lucide-react";
+import { PriceTierManager } from "@/components/price-list/PriceTierManager";
+import { DatePicker } from "@/components/ui/date-picker";
 
 const schema = z.object({
     service_type: z.string().min(1, "Service type is required"),
@@ -36,12 +39,31 @@ const schema = z.object({
     name: z.string().min(1, "Name is required").max(255, "Name must be less than 255 characters"),
     description: z.string().optional(),
     price: z.number().min(0, "Price must be greater than or equal to 0"),
+    base_price: z.number().min(0).optional(),
+    pricing_model: z.enum(['SINGLE', 'RANGE', 'TIERED']).optional(),
+    min_dives: z.number().min(1).optional(),
+    max_dives: z.number().min(1).optional(),
+    priority: z.number().optional(),
+    valid_from: z.string().optional(),
+    valid_until: z.string().optional(),
+    applicable_to: z.enum(['ALL', 'MEMBER', 'NON_MEMBER', 'GROUP', 'CORPORATE']).optional(),
     unit: z.string().optional(),
     tax_percentage: z.number().min(0).max(100).optional(),
     tax_inclusive: z.boolean().optional(),
     service_charge_inclusive: z.boolean().optional(),
     sort_order: z.number().optional(),
     is_active: z.boolean().optional(),
+}).refine((data) => {
+    if (data.pricing_model === 'RANGE' || data.pricing_model === 'TIERED') {
+        if (!data.min_dives || !data.max_dives) {
+            return false;
+        }
+        return data.min_dives <= data.max_dives;
+    }
+    return true;
+}, {
+    message: "min_dives must be less than or equal to max_dives",
+    path: ["max_dives"],
 });
 
 export default function EditPriceListItemPage() {
@@ -75,6 +97,7 @@ export default function EditPriceListItemPage() {
 
     const isEquipmentRental = form.watch('is_equipment_rental');
     const selectedEquipmentItemId = form.watch('equipment_item_id');
+    const pricingModel = form.watch('pricing_model') || 'SINGLE';
 
     useEffect(() => {
         const fetchData = async () => {
@@ -97,6 +120,14 @@ export default function EditPriceListItemPage() {
                     name: itemData.name || "",
                     description: itemData.description || "",
                     price: itemData.price || 0,
+                    base_price: itemData.base_price || itemData.price || undefined,
+                    pricing_model: itemData.pricing_model || 'SINGLE',
+                    min_dives: itemData.min_dives || 1,
+                    max_dives: itemData.max_dives || 1,
+                    priority: itemData.priority || 0,
+                    valid_from: itemData.valid_from || undefined,
+                    valid_until: itemData.valid_until || undefined,
+                    applicable_to: itemData.applicable_to || 'ALL',
                     unit: itemData.unit || undefined,
                     tax_percentage: itemData.tax_percentage || undefined,
                     tax_inclusive: itemData.tax_inclusive ?? false,
@@ -115,7 +146,7 @@ export default function EditPriceListItemPage() {
 
     useEffect(() => {
         if (isEquipmentRental) {
-            equipmentItemService.getAll(1, undefined, 'Available').then(data => {
+            equipmentItemService.getAll({ page: 1, status: 'Available' }).then(data => {
                 const itemsList = Array.isArray(data) ? data : (data as any).data || [];
                 setEquipmentItems(itemsList);
             }).catch(console.error);
@@ -165,6 +196,28 @@ export default function EditPriceListItemPage() {
             }
             
             const { is_equipment_rental, ...submitData } = data;
+            
+            // Set base_price from price if not provided
+            if (!submitData.base_price && submitData.price) {
+                submitData.base_price = submitData.price;
+            }
+            
+            // Set default values for pricing fields if not provided
+            if (!submitData.pricing_model) {
+                submitData.pricing_model = 'SINGLE';
+            }
+            if (!submitData.min_dives) {
+                submitData.min_dives = 1;
+            }
+            if (!submitData.max_dives) {
+                submitData.max_dives = 1;
+            }
+            if (submitData.priority === undefined) {
+                submitData.priority = 0;
+            }
+            if (!submitData.applicable_to) {
+                submitData.applicable_to = 'ALL';
+            }
             
             if (!submitData.service_type) {
                 alert("Please select a service type.");
@@ -421,6 +474,171 @@ export default function EditPriceListItemPage() {
                                             </FormItem>
                                         )}
                                     />
+
+                                    {/* Dive Pricing Configuration */}
+                                    <div className="space-y-4 border-t pt-4">
+                                        <h3 className="text-sm font-medium">Dive Pricing Configuration</h3>
+                                        
+                                        <FormField
+                                            control={form.control}
+                                            name="pricing_model"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Pricing Model</FormLabel>
+                                                    <Select onValueChange={field.onChange} value={field.value || 'SINGLE'}>
+                                                        <FormControl>
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="Select pricing model" />
+                                                            </SelectTrigger>
+                                                        </FormControl>
+                                                        <SelectContent>
+                                                            <SelectItem value="SINGLE">Single Price</SelectItem>
+                                                            <SelectItem value="RANGE">Range-Based (by dive count)</SelectItem>
+                                                            <SelectItem value="TIERED">Tiered Pricing</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        
+                                        {(pricingModel === 'RANGE' || pricingModel === 'TIERED') && (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <FormField
+                                                    control={form.control}
+                                                    name="min_dives"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>Min Dives</FormLabel>
+                                                            <FormControl>
+                                                                <Input
+                                                                    type="number"
+                                                                    min="1"
+                                                                    placeholder="1"
+                                                                    {...field}
+                                                                    onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                                                                    value={field.value || 1}
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="max_dives"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>Max Dives</FormLabel>
+                                                            <FormControl>
+                                                                <Input
+                                                                    type="number"
+                                                                    min="1"
+                                                                    placeholder="1"
+                                                                    {...field}
+                                                                    onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                                                                    value={field.value || 1}
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
+                                        )}
+                                        
+                                        <div className="grid grid-cols-2 gap-4 items-start">
+                                            <FormField
+                                                control={form.control}
+                                                name="priority"
+                                                render={({ field }) => (
+                                                    <FormItem className="flex flex-col">
+                                                        <FormLabel>Priority</FormLabel>
+                                                        <FormControl>
+                                                            <Input
+                                                                type="number"
+                                                                placeholder="0"
+                                                                {...field}
+                                                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                                                value={field.value || 0}
+                                                            />
+                                                        </FormControl>
+                                                        <p className="text-xs text-muted-foreground">Higher number = higher priority</p>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <FormField
+                                                control={form.control}
+                                                name="applicable_to"
+                                                render={({ field }) => (
+                                                    <FormItem className="flex flex-col">
+                                                        <FormLabel>Applicable To</FormLabel>
+                                                        <Select onValueChange={field.onChange} value={field.value || 'ALL'}>
+                                                            <FormControl>
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder="Select customer type" />
+                                                                </SelectTrigger>
+                                                            </FormControl>
+                                                            <SelectContent>
+                                                                <SelectItem value="ALL">All Customers</SelectItem>
+                                                                <SelectItem value="MEMBER">Members Only</SelectItem>
+                                                                <SelectItem value="NON_MEMBER">Non-Members Only</SelectItem>
+                                                                <SelectItem value="GROUP">Groups Only</SelectItem>
+                                                                <SelectItem value="CORPORATE">Corporate Only</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <FormField
+                                                control={form.control}
+                                                name="valid_from"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Valid From</FormLabel>
+                                                        <FormControl>
+                                                            <DatePicker
+                                                                value={field.value}
+                                                                onChange={field.onChange}
+                                                                placeholder="Select start date"
+                                                            />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <FormField
+                                                control={form.control}
+                                                name="valid_until"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Valid Until</FormLabel>
+                                                        <FormControl>
+                                                            <DatePicker
+                                                                value={field.value}
+                                                                onChange={field.onChange}
+                                                                placeholder="Select end date"
+                                                                minDate={form.watch('valid_from')}
+                                                            />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </div>
+
+                                        {/* Tier Manager for TIERED pricing */}
+                                        {pricingModel === 'TIERED' && item && (
+                                            <div className="mt-4">
+                                                <PriceTierManager itemId={item.id} pricingModel={pricingModel} />
+                                            </div>
+                                        )}
+                                    </div>
 
                                     <div className="grid grid-cols-2 gap-4">
                                         <FormField

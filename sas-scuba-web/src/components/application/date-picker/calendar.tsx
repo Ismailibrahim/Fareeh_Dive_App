@@ -111,6 +111,12 @@ const MonthYearSelector = () => {
         if (!isNaN(yearValue) && yearValue >= minYear && yearValue <= maxYear) {
             const newDate = currentDate.set({ year: yearValue });
             state.setFocusedDate(newDate);
+            
+            // If there's a selected value, update it with the new year to preserve month and day
+            if (state.value) {
+                const updatedValue = state.value.set({ year: yearValue });
+                state.setValue(updatedValue);
+            }
         } else {
             // Reset to current year if invalid
             setYearInput(currentYear.toString());
@@ -185,6 +191,12 @@ const YearInput = () => {
         if (!isNaN(yearValue) && yearValue >= minYear && yearValue <= maxYear) {
             const newDate = currentDate.set({ year: yearValue });
             state.setFocusedDate(newDate);
+            
+            // If there's a selected value, update it with the new year to preserve month and day
+            if (state.value) {
+                const updatedValue = state.value.set({ year: yearValue });
+                state.setValue(updatedValue);
+            }
         } else {
             // Reset to current year if invalid
             setYearInput(currentYear.toString());
@@ -221,6 +233,7 @@ export const Calendar = ({ highlightedDates, className, stateRef, ...props }: Ca
         const state = useContext(CalendarStateContext);
         
         // Update the ref with a getter function when state is available
+        // Also update when state.value changes so year changes are reflected
         React.useEffect(() => {
             if (stateRef && state) {
                 stateRef.current = {
@@ -232,7 +245,7 @@ export const Calendar = ({ highlightedDates, className, stateRef, ...props }: Ca
                     stateRef.current = null;
                 }
             };
-        }, [state, stateRef]);
+        }, [state, stateRef, state?.value]);
         
         return null;
     };

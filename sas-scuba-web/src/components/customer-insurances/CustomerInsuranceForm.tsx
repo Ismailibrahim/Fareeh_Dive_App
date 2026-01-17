@@ -35,7 +35,7 @@ const insuranceSchema = z.object({
     insurance_hotline_no: z.string().optional(),
     expiry_date: z.date().optional(),
     file_url: z.string().optional(),
-    status: z.boolean().default(true),
+    status: z.boolean(),
 });
 
 type InsuranceFormValues = z.infer<typeof insuranceSchema>;

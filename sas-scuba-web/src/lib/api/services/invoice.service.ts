@@ -1,7 +1,7 @@
 import apiClient from "../client";
 import { Booking } from "./booking.service";
 import { BookingDive } from "./booking-dive.service";
-import { PriceListItem } from "./price-list-item.service";
+import { PriceListItem } from "./price-list.service";
 import { Payment } from "./payment.service";
 
 export interface InvoiceItem {
@@ -10,6 +10,7 @@ export interface InvoiceItem {
     price_list_item_id?: number;
     booking_dive_id?: number;
     booking_equipment_id?: number;
+    booking_excursion_id?: number;
     description?: string;
     quantity: number;
     unit_price: number;
@@ -17,6 +18,7 @@ export interface InvoiceItem {
     total: number;
     booking_dive?: BookingDive;
     booking_equipment?: any;
+    booking_excursion?: any;
     price_list_item?: PriceListItem;
 }
 
@@ -50,6 +52,7 @@ export interface GenerateInvoiceRequest {
     invoice_type?: 'Advance' | 'Final' | 'Full';
     include_dives?: boolean;
     include_equipment?: boolean;
+    include_excursions?: boolean;
     tax_percentage?: number;
 }
 

@@ -103,9 +103,6 @@ export function InstructorForm({ initialData, instructorId }: InstructorFormProp
             passport_number: initialData?.passport_number || "",
             availability_status: initialData?.availability_status || "Available",
             max_dives_per_day: initialData?.max_dives_per_day,
-            hourly_rate: initialData?.hourly_rate,
-            commission_percentage: initialData?.commission_percentage,
-            payment_method: initialData?.payment_method || "",
             years_of_experience: initialData?.years_of_experience,
             total_dives_logged: initialData?.total_dives_logged,
             total_students_certified: initialData?.total_students_certified,
@@ -243,7 +240,7 @@ export function InstructorForm({ initialData, instructorId }: InstructorFormProp
             };
 
             if (instructorId) {
-                await instructorService.update(instructorId, cleanData);
+                await instructorService.update(Number(instructorId), cleanData);
                 router.push("/dashboard/instructors");
                 router.refresh();
             } else {

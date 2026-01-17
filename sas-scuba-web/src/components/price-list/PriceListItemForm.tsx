@@ -30,20 +30,45 @@ import { priceListItemService } from "@/lib/api/services/price-list-item.service
 import { serviceTypeService, ServiceType } from "@/lib/api/services/service-type.service";
 import { equipmentItemService, EquipmentItem } from "@/lib/api/services/equipment-item.service";
 import { unitService, Unit } from "@/lib/api/services/unit.service";
-import { Tag, DollarSign, Package, Info } from "lucide-react";
+import { Tag, DollarSign, Package, Info, Calendar } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
 
 const priceListItemSchema = z.object({
     service_type: z.string().min(1, "Service type is required"),
     is_equipment_rental: z.boolean().optional(),
-    equipment_item_id: z.number().optional(),
+    equipment_item_id: z.string().optional().or(z.literal("")),
     name: z.string().min(1, "Name is required").max(255, "Name must be less than 255 characters"),
     description: z.string().optional(),
-    price: z.number().min(0, "Price must be greater than or equal to 0"),
+    price: z.string().min(1, "Price is required"),
+    base_price: z.string().optional(),
+    pricing_model: z.enum(['SINGLE', 'RANGE', 'TIERED']).optional(),
+    min_dives: z.string().optional(),
+    max_dives: z.string().optional(),
+    priority: z.string().optional(),
+    valid_from: z.string().optional(),
+    valid_until: z.string().optional(),
+    applicable_to: z.enum(['ALL', 'MEMBER', 'NON_MEMBER', 'GROUP', 'CORPORATE']).optional(),
     unit: z.string().optional(),
-    tax_percentage: z.number().min(0).max(100).optional(),
-    sort_order: z.number().optional(),
+    tax_percentage: z.string().optional(),
+    sort_order: z.string().optional(),
     is_active: z.boolean().optional(),
+}).refine((data) => {
+    if (data.pricing_model === 'RANGE' || data.pricing_model === 'TIERED') {
+        const minDives = data.min_dives ? parseInt(data.min_dives) : undefined;
+        const maxDives = data.max_dives ? parseInt(data.max_dives) : undefined;
+        if (!minDives || !maxDives) {
+            return false;
+        }
+        return minDives <= maxDives;
+    }
+    return true;
+}, {
+    message: "min_dives must be less than or equal to max_dives",
+    path: ["max_dives"],
 });
+
+// Form values type (matches schema)
+type PriceListItemFormValues = z.infer<typeof priceListItemSchema>;
 
 interface PriceListItemFormProps {
     open: boolean;
@@ -63,30 +88,46 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
     const [units, setUnits] = useState<Unit[]>([]);
     const [loadingUnits, setLoadingUnits] = useState(false);
 
-    const form = useForm<PriceListItemFormData>({
+    const form = useForm<PriceListItemFormValues>({
         resolver: zodResolver(priceListItemSchema),
         defaultValues: {
             service_type: initialData?.service_type || "",
             is_equipment_rental: false,
-            equipment_item_id: initialData?.equipment_item_id || undefined,
+            equipment_item_id: initialData?.equipment_item_id ? String(initialData.equipment_item_id) : "",
             name: initialData?.name || "",
             description: initialData?.description || "",
-            price: initialData?.price || 0,
+            price: initialData?.price ? String(initialData.price) : "0",
+            base_price: initialData?.base_price ? String(initialData.base_price) : (initialData?.price ? String(initialData.price) : ""),
+            pricing_model: initialData?.pricing_model || 'SINGLE',
+            min_dives: initialData?.min_dives ? String(initialData.min_dives) : "1",
+            max_dives: initialData?.max_dives ? String(initialData.max_dives) : "1",
+            priority: initialData?.priority ? String(initialData.priority) : "0",
+            valid_from: initialData?.valid_from || undefined,
+            valid_until: initialData?.valid_until || undefined,
+            applicable_to: initialData?.applicable_to || 'ALL',
             unit: initialData?.unit || undefined,
-            tax_percentage: initialData?.tax_percentage || undefined,
-            sort_order: initialData?.sort_order || 0,
+            tax_percentage: initialData?.tax_percentage ? String(initialData.tax_percentage) : "",
+            sort_order: initialData?.sort_order ? String(initialData.sort_order) : "0",
             is_active: initialData?.is_active ?? true,
         },
         values: open ? {
             service_type: initialData?.service_type || "",
             is_equipment_rental: !!initialData?.equipment_item_id,
-            equipment_item_id: initialData?.equipment_item_id || undefined,
+            equipment_item_id: initialData?.equipment_item_id ? String(initialData.equipment_item_id) : "",
             name: initialData?.name || "",
             description: initialData?.description || "",
-            price: initialData?.price || 0,
+            price: initialData?.price ? String(initialData.price) : "0",
+            base_price: initialData?.base_price ? String(initialData.base_price) : (initialData?.price ? String(initialData.price) : ""),
+            pricing_model: initialData?.pricing_model || 'SINGLE',
+            min_dives: initialData?.min_dives ? String(initialData.min_dives) : "1",
+            max_dives: initialData?.max_dives ? String(initialData.max_dives) : "1",
+            priority: initialData?.priority ? String(initialData.priority) : "0",
+            valid_from: initialData?.valid_from || undefined,
+            valid_until: initialData?.valid_until || undefined,
+            applicable_to: initialData?.applicable_to || 'ALL',
             unit: initialData?.unit || undefined,
-            tax_percentage: initialData?.tax_percentage || undefined,
-            sort_order: initialData?.sort_order || 0,
+            tax_percentage: initialData?.tax_percentage ? String(initialData.tax_percentage) : "",
+            sort_order: initialData?.sort_order ? String(initialData.sort_order) : "0",
             is_active: initialData?.is_active ?? true,
         } : undefined,
     });
@@ -94,6 +135,7 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
     const selectedServiceType = form.watch('service_type');
     const isEquipmentRental = form.watch('is_equipment_rental');
     const selectedEquipmentItemId = form.watch('equipment_item_id');
+    const pricingModel = form.watch('pricing_model') || 'SINGLE';
 
     useEffect(() => {
         const fetchServiceTypes = async () => {
@@ -162,7 +204,7 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
             if (isEquipmentRental) {
                 try {
                     setLoadingEquipmentItems(true);
-                    const data = await equipmentItemService.getAll(1, undefined, 'Available');
+                    const data = await equipmentItemService.getAll({ page: 1, status: 'Available' });
                     const itemsList = Array.isArray(data) ? data : (data as any).data || [];
                     setEquipmentItems(itemsList);
                 } catch (error) {
@@ -183,7 +225,7 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
     // Auto-populate name when equipment item is selected
     useEffect(() => {
         if (selectedEquipmentItemId && equipmentItems.length > 0) {
-            const selectedItem = equipmentItems.find(item => item.id === selectedEquipmentItemId);
+            const selectedItem = equipmentItems.find(item => item.id === parseInt(selectedEquipmentItemId));
             if (selectedItem) {
                 const displayName = selectedItem.equipment?.name 
                     ? `${selectedItem.equipment.name}${selectedItem.size ? ` - ${selectedItem.size}` : ''}${selectedItem.inventory_code ? ` (${selectedItem.inventory_code})` : ''}`
@@ -196,16 +238,24 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
 
     useEffect(() => {
         if (open) {
-            const resetData = {
+            const resetData: PriceListItemFormValues = {
                 service_type: initialData?.service_type || "",
                 is_equipment_rental: !!initialData?.equipment_item_id,
-                equipment_item_id: initialData?.equipment_item_id || undefined,
+                equipment_item_id: initialData?.equipment_item_id ? String(initialData.equipment_item_id) : "",
                 name: initialData?.name || "",
                 description: initialData?.description || "",
-                price: initialData?.price || 0,
+                price: initialData?.price ? String(initialData.price) : "0",
+                base_price: initialData?.base_price ? String(initialData.base_price) : (initialData?.price ? String(initialData.price) : ""),
+                pricing_model: initialData?.pricing_model || 'SINGLE',
+                min_dives: initialData?.min_dives ? String(initialData.min_dives) : "1",
+                max_dives: initialData?.max_dives ? String(initialData.max_dives) : "1",
+                priority: initialData?.priority ? String(initialData.priority) : "0",
+                valid_from: initialData?.valid_from || undefined,
+                valid_until: initialData?.valid_until || undefined,
+                applicable_to: initialData?.applicable_to || 'ALL',
                 unit: initialData?.unit || undefined,
-                tax_percentage: initialData?.tax_percentage || undefined,
-                sort_order: initialData?.sort_order || 0,
+                tax_percentage: initialData?.tax_percentage ? String(initialData.tax_percentage) : "",
+                sort_order: initialData?.sort_order ? String(initialData.sort_order) : "0",
                 is_active: initialData?.is_active ?? true,
             };
             form.reset(resetData);
@@ -228,42 +278,62 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, units.length, loadingUnits, initialData]);
 
-    async function onSubmit(data: PriceListItemFormData) {
+    async function onSubmit(data: PriceListItemFormValues) {
         setLoading(true);
         try {
+            // Transform form data to API format
+            let serviceType = data.service_type;
+            
             // If equipment rental is checked but service_type is not set, try to set it
-            if (data.is_equipment_rental && !data.service_type && serviceTypes.length > 0) {
+            if (data.is_equipment_rental && !serviceType && serviceTypes.length > 0) {
                 const equipmentRentalType = serviceTypes.find(type => 
                     type.name.toLowerCase().includes('equipment') && 
                     type.name.toLowerCase().includes('rental')
                 );
                 if (equipmentRentalType) {
-                    data.service_type = equipmentRentalType.name;
+                    serviceType = equipmentRentalType.name;
                 } else {
                     // Fallback: try to find any service type with "rental" in the name
                     const rentalType = serviceTypes.find(type => 
                         type.name.toLowerCase().includes('rental')
                     );
                     if (rentalType) {
-                        data.service_type = rentalType.name;
+                        serviceType = rentalType.name;
                     }
                 }
             }
             
-            // Remove is_equipment_rental from the data as it's only used for UI state
-            const { is_equipment_rental, ...submitData } = data;
-            
             // Ensure service_type is set
-            if (!submitData.service_type) {
+            if (!serviceType) {
                 alert("Please select a service type or ensure Equipment Rental service type exists in your database.");
                 setLoading(false);
                 return;
             }
             
+            const payload: PriceListItemFormData = {
+                service_type: serviceType,
+                equipment_item_id: data.equipment_item_id && data.equipment_item_id !== "" ? parseInt(data.equipment_item_id) : undefined,
+                name: data.name,
+                description: data.description && data.description !== "" ? data.description : undefined,
+                price: parseFloat(data.price) || 0,
+                base_price: data.base_price && data.base_price !== "" ? parseFloat(data.base_price) : (parseFloat(data.price) || 0),
+                pricing_model: data.pricing_model || 'SINGLE',
+                min_dives: data.min_dives && data.min_dives !== "" ? parseInt(data.min_dives) : 1,
+                max_dives: data.max_dives && data.max_dives !== "" ? parseInt(data.max_dives) : 1,
+                priority: data.priority && data.priority !== "" ? parseInt(data.priority) : 0,
+                valid_from: data.valid_from && data.valid_from !== "" ? data.valid_from : undefined,
+                valid_until: data.valid_until && data.valid_until !== "" ? data.valid_until : undefined,
+                applicable_to: data.applicable_to || 'ALL',
+                unit: data.unit && data.unit !== "" ? data.unit : undefined,
+                tax_percentage: data.tax_percentage && data.tax_percentage !== "" ? parseFloat(data.tax_percentage) : undefined,
+                sort_order: data.sort_order && data.sort_order !== "" ? parseInt(data.sort_order) : 0,
+                is_active: data.is_active ?? true,
+            };
+            
             // Remove undefined values to avoid sending them to the backend
             const cleanedData: any = {};
-            Object.keys(submitData).forEach(key => {
-                const value = (submitData as any)[key];
+            Object.keys(payload).forEach(key => {
+                const value = (payload as any)[key];
                 if (value !== undefined && value !== null && value !== '') {
                     cleanedData[key] = value;
                 }
@@ -528,6 +598,165 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
                                 </FormItem>
                             )}
                         />
+                        
+                        {/* Dive Pricing Fields */}
+                        <div className="space-y-4 border-t pt-4">
+                            <h3 className="text-sm font-medium">Dive Pricing Configuration</h3>
+                            
+                            <FormField
+                                control={form.control}
+                                name="pricing_model"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Pricing Model</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value || 'SINGLE'}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select pricing model" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="SINGLE">Single Price</SelectItem>
+                                                <SelectItem value="RANGE">Range-Based (by dive count)</SelectItem>
+                                                <SelectItem value="TIERED">Tiered Pricing</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            
+                            {(pricingModel === 'RANGE' || pricingModel === 'TIERED') && (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="min_dives"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Min Dives</FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        type="number"
+                                                        min="1"
+                                                        placeholder="1"
+                                                        {...field}
+                                                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                                                        value={field.value || 1}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="max_dives"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Max Dives</FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        type="number"
+                                                        min="1"
+                                                        placeholder="1"
+                                                        {...field}
+                                                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                                                        value={field.value || 1}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                            )}
+                            
+                            <div className="grid grid-cols-2 gap-4 items-start">
+                                <FormField
+                                    control={form.control}
+                                    name="priority"
+                                    render={({ field }) => (
+                                        <FormItem className="flex flex-col">
+                                            <FormLabel>Priority</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    type="number"
+                                                    placeholder="0"
+                                                    {...field}
+                                                    onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                                    value={field.value || 0}
+                                                />
+                                            </FormControl>
+                                            <p className="text-xs text-muted-foreground">Higher number = higher priority</p>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="applicable_to"
+                                    render={({ field }) => (
+                                        <FormItem className="flex flex-col">
+                                            <FormLabel>Applicable To</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value || 'ALL'}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select customer type" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="ALL">All Customers</SelectItem>
+                                                    <SelectItem value="MEMBER">Members Only</SelectItem>
+                                                    <SelectItem value="NON_MEMBER">Non-Members Only</SelectItem>
+                                                    <SelectItem value="GROUP">Groups Only</SelectItem>
+                                                    <SelectItem value="CORPORATE">Corporate Only</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                    control={form.control}
+                                    name="valid_from"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Valid From</FormLabel>
+                                            <FormControl>
+                                                <DatePicker
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    placeholder="Select start date"
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="valid_until"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Valid Until</FormLabel>
+                                            <FormControl>
+                                                <DatePicker
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    placeholder="Select end date"
+                                                    minDate={form.watch('valid_from')}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+                        </div>
+                        
                         <DialogFooter>
                             <Button
                                 type="button"

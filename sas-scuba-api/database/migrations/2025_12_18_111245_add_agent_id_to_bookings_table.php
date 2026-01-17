@@ -22,10 +22,26 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('bookings')) {
+            return;
+        }
+
         Schema::table('bookings', function (Blueprint $table) {
-            $table->dropForeign(['agent_id']);
-            $table->dropIndex(['agent_id']);
-            $table->dropColumn('agent_id');
+            if (Schema::hasColumn('bookings', 'agent_id')) {
+                try {
+                    $table->dropForeign(['agent_id']);
+                } catch (\Exception $e) {
+                    // Foreign key might not exist, continue
+                }
+                
+                try {
+                    $table->dropIndex(['agent_id']);
+                } catch (\Exception $e) {
+                    // Index might not exist, continue
+                }
+                
+                $table->dropColumn('agent_id');
+            }
         });
     }
 };
