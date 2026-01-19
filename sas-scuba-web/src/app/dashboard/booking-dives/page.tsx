@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { BookingDive, bookingDiveService } from "@/lib/api/services/booking-dive.service";
 import {
@@ -13,7 +14,15 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, MoreHorizontal, Calendar, Plus, MapPin, Ship, Clock, Users, Eye } from "lucide-react";
+import { Search, MoreHorizontal, Calendar, Plus, MapPin, Ship, Clock, Users, Eye, Gauge, Filter } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
 import {
@@ -38,39 +47,41 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function BookingDivesPage() {
+    const router = useRouter();
     const [bookingDives, setBookingDives] = useState<BookingDive[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [statusFilter, setStatusFilter] = useState<string>("all");
 
     // Delete state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [bookingDiveToDelete, setBookingDiveToDelete] = useState<BookingDive | null>(null);
 
-    const fetchBookingDives = async () => {
-        setLoading(true);
-        try {
-            const data = await bookingDiveService.getAll();
-            const bookingDivesList = Array.isArray(data) ? data : (data as any).data || [];
-            setBookingDives(bookingDivesList);
-        } catch (error) {
-            console.error("Failed to fetch booking dives", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
+        const fetchBookingDives = async () => {
+            setLoading(true);
+            try {
+                const data = await bookingDiveService.getAll();
+                const bookingDivesList = Array.isArray(data) ? data : (data as any).data || [];
+                setBookingDives(bookingDivesList);
+            } catch (error) {
+                console.error("Failed to fetch booking dives", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
         fetchBookingDives();
-    }, []);
 
-    // Refresh data when page comes into focus
-    useEffect(() => {
+        // Refresh data when page comes into focus
         const handleFocus = () => {
             fetchBookingDives();
         };
         
         window.addEventListener('focus', handleFocus);
-        return () => window.removeEventListener('focus', handleFocus);
+        return () => {
+            window.removeEventListener('focus', handleFocus);
+        };
     }, []);
 
     const handleDeleteClick = (bookingDive: BookingDive) => {
@@ -91,12 +102,35 @@ export default function BookingDivesPage() {
         }
     };
 
-    const filteredBookingDives = bookingDives.filter(bookingDive =>
-        bookingDive.booking?.customer?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        bookingDive.booking?.dive_group?.group_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        bookingDive.dive_site?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        bookingDive.boat?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const getStatusVariant = (status?: string) => {
+        switch (status) {
+            case 'Completed':
+                return 'default';
+            case 'In Progress':
+                return 'secondary';
+            case 'Scheduled':
+                return 'outline';
+            case 'Cancelled':
+                return 'destructive';
+            default:
+                return 'outline';
+        }
+    };
+
+    const filteredBookingDives = bookingDives.filter(bookingDive => {
+        // Search filter
+        const matchesSearch = 
+            bookingDive.booking?.customer?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            bookingDive.booking?.customer?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            bookingDive.booking?.dive_group?.group_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            bookingDive.dive_site?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            bookingDive.boat?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        // Status filter
+        const matchesStatus = statusFilter === 'all' || bookingDive.status === statusFilter || (!bookingDive.status && statusFilter === 'Scheduled');
+        
+        return matchesSearch && matchesStatus;
+    });
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -105,11 +139,9 @@ export default function BookingDivesPage() {
                 <div className="flex items-center justify-between space-y-2">
                     <h2 className="text-3xl font-bold tracking-tight">Booking Dives</h2>
                     <div className="flex items-center space-x-2">
-                        <Link href="/dashboard/booking-dives/create">
-                            <Button>
-                                <Plus className="mr-2 h-4 w-4" /> Add Booking Dive
-                            </Button>
-                        </Link>
+                        <Button onClick={() => router.push("/dashboard/booking-dives/create")}>
+                            <Plus className="mr-2 h-4 w-4" /> Add Booking Dive
+                        </Button>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -122,6 +154,19 @@ export default function BookingDivesPage() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-[180px]">
+                            <Filter className="h-4 w-4 mr-2" />
+                            <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Statuses</SelectItem>
+                            <SelectItem value="Scheduled">Scheduled</SelectItem>
+                            <SelectItem value="In Progress">In Progress</SelectItem>
+                            <SelectItem value="Completed">Completed</SelectItem>
+                            <SelectItem value="Cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
 
                 {/* Desktop Table View */}
@@ -135,6 +180,9 @@ export default function BookingDivesPage() {
                                 <TableHead>Boat</TableHead>
                                 <TableHead>Dive Date</TableHead>
                                 <TableHead>Dive Time</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Duration</TableHead>
+                                <TableHead>Max Depth</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -149,6 +197,9 @@ export default function BookingDivesPage() {
                                             <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                                             <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                                             <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                                            <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                                             <TableCell className="text-right">
                                                 <Skeleton className="h-8 w-8 ml-auto" />
                                             </TableCell>
@@ -211,6 +262,28 @@ export default function BookingDivesPage() {
                                                 </div>
                                             ) : (
                                                 "-"
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant={getStatusVariant(bookingDive.status)}>
+                                                {bookingDive.status || 'Scheduled'}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            {bookingDive.dive_duration ? (
+                                                <span>{bookingDive.dive_duration} min</span>
+                                            ) : (
+                                                <span className="text-muted-foreground">-</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            {bookingDive.max_depth ? (
+                                                <div className="flex items-center gap-2">
+                                                    <Gauge className="h-4 w-4 text-muted-foreground" />
+                                                    {bookingDive.max_depth}m
+                                                </div>
+                                            ) : (
+                                                <span className="text-muted-foreground">-</span>
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">
@@ -337,6 +410,31 @@ export default function BookingDivesPage() {
                                                 Dive Time
                                             </CardDescription>
                                             <p>{bookingDive.dive_time}</p>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <CardDescription className="mb-1">Status</CardDescription>
+                                        <Badge variant={getStatusVariant(bookingDive.status)} className="w-fit">
+                                            {bookingDive.status || 'Scheduled'}
+                                        </Badge>
+                                    </div>
+                                    {(bookingDive.dive_duration || bookingDive.max_depth) && (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {bookingDive.dive_duration && (
+                                                <div>
+                                                    <CardDescription className="mb-1">Duration</CardDescription>
+                                                    <p className="text-sm font-medium">{bookingDive.dive_duration} min</p>
+                                                </div>
+                                            )}
+                                            {bookingDive.max_depth && (
+                                                <div>
+                                                    <CardDescription className="mb-1 flex items-center gap-2">
+                                                        <Gauge className="h-4 w-4" />
+                                                        Max Depth
+                                                    </CardDescription>
+                                                    <p className="text-sm font-medium">{bookingDive.max_depth}m</p>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                     <div className="flex gap-2 pt-2">

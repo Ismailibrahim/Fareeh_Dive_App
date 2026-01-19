@@ -29,7 +29,8 @@ import {
     ChevronDown,
     ChevronRight,
     Receipt,
-    Tag
+    Tag,
+    HandCoins
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -127,6 +128,11 @@ const menuGroups = [
                 href: "/dashboard/emergency-contacts",
                 icon: AlertCircle,
             },
+            {
+                title: "Waivers",
+                href: "/dashboard/waivers",
+                icon: FileText,
+            },
         ],
     },
     {
@@ -198,11 +204,6 @@ const menuGroups = [
                 href: "/dashboard/assets",
                 icon: Map,
             },
-            {
-                title: "Dive Log",
-                href: "/dashboard/dives",
-                icon: Anchor,
-            },
         ],
     },
     {
@@ -229,6 +230,11 @@ const menuGroups = [
                 title: "Expense Categories",
                 href: "/dashboard/expense-categories",
                 icon: Tag,
+            },
+            {
+                title: "Commissions",
+                href: "/dashboard/commissions",
+                icon: HandCoins,
             },
         ],
     },
