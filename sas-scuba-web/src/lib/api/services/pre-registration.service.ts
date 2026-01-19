@@ -17,6 +17,7 @@ export interface PreRegistrationLink {
     url: string;
     expires_at: string;
     created_at: string;
+    is_expired?: boolean;
 }
 
 export interface PreRegistrationSubmission {
@@ -39,6 +40,10 @@ export interface PreRegistrationSubmissionDetail extends PreRegistrationSubmissi
         full_name: string;
         email?: string;
         phone?: string;
+        address?: string;
+        city?: string;
+        zip_code?: string;
+        country?: string;
         passport_no?: string;
         date_of_birth?: string;
         gender?: string;
@@ -94,6 +99,10 @@ export interface PreRegistrationFormData {
         full_name: string;
         email?: string;
         phone?: string;
+        address?: string;
+        city?: string;
+        zip_code?: string;
+        country?: string;
         passport_no?: string;
         date_of_birth?: string;
         gender?: string;
@@ -160,12 +169,29 @@ export interface PaginatedResponse<T> {
     to: number;
 }
 
+export interface BulkLinksResponse {
+    message: string;
+    links: PreRegistrationLink[];
+    count: number;
+}
+
 export const preRegistrationService = {
     /**
      * Generate a new pre-registration link (staff only)
      */
     generateLink: async (expiresInDays?: number): Promise<PreRegistrationLink> => {
         const response = await apiClient.post<PreRegistrationLink>("/api/v1/pre-registration/links", {
+            expires_in_days: expiresInDays,
+        });
+        return response.data;
+    },
+
+    /**
+     * Generate multiple pre-registration links at once (staff only)
+     */
+    generateBulkLinks: async (quantity: number, expiresInDays?: number): Promise<BulkLinksResponse> => {
+        const response = await apiClient.post<BulkLinksResponse>("/api/v1/pre-registration/links/bulk", {
+            quantity,
             expires_in_days: expiresInDays,
         });
         return response.data;
@@ -233,6 +259,28 @@ export const preRegistrationService = {
             `/api/v1/pre-registration/submissions/${id}/reject`,
             { review_notes: reviewNotes }
         );
+        return response.data;
+    },
+
+    /**
+     * Get all pending (not yet submitted) links (staff only)
+     */
+    getPendingLinks: async (params?: { page?: number; per_page?: number }): Promise<PaginatedResponse<PreRegistrationLink>> => {
+        const queryParams = new URLSearchParams();
+        if (params?.page) queryParams.append('page', params.page.toString());
+        if (params?.per_page) queryParams.append('per_page', params.per_page.toString());
+        
+        const response = await apiClient.get<PaginatedResponse<PreRegistrationLink>>(
+            `/api/v1/pre-registration/links/pending?${queryParams.toString()}`
+        );
+        return response.data;
+    },
+
+    /**
+     * Delete a pending link (staff only)
+     */
+    deleteLink: async (id: number): Promise<{ message: string }> => {
+        const response = await apiClient.delete<{ message: string }>(`/api/v1/pre-registration/links/${id}`);
         return response.data;
     },
 };

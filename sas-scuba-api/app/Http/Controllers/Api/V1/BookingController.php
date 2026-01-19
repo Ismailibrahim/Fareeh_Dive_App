@@ -46,6 +46,7 @@ class BookingController extends Controller
         $validated = $request->validate([
             'dive_center_id' => 'required|exists:dive_centers,id',
             'customer_id' => 'required|exists:customers,id',
+            'agent_id' => 'nullable|exists:agents,id',
             'start_date' => 'required|date',
             'number_of_divers' => 'nullable|integer|min:1',
             'dive_site_id' => 'nullable|exists:dive_sites,id',
@@ -60,10 +61,14 @@ class BookingController extends Controller
         $customer = \App\Models\Customer::findOrFail($validated['customer_id']);
         $this->authorizeDiveCenterAccess($customer, 'Customer does not belong to your dive center');
 
+        // Use customer's agent_id if agent_id not explicitly provided
+        $agentId = $validated['agent_id'] ?? $customer->agent_id ?? null;
+
         // Map start_date to booking_date for database
         $bookingData = [
             'dive_center_id' => $validated['dive_center_id'],
             'customer_id' => $validated['customer_id'],
+            'agent_id' => $agentId,
             'booking_date' => $validated['start_date'],
             'number_of_divers' => $validated['number_of_divers'] ?? null,
             'status' => $validated['status'] ?? 'Pending',

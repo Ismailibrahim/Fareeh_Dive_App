@@ -4,7 +4,7 @@ import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, User, Mail, Phone, FileText, Globe, Calendar, UserCircle, Edit, MapPin, Plane } from "lucide-react";
+import { ArrowLeft, User, Mail, Phone, FileText, Globe, Calendar, UserCircle, Edit, MapPin, Plane, Building2 } from "lucide-react";
 import { EmergencyContactsSection } from "@/components/customers/EmergencyContactsSection";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -291,6 +291,25 @@ export default function CustomerDetailPage() {
                                                         <p className="text-sm">{customer.departure_to}</p>
                                                     </div>
                                                 )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Agent Information Section */}
+                                    {customer.agent && (
+                                        <div className="pt-4 border-t">
+                                            <div className="flex items-center gap-2 text-sm font-semibold text-primary mb-3">
+                                                <Building2 className="h-4 w-4" />
+                                                Agent Information
+                                            </div>
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-2 text-sm font-medium">
+                                                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                                                    Agent Name
+                                                </div>
+                                                <Link href={`/dashboard/agents/${customer.agent.id}`}>
+                                                    <p className="text-sm text-primary hover:underline">{customer.agent.agent_name}</p>
+                                                </Link>
                                             </div>
                                         </div>
                                     )}

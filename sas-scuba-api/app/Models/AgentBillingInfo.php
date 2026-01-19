@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AgentBillingInfo extends Model
 {
+    protected $table = 'agent_billing_info';
+
     protected $fillable = [
         'agent_id',
         'company_legal_name',

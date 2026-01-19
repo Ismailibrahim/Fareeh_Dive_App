@@ -160,6 +160,7 @@ class BookingExcursionController extends Controller
                 $booking = Booking::create([
                     'dive_center_id' => $diveCenterId,
                     'customer_id' => $validated['customer_id'],
+                    'agent_id' => $customer->agent_id ?? null,
                     'booking_date' => $validated['booking_date'] ?? $validated['excursion_date'] ?? now()->toDateString(),
                     'number_of_divers' => $validated['number_of_participants'] ?? 1,
                     'status' => 'Pending',

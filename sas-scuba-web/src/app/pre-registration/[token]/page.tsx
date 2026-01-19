@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { User, Mail, Phone, CreditCard, Flag, Calendar, AlertCircle, Award, Building, MapPin, Plus, X, CheckCircle2, Plane } from "lucide-react";
+import { User, Mail, Phone, CreditCard, Flag, Calendar, AlertCircle, Award, Building, MapPin, Plus, X, CheckCircle2, Plane, Globe } from "lucide-react";
 import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
 import { safeFormatDate, safeParseDate } from "@/lib/utils/date-format";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,7 @@ import { preRegistrationService, PreRegistrationFormData } from "@/lib/api/servi
 import { nationalityService, Nationality } from "@/lib/api/services/nationality.service";
 import { relationshipService, Relationship } from "@/lib/api/services/relationship.service";
 import { agencyService, Agency } from "@/lib/api/services/agency.service";
+import { countryService, Country } from "@/lib/api/services/country.service";
 import axios from "axios";
 
 // Create a separate axios instance for public requests (without auth interceptors)
@@ -44,6 +45,10 @@ const preRegistrationSchema = z.object({
         full_name: z.string().min(2, "Name must be at least 2 characters."),
         email: z.string().email().or(z.literal("")),
         phone: z.string().optional(),
+        address: z.string().optional(),
+        city: z.string().optional(),
+        zip_code: z.string().optional(),
+        country: z.string().optional(),
         passport_no: z.string().optional(),
         nationality: z.string().optional(),
         gender: z.string().optional(),
@@ -102,6 +107,7 @@ export default function PreRegistrationPage() {
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [nationalities, setNationalities] = useState<Nationality[]>([]);
+    const [countries, setCountries] = useState<Country[]>([]);
     const [relationships, setRelationships] = useState<Relationship[]>([]);
     const [agencies, setAgencies] = useState<Agency[]>([]);
     const [diveCenterName, setDiveCenterName] = useState<string>("");
@@ -116,6 +122,10 @@ export default function PreRegistrationPage() {
                 full_name: "",
                 email: "",
                 phone: "",
+                address: "",
+                city: "",
+                zip_code: "",
+                country: "",
                 passport_no: "",
                 nationality: "",
                 gender: "",
@@ -192,14 +202,16 @@ export default function PreRegistrationPage() {
                 setDiveCenterName(formData.data.dive_center.name);
                 setExpiresAt(formData.data.expires_at);
 
-                // Fetch nationalities, relationships, agencies (these might need to be public endpoints or we handle errors)
+                // Fetch nationalities, countries, relationships, agencies (these might need to be public endpoints or we handle errors)
                 try {
-                    const [nationalitiesData, relationshipsData, agenciesData] = await Promise.all([
+                    const [nationalitiesData, countriesData, relationshipsData, agenciesData] = await Promise.all([
                         nationalityService.getAll(),
+                        countryService.getAll(),
                         relationshipService.getAll(),
                         agencyService.getAll(),
                     ]);
                     setNationalities(nationalitiesData);
+                    setCountries(countriesData);
                     setRelationships(relationshipsData);
                     setAgencies(agenciesData);
                 } catch (e) {
@@ -488,6 +500,86 @@ export default function PreRegistrationPage() {
                                                         {nationalities.map((nationality) => (
                                                             <SelectItem key={nationality.id} value={nationality.name}>
                                                                 {nationality.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                                
+                                {/* Address Information */}
+                                <Separator />
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                                        <MapPin className="h-5 w-5 text-primary" />
+                                        Address Information
+                                    </h3>
+                                    <FormField
+                                        control={form.control}
+                                        name="customer.address"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Address</FormLabel>
+                                                <FormControl>
+                                                    <div className="relative">
+                                                        <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                                        <Input placeholder="123 Main Street" className="pl-9" {...field} />
+                                                    </div>
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <FormField
+                                            control={form.control}
+                                            name="customer.city"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>City</FormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="New York" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="customer.zip_code"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Zip Code</FormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="10001" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                    <FormField
+                                        control={form.control}
+                                        name="customer.country"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Country</FormLabel>
+                                                <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                                                    <FormControl>
+                                                        <div className="relative">
+                                                            <Globe className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                                                            <SelectTrigger className="pl-9">
+                                                                <SelectValue placeholder="Select country" />
+                                                            </SelectTrigger>
+                                                        </div>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        {countries.map((country) => (
+                                                            <SelectItem key={country.id} value={country.name}>
+                                                                {country.name}
                                                             </SelectItem>
                                                         ))}
                                                     </SelectContent>

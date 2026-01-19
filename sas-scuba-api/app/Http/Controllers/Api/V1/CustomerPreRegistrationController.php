@@ -55,6 +55,66 @@ class CustomerPreRegistrationController extends Controller
     }
 
     /**
+     * Generate multiple pre-registration links at once (staff only)
+     */
+    public function generateBulkLinks(Request $request)
+    {
+        $user = $request->user();
+        
+        $validated = $request->validate([
+            'quantity' => 'required|integer|min:1|max:100',
+            'expires_in_days' => 'nullable|integer|min:1|max:365',
+        ]);
+
+        $quantity = $validated['quantity'];
+        $expiresInDays = $validated['expires_in_days'] ?? 30; // Default 30 days
+        $expiresAt = Carbon::now()->addDays($expiresInDays);
+        $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
+
+        $links = [];
+        
+        DB::beginTransaction();
+        try {
+            for ($i = 0; $i < $quantity; $i++) {
+                $preRegistration = CustomerPreRegistration::create([
+                    'dive_center_id' => $user->dive_center_id,
+                    'token' => CustomerPreRegistration::generateToken(),
+                    'expires_at' => $expiresAt,
+                    'status' => 'pending',
+                    'customer_data' => [], // Initialize as empty array
+                    'emergency_contacts_data' => [], // Initialize as empty array
+                    'certifications_data' => [], // Initialize as empty array
+                ]);
+
+                $links[] = [
+                    'id' => $preRegistration->id,
+                    'token' => $preRegistration->token,
+                    'url' => rtrim($frontendUrl, '/') . "/pre-registration/{$preRegistration->token}",
+                    'expires_at' => $preRegistration->expires_at->toIso8601String(),
+                    'created_at' => $preRegistration->created_at->toIso8601String(),
+                ];
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => "Successfully generated {$quantity} registration link(s).",
+                'links' => $links,
+                'count' => count($links),
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error generating bulk pre-registration links: ' . $e->getMessage());
+            
+            return response()->json([
+                'message' => 'Failed to generate links.',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while generating links',
+            ], 500);
+        }
+    }
+
+    /**
      * Get registration form data by token (public, no auth)
      */
     public function getByToken($token)
@@ -113,6 +173,10 @@ class CustomerPreRegistrationController extends Controller
             'customer.full_name' => 'required|string|max:255',
             'customer.email' => 'nullable|email|max:255',
             'customer.phone' => 'nullable|string|max:50',
+            'customer.address' => 'nullable|string|max:255',
+            'customer.city' => 'nullable|string|max:255',
+            'customer.zip_code' => 'nullable|string|max:20',
+            'customer.country' => 'nullable|string|max:255',
             'customer.passport_no' => 'nullable|string|max:50',
             'customer.date_of_birth' => 'nullable|date',
             'customer.gender' => 'nullable|string',
@@ -284,6 +348,10 @@ class CustomerPreRegistrationController extends Controller
                 'full_name' => $submission->customer_data['full_name'],
                 'email' => $submission->customer_data['email'] ?? null,
                 'phone' => $submission->customer_data['phone'] ?? null,
+                'address' => $submission->customer_data['address'] ?? null,
+                'city' => $submission->customer_data['city'] ?? null,
+                'zip_code' => $submission->customer_data['zip_code'] ?? null,
+                'country' => $submission->customer_data['country'] ?? null,
                 'passport_no' => $submission->customer_data['passport_no'] ?? null,
                 'date_of_birth' => $submission->customer_data['date_of_birth'] ?? null,
                 'gender' => $submission->customer_data['gender'] ?? null,
@@ -431,6 +499,60 @@ class CustomerPreRegistrationController extends Controller
         return response()->json([
             'message' => 'Submission rejected successfully.',
             'submission_id' => $submission->id,
+        ], 200);
+    }
+
+    /**
+     * List all pending (not yet submitted) pre-registration links (staff only)
+     */
+    public function listPendingLinks(Request $request)
+    {
+        $user = $request->user();
+        $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
+        
+        $query = CustomerPreRegistration::where('dive_center_id', $user->dive_center_id)
+            ->whereNull('submitted_at')
+            ->orderBy('created_at', 'desc');
+
+        $perPage = min(max($request->get('per_page', 50), 1), 100);
+        
+        $links = $query->paginate($perPage);
+
+        // Transform the data for frontend
+        $links->getCollection()->transform(function ($link) use ($frontendUrl) {
+            return [
+                'id' => $link->id,
+                'token' => $link->token,
+                'url' => rtrim($frontendUrl, '/') . "/pre-registration/{$link->token}",
+                'expires_at' => $link->expires_at->toIso8601String(),
+                'created_at' => $link->created_at->toIso8601String(),
+                'is_expired' => $link->isExpired(),
+            ];
+        });
+
+        return response()->json($links);
+    }
+
+    /**
+     * Delete a pre-registration link (staff only)
+     */
+    public function destroy($id)
+    {
+        $link = CustomerPreRegistration::findOrFail($id);
+        
+        $this->authorizeDiveCenterAccess($link, 'Unauthorized access to this link');
+
+        // Only allow deletion if not yet submitted
+        if ($link->submitted_at !== null) {
+            return response()->json([
+                'message' => 'Cannot delete a link that has already been submitted.',
+            ], 422);
+        }
+
+        $link->delete();
+
+        return response()->json([
+            'message' => 'Link deleted successfully.',
         ], 200);
     }
 }

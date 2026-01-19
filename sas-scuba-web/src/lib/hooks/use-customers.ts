@@ -82,3 +82,17 @@ export function useDeleteCustomer() {
     });
 }
 
+/**
+ * Hook to bulk assign agent to multiple customers
+ */
+export function useBulkAssignAgent() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ customerIds, agentId }: { customerIds: number[]; agentId: number | null }) =>
+            customerService.bulkAssignAgent(customerIds, agentId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+        },
+    });
+}
+

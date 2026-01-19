@@ -30,11 +30,22 @@ import {
     DialogTitle,
     DialogFooter,
 } from "@/components/ui/dialog";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Eye, Check, X, Copy, ExternalLink, AlertCircle, User, Mail, Phone, Calendar, Award, Building, MapPin, Download, QrCode } from "lucide-react";
-import { preRegistrationService, PreRegistrationSubmission, PreRegistrationSubmissionDetail } from "@/lib/api/services/pre-registration.service";
+import { Plus, Eye, Check, X, Copy, ExternalLink, AlertCircle, User, Mail, Phone, Calendar, Award, Building, MapPin, Download, QrCode, Trash2, CheckCircle2 } from "lucide-react";
+import { preRegistrationService, PreRegistrationSubmission, PreRegistrationSubmissionDetail, PreRegistrationLink } from "@/lib/api/services/pre-registration.service";
 import { safeFormatDate } from "@/lib/utils/date-format";
 import dynamic from "next/dynamic";
 
@@ -60,6 +71,18 @@ export default function PreRegistrationsPage() {
     const [expiresInDays, setExpiresInDays] = useState("30");
     const [newLink, setNewLink] = useState<{ url: string; expires_at: string } | null>(null);
     const [showLinkDialog, setShowLinkDialog] = useState(false);
+    const [showBulkGenerateDialog, setShowBulkGenerateDialog] = useState(false);
+    const [bulkQuantity, setBulkQuantity] = useState("10");
+    const [generatingBulkLinks, setGeneratingBulkLinks] = useState(false);
+    const [bulkLinks, setBulkLinks] = useState<PreRegistrationLink[]>([]);
+    const [showBulkLinksDialog, setShowBulkLinksDialog] = useState(false);
+    const [pendingLinks, setPendingLinks] = useState<PreRegistrationLink[]>([]);
+    const [loadingPendingLinks, setLoadingPendingLinks] = useState(false);
+    const [deletingLinkId, setDeletingLinkId] = useState<number | null>(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [linkToDelete, setLinkToDelete] = useState<PreRegistrationLink | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const qrCodeRef = useRef<HTMLDivElement>(null);
     const [pagination, setPagination] = useState({
         current_page: 1,
@@ -70,6 +93,7 @@ export default function PreRegistrationsPage() {
 
     useEffect(() => {
         fetchSubmissions();
+        fetchPendingLinks();
     }, [statusFilter, searchQuery, pagination.current_page]);
 
     const fetchSubmissions = async () => {
@@ -95,6 +119,47 @@ export default function PreRegistrationsPage() {
         }
     };
 
+    const fetchPendingLinks = async () => {
+        try {
+            setLoadingPendingLinks(true);
+            const response = await preRegistrationService.getPendingLinks({
+                per_page: 50,
+            });
+            setPendingLinks(response.data);
+        } catch (error) {
+            console.error("Failed to fetch pending links", error);
+        } finally {
+            setLoadingPendingLinks(false);
+        }
+    };
+
+    const handleDeleteClick = (link: PreRegistrationLink) => {
+        setLinkToDelete(link);
+        setDeleteDialogOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!linkToDelete) return;
+
+        try {
+            setDeletingLinkId(linkToDelete.id);
+            await preRegistrationService.deleteLink(linkToDelete.id);
+            fetchPendingLinks(); // Refresh the list
+            setSuccessMessage("Link deleted successfully!");
+            setDeleteDialogOpen(false);
+            setLinkToDelete(null);
+            // Clear success message after 5 seconds
+            setTimeout(() => setSuccessMessage(null), 5000);
+        } catch (error) {
+            console.error("Failed to delete link", error);
+            setErrorMessage("Failed to delete link. Please try again.");
+            // Clear error message after 5 seconds
+            setTimeout(() => setErrorMessage(null), 5000);
+        } finally {
+            setDeletingLinkId(null);
+        }
+    };
+
     const generateLink = async () => {
         try {
             setGeneratingLink(true);
@@ -104,17 +169,78 @@ export default function PreRegistrationsPage() {
                 expires_at: link.expires_at,
             });
             setShowLinkDialog(true);
+            fetchPendingLinks(); // Refresh pending links
         } catch (error) {
             console.error("Failed to generate link", error);
-            alert("Failed to generate link. Please try again.");
+            setErrorMessage("Failed to generate link. Please try again.");
+            setTimeout(() => setErrorMessage(null), 5000);
         } finally {
             setGeneratingLink(false);
         }
     };
 
+    const handleBulkGenerateClick = () => {
+        setBulkQuantity("10"); // Reset to default
+        setShowBulkGenerateDialog(true);
+    };
+
+    const generateBulkLinks = async () => {
+        const quantityNum = parseInt(bulkQuantity);
+        if (isNaN(quantityNum) || quantityNum < 1 || quantityNum > 100) {
+            setErrorMessage("Please enter a valid quantity between 1 and 100.");
+            setTimeout(() => setErrorMessage(null), 5000);
+            return;
+        }
+
+        try {
+            setGeneratingBulkLinks(true);
+            const response = await preRegistrationService.generateBulkLinks(quantityNum, parseInt(expiresInDays));
+            setBulkLinks(response.links);
+            setShowBulkGenerateDialog(false);
+            setShowBulkLinksDialog(true);
+            fetchPendingLinks(); // Refresh pending links
+        } catch (error) {
+            console.error("Failed to generate bulk links", error);
+            setErrorMessage("Failed to generate links. Please try again.");
+            setTimeout(() => setErrorMessage(null), 5000);
+        } finally {
+            setGeneratingBulkLinks(false);
+        }
+    };
+
     const copyLink = (url: string) => {
         navigator.clipboard.writeText(url);
-        alert("Link copied to clipboard!");
+        setSuccessMessage("Link copied to clipboard!");
+        setTimeout(() => setSuccessMessage(null), 3000);
+    };
+
+    const copyAllLinks = () => {
+        const allUrls = bulkLinks.map(link => link.url).join('\n');
+        navigator.clipboard.writeText(allUrls);
+        setSuccessMessage(`Copied ${bulkLinks.length} link(s) to clipboard!`);
+        setTimeout(() => setSuccessMessage(null), 3000);
+    };
+
+    const exportLinksAsCSV = () => {
+        const csvContent = [
+            ['URL', 'Token', 'Expires At', 'Created At'],
+            ...bulkLinks.map(link => [
+                link.url,
+                link.token,
+                link.expires_at,
+                link.created_at
+            ])
+        ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `registration-links-${Date.now()}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const downloadQRCode = () => {
@@ -170,10 +296,11 @@ export default function PreRegistrationsPage() {
             };
 
             img.src = url;
-        } catch (error) {
-            console.error('Error downloading QR code:', error);
-            alert('Failed to download QR code. Please try again.');
-        }
+                } catch (error) {
+                    console.error('Error downloading QR code:', error);
+                    setErrorMessage('Failed to download QR code. Please try again.');
+                    setTimeout(() => setErrorMessage(null), 5000);
+                }
     };
 
     const viewSubmission = async (id: number) => {
@@ -194,10 +321,12 @@ export default function PreRegistrationsPage() {
             setShowDetailsDialog(false);
             setSelectedSubmission(null);
             fetchSubmissions();
-            alert("Submission approved successfully!");
+            setSuccessMessage("Submission approved successfully!");
+            setTimeout(() => setSuccessMessage(null), 5000);
         } catch (error) {
             console.error("Failed to approve submission", error);
-            alert("Failed to approve submission. Please try again.");
+            setErrorMessage("Failed to approve submission. Please try again.");
+            setTimeout(() => setErrorMessage(null), 5000);
         } finally {
             setApproving(false);
         }
@@ -205,7 +334,8 @@ export default function PreRegistrationsPage() {
 
     const rejectSubmission = async () => {
         if (!selectedSubmission || !rejectNotes.trim()) {
-            alert("Please provide rejection notes.");
+            setErrorMessage("Please provide rejection notes.");
+            setTimeout(() => setErrorMessage(null), 5000);
             return;
         }
         try {
@@ -216,10 +346,12 @@ export default function PreRegistrationsPage() {
             setSelectedSubmission(null);
             setRejectNotes("");
             fetchSubmissions();
-            alert("Submission rejected successfully!");
+            setSuccessMessage("Submission rejected successfully!");
+            setTimeout(() => setSuccessMessage(null), 5000);
         } catch (error) {
             console.error("Failed to reject submission", error);
-            alert("Failed to reject submission. Please try again.");
+            setErrorMessage("Failed to reject submission. Please try again.");
+            setTimeout(() => setErrorMessage(null), 5000);
         } finally {
             setRejecting(false);
         }
@@ -240,13 +372,32 @@ export default function PreRegistrationsPage() {
         <div className="flex flex-col min-h-screen bg-slate-50/50 dark:bg-slate-900/50">
             <Header title="Pre-Registrations" />
             <div className="flex-1 space-y-6 p-8 pt-6">
+                {/* Success/Error Messages */}
+                {successMessage && (
+                    <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
+                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        <AlertTitle className="text-green-800 dark:text-green-200">Success</AlertTitle>
+                        <AlertDescription className="text-green-700 dark:text-green-300">
+                            {successMessage}
+                        </AlertDescription>
+                    </Alert>
+                )}
+                {errorMessage && (
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Error</AlertTitle>
+                        <AlertDescription>
+                            {errorMessage}
+                        </AlertDescription>
+                    </Alert>
+                )}
                 {/* Actions */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <h2 className="text-3xl font-bold tracking-tight">Pre-Registration Management</h2>
                         <p className="text-muted-foreground">Manage customer pre-registration links and review submissions</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                         <div className="flex items-center gap-2">
                             <Label>Expires in:</Label>
                             <Select value={expiresInDays} onValueChange={setExpiresInDays}>
@@ -262,9 +413,13 @@ export default function PreRegistrationsPage() {
                                 </SelectContent>
                             </Select>
                         </div>
-                        <Button onClick={generateLink} disabled={generatingLink}>
+                        <Button onClick={generateLink} disabled={generatingLink || generatingBulkLinks} variant="outline">
                             <Plus className="h-4 w-4 mr-2" />
-                            {generatingLink ? "Generating..." : "Generate Link"}
+                            {generatingLink ? "Generating..." : "Generate 1 Link"}
+                        </Button>
+                        <Button onClick={handleBulkGenerateClick} disabled={generatingLink || generatingBulkLinks}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Bulk Generate
                         </Button>
                     </div>
                 </div>
@@ -297,6 +452,85 @@ export default function PreRegistrationsPage() {
                                 </SelectContent>
                             </Select>
                         </div>
+                    </CardContent>
+                </Card>
+
+                {/* Pending Links Section */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Pending Links</CardTitle>
+                        <CardDescription>Generated links that have not been submitted yet</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {loadingPendingLinks ? (
+                            <div className="text-center py-8">Loading...</div>
+                        ) : pendingLinks.length === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground">
+                                No pending links found.
+                            </div>
+                        ) : (
+                            <div className="border rounded-md">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>URL</TableHead>
+                                            <TableHead>Created</TableHead>
+                                            <TableHead>Expires</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {pendingLinks.map((link) => (
+                                            <TableRow key={link.id}>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <Input value={link.url} readOnly className="font-mono text-sm" />
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => copyLink(link.url)}
+                                                        >
+                                                            <Copy className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {safeFormatDate(link.created_at, "PPp")}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {safeFormatDate(link.expires_at, "PPp")}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {link.is_expired ? (
+                                                        <Badge className="bg-red-500">Expired</Badge>
+                                                    ) : (
+                                                        <Badge className="bg-green-500">Active</Badge>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleDeleteClick(link)}
+                                                        disabled={deletingLinkId === link.id}
+                                                    >
+                                                        {deletingLinkId === link.id ? (
+                                                            "Deleting..."
+                                                        ) : (
+                                                            <>
+                                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                                Delete
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -570,6 +804,30 @@ export default function PreRegistrationsPage() {
                                             <p>{safeFormatDate(selectedSubmission.customer_data.date_of_birth, "PPP")}</p>
                                         </div>
                                     )}
+                                    {selectedSubmission.customer_data.address && (
+                                        <div className="col-span-2">
+                                            <Label className="text-muted-foreground">Address</Label>
+                                            <p>{selectedSubmission.customer_data.address}</p>
+                                        </div>
+                                    )}
+                                    {selectedSubmission.customer_data.city && (
+                                        <div>
+                                            <Label className="text-muted-foreground">City</Label>
+                                            <p>{selectedSubmission.customer_data.city}</p>
+                                        </div>
+                                    )}
+                                    {selectedSubmission.customer_data.zip_code && (
+                                        <div>
+                                            <Label className="text-muted-foreground">Zip Code</Label>
+                                            <p>{selectedSubmission.customer_data.zip_code}</p>
+                                        </div>
+                                    )}
+                                    {selectedSubmission.customer_data.country && (
+                                        <div>
+                                            <Label className="text-muted-foreground">Country</Label>
+                                            <p>{selectedSubmission.customer_data.country}</p>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
 
@@ -767,6 +1025,136 @@ export default function PreRegistrationsPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Bulk Links Dialog */}
+            <Dialog open={showBulkLinksDialog} onOpenChange={setShowBulkLinksDialog}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Generated Registration Links</DialogTitle>
+                        <DialogDescription>
+                            {bulkLinks.length} link(s) generated successfully. Copy individual links or export all as CSV.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {bulkLinks.length > 0 && (
+                        <div className="space-y-4">
+                            <div className="flex gap-2 justify-end">
+                                <Button variant="outline" onClick={copyAllLinks}>
+                                    <Copy className="h-4 w-4 mr-2" />
+                                    Copy All Links
+                                </Button>
+                                <Button variant="outline" onClick={exportLinksAsCSV}>
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Export as CSV
+                                </Button>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                                Expires on: {safeFormatDate(bulkLinks[0]?.expires_at, "PPp")}
+                            </div>
+                            <div className="border rounded-md">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-12">#</TableHead>
+                                            <TableHead>URL</TableHead>
+                                            <TableHead className="w-24">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {bulkLinks.map((link, index) => (
+                                            <TableRow key={link.id}>
+                                                <TableCell className="font-medium">{index + 1}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <Input value={link.url} readOnly className="font-mono text-sm" />
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => copyLink(link.url)}
+                                                    >
+                                                        <Copy className="h-4 w-4" />
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button onClick={() => setShowBulkLinksDialog(false)}>Close</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Bulk Generate Dialog */}
+            <Dialog open={showBulkGenerateDialog} onOpenChange={setShowBulkGenerateDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Bulk Generate Links</DialogTitle>
+                        <DialogDescription>
+                            Enter the number of registration links you want to generate. All links will expire in {expiresInDays} days.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div>
+                            <Label htmlFor="bulk-quantity">Quantity</Label>
+                            <Input
+                                id="bulk-quantity"
+                                type="number"
+                                min="1"
+                                max="100"
+                                value={bulkQuantity}
+                                onChange={(e) => setBulkQuantity(e.target.value)}
+                                placeholder="10"
+                                className="mt-2"
+                            />
+                            <p className="text-sm text-muted-foreground mt-1">
+                                Enter a number between 1 and 100
+                            </p>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowBulkGenerateDialog(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={generateBulkLinks} disabled={generatingBulkLinks}>
+                            {generatingBulkLinks ? "Generating..." : `Generate ${bulkQuantity || "0"} Links`}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the registration link
+                            {linkToDelete && (
+                                <>
+                                    <br />
+                                    <strong className="font-mono text-xs mt-2 block">{linkToDelete.url}</strong>
+                                </>
+                            )}
+                            and it will no longer be accessible.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setLinkToDelete(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmDelete}
+                            className="bg-red-600 hover:bg-red-700"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

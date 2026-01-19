@@ -25,11 +25,15 @@ Route::prefix('v1')->group(function () {
 
         // Pre-registration management routes (staff only) - MUST come before public routes to avoid route conflicts
         Route::post('/pre-registration/links', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'generateLink']);
+        Route::post('/pre-registration/links/bulk', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'generateBulkLinks']);
+        Route::get('/pre-registration/links/pending', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'listPendingLinks']);
+        Route::delete('/pre-registration/links/{id}', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'destroy']);
         Route::get('/pre-registration/submissions', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'index']);
         Route::get('/pre-registration/submissions/{id}', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'show']);
         Route::post('/pre-registration/submissions/{id}/approve', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'approve']);
         Route::post('/pre-registration/submissions/{id}/reject', [\App\Http\Controllers\Api\V1\CustomerPreRegistrationController::class, 'reject']);
 
+        Route::post('customers/bulk-assign-agent', [\App\Http\Controllers\Api\V1\CustomerController::class, 'bulkAssignAgent']);
         Route::apiResource('customers', \App\Http\Controllers\Api\V1\CustomerController::class);
         Route::apiResource('customers.emergency-contacts', \App\Http\Controllers\Api\V1\EmergencyContactController::class)->except(['index']);
         Route::get('customers/{customer}/emergency-contacts', [\App\Http\Controllers\Api\V1\EmergencyContactController::class, 'index']);

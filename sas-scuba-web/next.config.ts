@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  // Ensure Turbopack uses this app folder as root (prevents it from selecting
+  // an unrelated parent directory when multiple lockfiles exist).
+  turbopack: {
+    root: __dirname,
+  },
   reactCompiler: true,
   // TypeScript checking enabled for code review
   typescript: {

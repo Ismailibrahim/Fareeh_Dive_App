@@ -53,10 +53,13 @@ class AgentCommissionService
             }
         }
         
+        // Calculate commissionable amount based on configuration
+        $commissionableAmount = $this->calculateCommissionableAmount($invoice, $commercialTerms);
+        
         // Calculate commission amount
         $commissionAmount = $this->calculateCommissionAmount(
             $commercialTerms,
-            $invoice->total
+            $commissionableAmount
         );
         
         // Create or update commission entry
@@ -117,12 +120,65 @@ class AgentCommissionService
     }
 
     /**
+     * Calculate commissionable amount from invoice items based on commercial terms configuration
+     * Returns net amount (subtotal - discount) for eligible items
+     */
+    protected function calculateCommissionableAmount(Invoice $invoice, AgentCommercialTerm $commercialTerms): float
+    {
+        // Get all invoice items
+        $invoiceItems = $invoice->invoiceItems;
+        
+        if ($invoiceItems->isEmpty()) {
+            return 0;
+        }
+        
+        // Filter items based on configuration
+        $eligibleItems = $invoiceItems->filter(function ($item) use ($commercialTerms) {
+            // If exclude_equipment_from_commission is true, exclude items with booking_equipment_id
+            if ($commercialTerms->exclude_equipment_from_commission && $item->booking_equipment_id) {
+                return false;
+            }
+            
+            // If include_manual_items_in_commission is false, exclude items without any booking reference
+            if (!$commercialTerms->include_manual_items_in_commission) {
+                // Item is manual if it has no booking references
+                $isManualItem = !$item->booking_dive_id && 
+                               !$item->booking_equipment_id && 
+                               !$item->booking_excursion_id;
+                if ($isManualItem) {
+                    return false;
+                }
+            }
+            
+            return true;
+        });
+        
+        // Calculate subtotal from eligible items
+        $filteredSubtotal = $eligibleItems->sum('total');
+        
+        // Apply discount proportionally if invoice has discount
+        $discount = $invoice->discount ?? 0;
+        if ($discount > 0 && $invoice->subtotal > 0) {
+            // Calculate discount proportion for filtered items
+            $discountProportion = $filteredSubtotal / $invoice->subtotal;
+            $filteredDiscount = $discount * $discountProportion;
+        } else {
+            $filteredDiscount = 0;
+        }
+        
+        // Return net amount (subtotal - discount)
+        $netAmount = max(0, $filteredSubtotal - $filteredDiscount);
+        
+        return round($netAmount, 2);
+    }
+
+    /**
      * Calculate commission amount based on commercial terms
      */
-    protected function calculateCommissionAmount(AgentCommercialTerm $commercialTerms, float $invoiceTotal): float
+    protected function calculateCommissionAmount(AgentCommercialTerm $commercialTerms, float $commissionableAmount): float
     {
         if ($commercialTerms->commission_type === 'Percentage') {
-            $commissionAmount = ($invoiceTotal * $commercialTerms->commission_rate) / 100;
+            $commissionAmount = ($commissionableAmount * $commercialTerms->commission_rate) / 100;
         } else {
             // Fixed Amount
             $commissionAmount = $commercialTerms->commission_rate;

@@ -108,7 +108,7 @@ export default function BookingExcursionDetailPage() {
                                         <Calendar className="h-4 w-4" />
                                         Excursion Date
                                     </CardDescription>
-                                    <p>{safeFormatDate(bookingExcursion.excursion_date)}</p>
+                                    <p>{safeFormatDate(bookingExcursion.excursion_date, "MMM d, yyyy", "-")}</p>
                                 </div>
                             )}
                             {bookingExcursion.excursion_time && (
@@ -145,7 +145,7 @@ export default function BookingExcursionDetailPage() {
                             {bookingExcursion.completed_at && (
                                 <div>
                                     <CardDescription>Completed At</CardDescription>
-                                    <p>{safeFormatDate(bookingExcursion.completed_at)}</p>
+                                    <p>{safeFormatDate(bookingExcursion.completed_at, "MMM d, yyyy 'at' h:mm a", "-")}</p>
                                 </div>
                             )}
                             {bookingExcursion.notes && (

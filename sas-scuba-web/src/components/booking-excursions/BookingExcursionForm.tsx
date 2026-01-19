@@ -278,8 +278,8 @@ export function BookingExcursionForm({ initialData, bookingExcursionId }: Bookin
                                             <FormLabel>Booking Date</FormLabel>
                                             <FormControl>
                                                 <DatePicker
-                                                    date={field.value ? new Date(field.value) : undefined}
-                                                    onSelect={(date) => {
+                                                    selected={field.value ? new Date(field.value) : undefined}
+                                                    onChange={(date) => {
                                                         field.onChange(date ? date.toISOString().split('T')[0] : '');
                                                     }}
                                                 />
@@ -365,8 +365,8 @@ export function BookingExcursionForm({ initialData, bookingExcursionId }: Bookin
                                         </FormLabel>
                                         <FormControl>
                                             <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onSelect={(date) => {
+                                                selected={field.value ? new Date(field.value) : undefined}
+                                                onChange={(date) => {
                                                     field.onChange(date ? date.toISOString().split('T')[0] : '');
                                                 }}
                                             />

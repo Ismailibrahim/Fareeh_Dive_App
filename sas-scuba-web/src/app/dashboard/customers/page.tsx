@@ -16,9 +16,11 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, MoreHorizontal, User as UserIcon, Plus, Award, AlertCircle } from "lucide-react";
+import { Search, MoreHorizontal, User as UserIcon, Plus, Award, AlertCircle, Building2 } from "lucide-react";
 import Link from "next/link";
 import { safeFormatDate } from "@/lib/utils/date-format";
+import { Checkbox } from "@/components/ui/checkbox";
+import { BulkAssignAgentDialog } from "@/components/customers/BulkAssignAgentDialog";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -48,6 +50,10 @@ export default function CustomersPage() {
     // Delete state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
+
+    // Selection state
+    const [selectedCustomers, setSelectedCustomers] = useState<Set<number>>(new Set());
+    const [assignAgentDialogOpen, setAssignAgentDialogOpen] = useState(false);
 
     // Debounce search term (500ms delay)
     const debouncedSearch = useDebouncedCallback((value: string) => {
@@ -111,6 +117,31 @@ export default function CustomersPage() {
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
+        setSelectedCustomers(new Set()); // Clear selection on page change
+    };
+
+    const handleSelectCustomer = (customerId: number, checked: boolean) => {
+        setSelectedCustomers(prev => {
+            const newSet = new Set(prev);
+            if (checked) {
+                newSet.add(customerId);
+            } else {
+                newSet.delete(customerId);
+            }
+            return newSet;
+        });
+    };
+
+    const handleSelectAll = () => {
+        if (selectedCustomers.size === customers.length) {
+            setSelectedCustomers(new Set());
+        } else {
+            setSelectedCustomers(new Set(customers.map(c => c.id)));
+        }
+    };
+
+    const handleAssignAgentSuccess = () => {
+        setSelectedCustomers(new Set());
     };
 
     return (
@@ -120,6 +151,15 @@ export default function CustomersPage() {
                 <div className="flex items-center justify-between space-y-2">
                     <h2 className="text-3xl font-bold tracking-tight">Customers</h2>
                     <div className="flex items-center space-x-2">
+                        {selectedCustomers.size > 0 && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setAssignAgentDialogOpen(true)}
+                            >
+                                <Building2 className="mr-2 h-4 w-4" />
+                                Assign Agent ({selectedCustomers.size})
+                            </Button>
+                        )}
                         <Link href="/dashboard/customers/create">
                             <Button>
                                 <Plus className="mr-2 h-4 w-4" /> Add Customer
@@ -142,6 +182,12 @@ export default function CustomersPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-[50px]">
+                                    <Checkbox
+                                        checked={customers.length > 0 && selectedCustomers.size === customers.length}
+                                        onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                                    />
+                                </TableHead>
                                 <TableHead className="w-[80px]">Avatar</TableHead>
                                 <TableHead>Name</TableHead>
                                 <TableHead>Contact</TableHead>
@@ -195,6 +241,12 @@ export default function CustomersPage() {
                             ) : (
                                 customers.map((customer) => (
                                     <TableRow key={customer.id}>
+                                        <TableCell>
+                                            <Checkbox
+                                                checked={selectedCustomers.has(customer.id)}
+                                                onCheckedChange={() => handleSelectCustomer(customer.id)}
+                                            />
+                                        </TableCell>
                                         <TableCell>
                                             <Avatar>
                                                 <AvatarFallback className="bg-primary/10 text-primary">
@@ -291,6 +343,10 @@ export default function CustomersPage() {
                             <div key={customer.id} className="rounded-lg border bg-card text-card-foreground shadow-sm p-4 space-y-3">
                                 <div className="flex items-start justify-between">
                                     <div className="flex items-center gap-3">
+                                        <Checkbox
+                                            checked={selectedCustomers.has(customer.id)}
+                                            onCheckedChange={(checked) => handleSelectCustomer(customer.id, checked as boolean)}
+                                        />
                                         <Avatar className="h-10 w-10">
                                             <AvatarFallback className="bg-primary/10 text-primary">
                                                 {customer.full_name.substring(0, 2).toUpperCase()}
@@ -358,6 +414,13 @@ export default function CustomersPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <BulkAssignAgentDialog
+                open={assignAgentDialogOpen}
+                onOpenChange={setAssignAgentDialogOpen}
+                selectedCustomerIds={Array.from(selectedCustomers)}
+                onSuccess={handleAssignAgentSuccess}
+            />
         </div>
     );
 }

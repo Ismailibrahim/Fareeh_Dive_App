@@ -8,6 +8,7 @@ use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 class CustomerController extends Controller
 {
@@ -24,7 +25,7 @@ class CustomerController extends Controller
             $hasFlightTimeColumn = Schema::hasColumn('customers', 'departure_flight_time');
             
             // Build select columns - conditionally include departure_flight_time
-            $columns = ['id', 'full_name', 'email', 'phone', 'address', 'city', 'zip_code', 'country', 'passport_no', 'nationality', 'gender', 'date_of_birth', 'departure_date', 'departure_flight', 'departure_to', 'dive_center_id', 'created_at', 'updated_at'];
+            $columns = ['id', 'full_name', 'email', 'phone', 'address', 'city', 'zip_code', 'country', 'passport_no', 'nationality', 'gender', 'date_of_birth', 'departure_date', 'departure_flight', 'departure_to', 'agent_id', 'dive_center_id', 'created_at', 'updated_at'];
             
             if ($hasFlightTimeColumn) {
                 $columns[] = 'departure_flight_time';
@@ -99,8 +100,22 @@ class CustomerController extends Controller
             'departure_flight' => 'nullable|string|max:255',
             'departure_flight_time' => 'nullable|string|regex:/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/',
             'departure_to' => 'nullable|string|max:255',
+            'agent_id' => 'nullable|exists:agents,id',
             'dive_center_id' => 'required|exists:dive_centers,id',
         ]);
+
+        // Validate agent belongs to same dive center if provided
+        if (isset($validated['agent_id'])) {
+            $agent = \App\Models\Agent::where('id', $validated['agent_id'])
+                ->where('dive_center_id', $validated['dive_center_id'])
+                ->first();
+            
+            if (!$agent) {
+                return response()->json([
+                    'message' => 'Agent does not belong to your dive center'
+                ], 422);
+            }
+        }
 
         $customer = Customer::create($validated);
         return response()->json($customer, 201);
@@ -114,7 +129,7 @@ class CustomerController extends Controller
         // Verify customer belongs to user's dive center
         $this->authorizeDiveCenterAccess($customer, 'Unauthorized access to this customer');
         
-        $customer->load('emergencyContacts');
+        $customer->load(['emergencyContacts', 'agent:id,agent_name']);
         return $customer;
     }
 
@@ -155,7 +170,21 @@ class CustomerController extends Controller
                     }
                 }],
                 'departure_to' => 'nullable|string|max:255',
+                'agent_id' => 'nullable|exists:agents,id',
             ]);
+
+            // Validate agent belongs to same dive center if provided
+            if (isset($validated['agent_id'])) {
+                $agent = \App\Models\Agent::where('id', $validated['agent_id'])
+                    ->where('dive_center_id', $customer->dive_center_id)
+                    ->first();
+                
+                if (!$agent) {
+                    return response()->json([
+                        'message' => 'Agent does not belong to your dive center'
+                    ], 422);
+                }
+            }
 
             $customer->update($validated);
             return response()->json($customer);
@@ -188,5 +217,104 @@ class CustomerController extends Controller
         
         $customer->delete();
         return response()->noContent();
+    }
+
+    /**
+     * Bulk assign agent to multiple customers.
+     */
+    public function bulkAssignAgent(Request $request)
+    {
+        try {
+            $user = $request->user();
+            $diveCenterId = $user->dive_center_id;
+
+            if (!$diveCenterId) {
+                return response()->json([
+                    'message' => 'Dive center not found'
+                ], 400);
+            }
+
+            $validated = $request->validate([
+                'customer_ids' => 'required|array|min:1',
+                'customer_ids.*' => 'required|exists:customers,id',
+                'agent_id' => 'nullable|exists:agents,id',
+            ]);
+
+            $customerIds = $validated['customer_ids'];
+            $agentId = $validated['agent_id'] ?? null;
+
+            // Validate agent belongs to same dive center if provided
+            if ($agentId !== null) {
+                $agent = \App\Models\Agent::where('id', $agentId)
+                    ->where('dive_center_id', $diveCenterId)
+                    ->first();
+                
+                if (!$agent) {
+                    return response()->json([
+                        'message' => 'Agent does not belong to your dive center'
+                    ], 422);
+                }
+            }
+
+            // Fetch all customers and verify they belong to the dive center
+            $customers = Customer::whereIn('id', $customerIds)
+                ->where('dive_center_id', $diveCenterId)
+                ->get();
+
+            if ($customers->count() !== count($customerIds)) {
+                return response()->json([
+                    'message' => 'One or more customers do not belong to your dive center or do not exist'
+                ], 422);
+            }
+
+            // Update all customers in a transaction
+            DB::beginTransaction();
+            
+            $successCount = 0;
+            $errors = [];
+
+            foreach ($customers as $customer) {
+                try {
+                    $customer->update(['agent_id' => $agentId]);
+                    $successCount++;
+                } catch (\Exception $e) {
+                    $errors[] = [
+                        'customer_id' => $customer->id,
+                        'error' => $e->getMessage()
+                    ];
+                    Log::error('Error updating customer agent', [
+                        'customer_id' => $customer->id,
+                        'agent_id' => $agentId,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success_count' => $successCount,
+                'failed_count' => count($errors),
+                'errors' => $errors,
+                'message' => "Successfully assigned agent to {$successCount} customer(s)"
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error in bulk assign agent: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
+            ]);
+            
+            return response()->json([
+                'message' => 'Failed to assign agent',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while assigning agent'
+            ], 500);
+        }
     }
 }

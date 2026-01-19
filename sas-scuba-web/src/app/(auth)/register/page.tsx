@@ -30,6 +30,8 @@ export default function RegisterPage() {
         resolver: zodResolver(registerSchema),
         defaultValues: {
             name: "",
+            dive_center_name: "",
+            country: "",
             email: "",
             password: "",
             password_confirmation: "",
@@ -79,6 +81,32 @@ export default function RegisterPage() {
                                         <FormLabel>Full Name</FormLabel>
                                         <FormControl>
                                             <Input placeholder="John Doe" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="dive_center_name"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Dive Center Name</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="e.g. SAS Scuba Dive Center" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="country"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Country</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="e.g. Maldives" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>

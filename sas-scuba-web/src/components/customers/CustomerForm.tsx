@@ -17,11 +17,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { customerService, CustomerFormData, Customer } from "@/lib/api/services/customer.service";
 import { nationalityService, Nationality } from "@/lib/api/services/nationality.service";
 import { countryService, Country } from "@/lib/api/services/country.service";
+import { agentService, Agent } from "@/lib/api/services/agent.service";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { User, Mail, Phone, CreditCard, Flag, MapPin, Globe, Plane } from "lucide-react";
+import { User, Mail, Phone, CreditCard, Flag, MapPin, Globe, Plane, Building2 } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { safeParseDate } from "@/lib/utils/date-format";
 
@@ -41,6 +42,7 @@ const customerSchema = z.object({
     departure_flight: z.string().optional(),
     departure_flight_time: z.string().optional(),
     departure_to: z.string().optional(),
+    agent_id: z.string().optional().or(z.literal("")),
 });
 
 // Form values type (matches schema)
@@ -58,6 +60,8 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
     const [loadingNationalities, setLoadingNationalities] = useState(true);
     const [countries, setCountries] = useState<Country[]>([]);
     const [loadingCountries, setLoadingCountries] = useState(true);
+    const [agents, setAgents] = useState<Agent[]>([]);
+    const [loadingAgents, setLoadingAgents] = useState(true);
 
     useEffect(() => {
         const fetchNationalities = async () => {
@@ -85,6 +89,21 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
             }
         };
         fetchCountries();
+    }, []);
+
+    useEffect(() => {
+        const fetchAgents = async () => {
+            try {
+                const data = await agentService.getAll({ status: 'Active' });
+                const agentList = Array.isArray(data) ? data : (data as any).data || [];
+                setAgents(agentList);
+            } catch (error) {
+                console.error("Failed to fetch agents", error);
+            } finally {
+                setLoadingAgents(false);
+            }
+        };
+        fetchAgents();
     }, []);
 
     // Helper function to convert date string to YYYY-MM-DD format
@@ -116,6 +135,7 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
             departure_flight: initialData?.departure_flight || "",
             departure_flight_time: initialData?.departure_flight_time || "",
             departure_to: initialData?.departure_to || "",
+            agent_id: initialData?.agent_id ? String(initialData.agent_id) : "",
         },
     });
 
@@ -135,6 +155,7 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
                 nationality: data.nationality || undefined,
                 gender: data.gender || undefined,
                 date_of_birth: data.date_of_birth || undefined,
+                agent_id: data.agent_id && data.agent_id !== "" && data.agent_id !== "none" ? Number(data.agent_id) : undefined,
             };
             
             if (customerId) {
@@ -181,6 +202,48 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
                                             <Input placeholder="John Doe" className="pl-9" {...field} />
                                         </div>
                                     </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="agent_id"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Agent</FormLabel>
+                                    <Select 
+                                        onValueChange={(value) => {
+                                            field.onChange(value === "none" ? "" : value);
+                                        }} 
+                                        value={field.value === "" ? "none" : (field.value && field.value !== "" ? field.value : undefined)}
+                                        disabled={loadingAgents || agents.length === 0}
+                                    >
+                                        <FormControl>
+                                            <div className="relative">
+                                                <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                                                <SelectTrigger className="pl-9">
+                                                    <SelectValue placeholder={
+                                                        loadingAgents 
+                                                            ? "Loading..." 
+                                                            : agents.length === 0 
+                                                            ? "No agents available" 
+                                                            : "Select an agent (optional)"
+                                                    } />
+                                                </SelectTrigger>
+                                            </div>
+                                        </FormControl>
+                                        {agents.length > 0 && (
+                                            <SelectContent>
+                                                <SelectItem value="none">None</SelectItem>
+                                                {agents.map((agent) => (
+                                                    <SelectItem key={agent.id} value={String(agent.id)}>
+                                                        {agent.agent_name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        )}
+                                    </Select>
                                     <FormMessage />
                                 </FormItem>
                             )}

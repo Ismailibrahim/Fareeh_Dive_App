@@ -73,6 +73,11 @@ class Agent extends Model
         return $this->hasMany(DiveGroup::class);
     }
 
+    public function customers(): HasMany
+    {
+        return $this->hasMany(Customer::class);
+    }
+
     // Performance Metrics Accessors
     public function getTotalClientsReferredAttribute(): int
     {

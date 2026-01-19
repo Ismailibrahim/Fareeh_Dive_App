@@ -23,6 +23,8 @@ export interface AgentCommercialTerm {
     tax_registration_no?: string;
     payment_terms: 'Prepaid' | 'Weekly' | 'Monthly' | 'On Invoice';
     credit_limit?: number;
+    exclude_equipment_from_commission?: boolean;
+    include_manual_items_in_commission?: boolean;
 }
 
 export interface AgentBillingInfo {

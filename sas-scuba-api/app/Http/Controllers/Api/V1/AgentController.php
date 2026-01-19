@@ -112,6 +112,8 @@ class AgentController extends Controller
             'commercial_terms.tax_registration_no' => 'nullable|string|max:255',
             'commercial_terms.payment_terms' => 'required_with:commercial_terms|in:Prepaid,Weekly,Monthly,On Invoice',
             'commercial_terms.credit_limit' => 'nullable|numeric|min:0',
+            'commercial_terms.exclude_equipment_from_commission' => 'nullable|boolean',
+            'commercial_terms.include_manual_items_in_commission' => 'nullable|boolean',
             
             // Billing info
             'billing_info' => 'sometimes|array',
@@ -241,6 +243,8 @@ class AgentController extends Controller
             'commercial_terms.tax_registration_no' => 'nullable|string|max:255',
             'commercial_terms.payment_terms' => 'required_with:commercial_terms|in:Prepaid,Weekly,Monthly,On Invoice',
             'commercial_terms.credit_limit' => 'nullable|numeric|min:0',
+            'commercial_terms.exclude_equipment_from_commission' => 'nullable|boolean',
+            'commercial_terms.include_manual_items_in_commission' => 'nullable|boolean',
             
             // Billing info
             'billing_info' => 'sometimes|array',

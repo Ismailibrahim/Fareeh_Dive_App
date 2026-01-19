@@ -37,38 +37,72 @@ return new class extends Migration
             DB::statement('ALTER TABLE invoices ALTER COLUMN booking_id DROP NOT NULL');
         } elseif ($driver === 'sqlite') {
             // SQLite doesn't support ALTER COLUMN, need to recreate table
-            // This is a simplified approach - in production, you'd want to preserve data
             DB::statement('PRAGMA foreign_keys=off');
             DB::statement('BEGIN TRANSACTION');
-            
-            // Get existing data
-            $invoices = DB::table('invoices')->get();
-            
-            // Drop and recreate table
-            DB::statement('CREATE TABLE invoices_new AS SELECT * FROM invoices');
-            DB::statement('DROP TABLE invoices');
-            DB::statement('CREATE TABLE invoices (
-                id BIGINT PRIMARY KEY AUTOINCREMENT,
-                dive_center_id BIGINT NOT NULL,
-                booking_id BIGINT NULL,
-                invoice_no VARCHAR(255) UNIQUE NULL,
-                invoice_date DATE NULL,
-                subtotal DECIMAL(10,2) NULL,
-                tax DECIMAL(10,2) NULL,
-                total DECIMAL(10,2) NULL,
-                currency VARCHAR(255) NULL,
-                status VARCHAR(255) DEFAULT "Draft",
-                created_at TIMESTAMP NULL,
-                updated_at TIMESTAMP NULL,
-                FOREIGN KEY (dive_center_id) REFERENCES dive_centers(id) ON DELETE CASCADE,
-                FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
-            )');
-            
-            // Restore data
-            foreach ($invoices as $invoice) {
-                DB::table('invoices')->insert((array) $invoice);
-            }
-            
+
+            // Drop existing indexes that would conflict after table recreation
+            DB::statement('DROP INDEX IF EXISTS invoices_invoice_no_unique');
+
+            // Rename existing table
+            DB::statement('ALTER TABLE invoices RENAME TO invoices_old');
+
+            // Recreate table with booking_id nullable (SQLite requires INTEGER PRIMARY KEY for AUTOINCREMENT)
+            DB::statement("
+                CREATE TABLE invoices (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    dive_center_id INTEGER NOT NULL,
+                    booking_id INTEGER NULL,
+                    invoice_no VARCHAR(255) NULL,
+                    invoice_date DATE NULL,
+                    subtotal DECIMAL(10,2) NULL,
+                    tax DECIMAL(10,2) NULL,
+                    total DECIMAL(10,2) NULL,
+                    currency VARCHAR(255) NULL,
+                    status VARCHAR(255) DEFAULT 'Draft',
+                    created_at TIMESTAMP NULL,
+                    updated_at TIMESTAMP NULL,
+                    FOREIGN KEY (dive_center_id) REFERENCES dive_centers(id) ON DELETE CASCADE,
+                    FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
+                )
+            ");
+
+            // Restore unique constraint on invoice_no with a non-reserved index name
+            DB::statement("CREATE UNIQUE INDEX invoices_invoice_no_unique ON invoices (invoice_no)");
+
+            // Copy data across
+            DB::statement("
+                INSERT INTO invoices (
+                    id,
+                    dive_center_id,
+                    booking_id,
+                    invoice_no,
+                    invoice_date,
+                    subtotal,
+                    tax,
+                    total,
+                    currency,
+                    status,
+                    created_at,
+                    updated_at
+                )
+                SELECT
+                    id,
+                    dive_center_id,
+                    booking_id,
+                    invoice_no,
+                    invoice_date,
+                    subtotal,
+                    tax,
+                    total,
+                    currency,
+                    status,
+                    created_at,
+                    updated_at
+                FROM invoices_old
+            ");
+
+            DB::statement('DROP TABLE invoices_old');
+
             DB::statement('COMMIT');
             DB::statement('PRAGMA foreign_keys=on');
         }

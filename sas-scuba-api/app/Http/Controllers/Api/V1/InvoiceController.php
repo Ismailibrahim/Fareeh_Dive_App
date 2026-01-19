@@ -31,42 +31,67 @@ class InvoiceController extends Controller
      */
     public function index(Request $request)
     {
-        $user = $request->user();
-        $diveCenterId = $user->dive_center_id;
+        try {
+            $user = $request->user();
+            $diveCenterId = $user->dive_center_id;
 
-        // Select only needed columns and eager load relationships upfront
-        $query = Invoice::select('id', 'dive_center_id', 'booking_id', 'customer_id', 'invoice_no', 'invoice_date', 'invoice_type', 'status', 'subtotal', 'tax', 'service_charge', 'discount', 'total', 'currency', 'notes', 'created_at', 'updated_at')
-            ->with([
-                'booking:id,customer_id,dive_center_id,booking_date,status',
-                'booking.customer:id,full_name,email',
-                'customer:id,full_name,email',
-                'invoiceItems:id,invoice_id,description,quantity,unit_price,total',
-                'payments:id,invoice_id,amount,payment_date,payment_method_id'
-            ])
-            ->where('dive_center_id', $diveCenterId);
+            // Eager load relationships upfront with defensive column selection
+            $query = Invoice::where('dive_center_id', $diveCenterId)
+                ->with([
+                    'booking' => function ($query) {
+                        $query->select('id', 'customer_id', 'dive_center_id', 'booking_date', 'status');
+                    },
+                    'booking.customer' => function ($query) {
+                        $query->select('id', 'full_name', 'email');
+                    },
+                    'customer' => function ($query) {
+                        $query->select('id', 'full_name', 'email');
+                    },
+                    'invoiceItems' => function ($query) {
+                        $query->select('id', 'invoice_id', 'description', 'quantity', 'unit_price', 'total');
+                    },
+                    'payments' => function ($query) {
+                        $query->select('id', 'invoice_id', 'amount', 'payment_date', 'payment_method_id');
+                    }
+                ]);
 
-        // Filter by status
-        if ($request->has('status')) {
-            $query->where('status', $request->input('status'));
+            // Filter by status
+            if ($request->has('status')) {
+                $query->where('status', $request->input('status'));
+            }
+
+            // Filter by customer - check both direct customer_id and through booking
+            if ($request->has('customer_id')) {
+                $customerId = $request->input('customer_id');
+                $query->where(function ($q) use ($customerId) {
+                    $q->where('customer_id', $customerId)
+                      ->orWhereHas('booking', function ($bookingQuery) use ($customerId) {
+                          $bookingQuery->where('customer_id', $customerId);
+                      });
+                });
+            }
+
+            // Filter by invoice type
+            if ($request->has('invoice_type')) {
+                $query->where('invoice_type', $request->input('invoice_type'));
+            }
+
+            // Get pagination parameters
+            $perPage = $request->get('per_page', 20);
+            $perPage = min(max($perPage, 1), 100); // Limit between 1 and 100
+
+            return $query->orderBy('created_at', 'desc')->paginate($perPage);
+        } catch (\Exception $e) {
+            \Log::error('InvoiceController::index error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            return response()->json([
+                'message' => 'Failed to fetch invoices',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while fetching invoices'
+            ], 500);
         }
-
-        // Filter by customer
-        if ($request->has('customer_id')) {
-            $query->whereHas('booking', function ($q) use ($request) {
-                $q->where('customer_id', $request->input('customer_id'));
-            });
-        }
-
-        // Filter by invoice type
-        if ($request->has('invoice_type')) {
-            $query->where('invoice_type', $request->input('invoice_type'));
-        }
-
-        // Get pagination parameters
-        $perPage = $request->get('per_page', 20);
-        $perPage = min(max($perPage, 1), 100); // Limit between 1 and 100
-
-        return $query->orderBy('created_at', 'desc')->paginate($perPage);
     }
 
     /**
@@ -125,12 +150,21 @@ class InvoiceController extends Controller
 
         $invoiceType = $validated['invoice_type'] ?? 'Full';
 
+        // Set agent_id from booking or customer
+        $agentId = null;
+        if ($booking && $booking->agent_id) {
+            $agentId = $booking->agent_id;
+        } elseif ($customer && $customer->agent_id) {
+            $agentId = $customer->agent_id;
+        }
+
         DB::beginTransaction();
         try {
             $invoice = Invoice::create([
                 'dive_center_id' => $diveCenterId,
                 'booking_id' => $bookingId,
                 'customer_id' => $customerId,
+                'agent_id' => $agentId,
                 'invoice_no' => null, // Will be generated
                 'invoice_date' => $validated['invoice_date'] ?? now()->toDateString(),
                 'invoice_type' => $invoiceType,
@@ -194,6 +228,8 @@ class InvoiceController extends Controller
             $invoice = Invoice::create([
                 'dive_center_id' => $diveCenterId,
                 'booking_id' => $validated['booking_id'],
+                'customer_id' => $booking->customer_id,
+                'agent_id' => $booking->agent_id ?? null,
                 'invoice_no' => null,
                 'invoice_date' => now()->toDateString(),
                 'invoice_type' => $invoiceType,
@@ -391,45 +427,87 @@ class InvoiceController extends Controller
      */
     public function show(Request $request, Invoice $invoice)
     {
-        // Verify invoice belongs to user's dive center
-        $this->authorizeDiveCenterAccess($invoice, 'Unauthorized access to this invoice');
+        try {
+            // Verify invoice belongs to user's dive center
+            $this->authorizeDiveCenterAccess($invoice, 'Unauthorized access to this invoice');
 
-        // Eager load all relationships upfront for better performance
-        $relations = [
-            'customer:id,full_name,email,phone',
-            'invoiceItems.priceListItem',
-            'payments'
-        ];
-        
-        // Conditionally add booking-related relationships
-        if ($invoice->booking_id) {
-            $relations[] = 'booking:id,customer_id,dive_center_id,booking_date,status';
-            $relations[] = 'booking.customer:id,full_name,email';
-        }
-        
-        // Load dive, equipment, and excursion relationships for items that have them
-        $relations[] = [
-            'invoiceItems' => function ($query) {
-                $query->with([
-                    'bookingDive:id,dive_site_id,dive_date',
-                    'bookingDive.diveSite:id,name',
-                    'bookingEquipment:id,equipment_item_id',
-                    'bookingEquipment.equipmentItem:id,equipment_id,size',
-                    'bookingEquipment.equipmentItem.equipment:id,name',
-                    'bookingExcursion:id,excursion_id,excursion_date',
-                    'bookingExcursion.excursion:id,name'
+            // Eager load relationships using closures for better control
+            $invoice->load([
+                'customer' => function ($query) {
+                    $query->select('id', 'full_name', 'email', 'phone');
+                },
+                'agent' => function ($query) {
+                    $query->select('id', 'name', 'email');
+                },
+                'invoiceItems' => function ($query) {
+                    $query->select('id', 'invoice_id', 'price_list_item_id', 'booking_dive_id', 'booking_equipment_id', 'booking_excursion_id', 'description', 'quantity', 'unit_price', 'discount', 'total')
+                        ->with([
+                            'priceListItem' => function ($q) {
+                                $q->select('id', 'name', 'description', 'price');
+                            },
+                            'bookingDive' => function ($q) {
+                                $q->select('id', 'dive_site_id', 'dive_date');
+                            },
+                            'bookingDive.diveSite' => function ($q) {
+                                $q->select('id', 'name');
+                            },
+                            'bookingEquipment' => function ($q) {
+                                $q->select('id', 'equipment_item_id');
+                            },
+                            'bookingEquipment.equipmentItem' => function ($q) {
+                                $q->select('id', 'equipment_id', 'size', 'serial_no');
+                            },
+                            'bookingEquipment.equipmentItem.equipment' => function ($q) {
+                                $q->select('id', 'name');
+                            },
+                            'bookingExcursion' => function ($q) {
+                                $q->select('id', 'excursion_id', 'excursion_date');
+                            },
+                            'bookingExcursion.excursion' => function ($q) {
+                                $q->select('id', 'name');
+                            }
+                        ]);
+                },
+                'payments' => function ($query) {
+                    $query->select('id', 'invoice_id', 'amount', 'payment_date', 'payment_method_id')
+                        ->with('paymentMethod:id,name');
+                }
+            ]);
+            
+            // Conditionally load booking-related relationships
+            if ($invoice->booking_id) {
+                $invoice->load([
+                    'booking' => function ($query) {
+                        $query->select('id', 'customer_id', 'dive_center_id', 'booking_date', 'status');
+                    },
+                    'booking.customer' => function ($query) {
+                        $query->select('id', 'full_name', 'email');
+                    }
                 ]);
             }
-        ];
-        
-        // Load related invoice if exists
-        if ($invoice->related_invoice_id) {
-            $relations[] = 'relatedInvoice:id,invoice_no,invoice_date,total';
-        }
-        
-        $invoice->load($relations);
+            
+            // Load related invoice if exists
+            if ($invoice->related_invoice_id) {
+                $invoice->load([
+                    'relatedInvoice' => function ($query) {
+                        $query->select('id', 'invoice_no', 'invoice_date', 'total');
+                    }
+                ]);
+            }
 
-        return response()->json($invoice);
+            return response()->json($invoice);
+        } catch (\Exception $e) {
+            \Log::error('InvoiceController::show error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'invoice_id' => $invoice->id ?? null,
+            ]);
+            return response()->json([
+                'message' => 'Failed to fetch invoice',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while fetching invoice'
+            ], 500);
+        }
     }
 
     /**

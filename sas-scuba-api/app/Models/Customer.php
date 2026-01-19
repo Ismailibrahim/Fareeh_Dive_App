@@ -8,6 +8,7 @@ class Customer extends Model
 {
     protected $fillable = [
         'dive_center_id',
+        'agent_id',
         'full_name',
         'email',
         'phone',
@@ -43,6 +44,21 @@ class Customer extends Model
     public function diveCenter()
     {
         return $this->belongsTo(DiveCenter::class);
+    }
+
+    public function agent()
+    {
+        return $this->belongsTo(Agent::class);
+    }
+
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class);
+    }
+
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
     }
 
     public function insurance()

@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Search, MoreHorizontal, Package, Plus, Tag, Edit, Trash2, FileSpreadsheet } from "lucide-react";
 import Link from "next/link";
 import {

@@ -4,8 +4,7 @@ namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\User;
-use Illuminate\Support\Facades\Hash;
+use App\Services\DiveCenterProvisioningService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -18,15 +17,24 @@ class AuthController extends Controller
         try {
             $request->validate([
                 'name' => 'required|string|max:255',
+                'dive_center_name' => 'required|string|max:255',
+                'country' => 'required|string|max:255',
                 'email' => 'required|string|email|max:255|unique:users',
                 'password' => 'required|string|min:8|confirmed',
             ]);
 
-            $user = User::create([
-                'full_name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-            ]);
+            $provisioningService = new DiveCenterProvisioningService();
+            $user = $provisioningService->createDiveCenterWithAdmin(
+                [
+                    'name' => $request->dive_center_name,
+                    'country' => $request->country,
+                ],
+                [
+                    'full_name' => $request->name,
+                    'email' => $request->email,
+                    'password' => $request->password,
+                ]
+            );
 
             // Use session-based authentication for SPA
             Auth::login($user);

@@ -58,6 +58,8 @@ const agentSchema = z.object({
         tax_registration_no: z.string().optional(),
         payment_terms: z.enum(['Prepaid', 'Weekly', 'Monthly', 'On Invoice']),
         credit_limit: z.number().min(0).optional(),
+        exclude_equipment_from_commission: z.boolean().optional(),
+        include_manual_items_in_commission: z.boolean().optional(),
     }).optional(),
     
     // Billing Info
@@ -146,6 +148,8 @@ export function AgentForm({ initialData, agentId }: AgentFormProps) {
                 tax_registration_no: initialData.commercial_terms.tax_registration_no || "",
                 payment_terms: initialData.commercial_terms.payment_terms,
                 credit_limit: initialData.commercial_terms.credit_limit,
+                exclude_equipment_from_commission: initialData.commercial_terms.exclude_equipment_from_commission ?? false,
+                include_manual_items_in_commission: initialData.commercial_terms.include_manual_items_in_commission ?? true,
             } : undefined,
             billing_info: initialData?.billing_info ? {
                 company_legal_name: initialData.billing_info.company_legal_name || "",
@@ -217,20 +221,28 @@ export function AgentForm({ initialData, agentId }: AgentFormProps) {
                 country: data.country,
                 city: data.city,
                 status: data.status,
-                brand_name: data.brand_name || undefined,
-                website: data.website || undefined,
-                notes: data.notes || undefined,
-                contact: data.contact,
-                commercial_terms: data.commercial_terms,
-                billing_info: data.billing_info,
-                contract: data.contract ? {
-                    ...data.contract,
-                    contract_start_date: data.contract.contract_start_date ? format(data.contract.contract_start_date, 'yyyy-MM-dd') : undefined,
-                    contract_end_date: data.contract.contract_end_date ? format(data.contract.contract_end_date, 'yyyy-MM-dd') : undefined,
-                    commission_valid_from: data.contract.commission_valid_from ? format(data.contract.commission_valid_from, 'yyyy-MM-dd') : undefined,
-                    commission_valid_until: data.contract.commission_valid_until ? format(data.contract.commission_valid_until, 'yyyy-MM-dd') : undefined,
-                } : undefined,
-                tag_ids: data.tag_ids,
+                ...(data.brand_name && { brand_name: data.brand_name }),
+                ...(data.website && { website: data.website }),
+                ...(data.notes && { notes: data.notes }),
+                ...(data.contact && { contact: data.contact }),
+                ...(data.commercial_terms && {
+                    commercial_terms: {
+                        ...data.commercial_terms,
+                        exclude_equipment_from_commission: data.commercial_terms.exclude_equipment_from_commission ?? false,
+                        include_manual_items_in_commission: data.commercial_terms.include_manual_items_in_commission ?? true,
+                    }
+                }),
+                ...(data.billing_info && { billing_info: data.billing_info }),
+                ...(data.contract && {
+                    contract: {
+                        ...data.contract,
+                        ...(data.contract.contract_start_date && { contract_start_date: format(data.contract.contract_start_date, 'yyyy-MM-dd') }),
+                        ...(data.contract.contract_end_date && { contract_end_date: format(data.contract.contract_end_date, 'yyyy-MM-dd') }),
+                        ...(data.contract.commission_valid_from && { commission_valid_from: format(data.contract.commission_valid_from, 'yyyy-MM-dd') }),
+                        ...(data.contract.commission_valid_until && { commission_valid_until: format(data.contract.commission_valid_until, 'yyyy-MM-dd') }),
+                    }
+                }),
+                ...(data.tag_ids && data.tag_ids.length > 0 && { tag_ids: data.tag_ids }),
             };
 
             if (agentId) {
@@ -242,9 +254,11 @@ export function AgentForm({ initialData, agentId }: AgentFormProps) {
                 router.push(`/dashboard/agents/${newAgent.id}`);
                 router.refresh();
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to save agent", error);
-            alert("Failed to save agent. Please try again.");
+            const errorMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message || "Failed to save agent. Please try again.";
+            console.error("Error details:", error?.response?.data);
+            alert(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -283,7 +297,7 @@ export function AgentForm({ initialData, agentId }: AgentFormProps) {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Agent Type *</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} value={field.value && field.value !== "" ? field.value : undefined}>
                                             <FormControl>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select type" />
@@ -306,7 +320,7 @@ export function AgentForm({ initialData, agentId }: AgentFormProps) {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Status</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} value={field.value && field.value !== "" ? field.value : undefined}>
                                             <FormControl>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select status" />
@@ -435,7 +449,7 @@ export function AgentForm({ initialData, agentId }: AgentFormProps) {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Preferred Communication</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} value={field.value && field.value !== "" ? field.value : undefined}>
                                             <FormControl>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select method" />
@@ -520,7 +534,7 @@ export function AgentForm({ initialData, agentId }: AgentFormProps) {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Commission Type</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} value={field.value && field.value !== "" ? field.value : undefined}>
                                             <FormControl>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select type" />
@@ -542,7 +556,17 @@ export function AgentForm({ initialData, agentId }: AgentFormProps) {
                                     <FormItem>
                                         <FormLabel>Commission Rate / Amount</FormLabel>
                                         <FormControl>
-                                            <Input type="number" step="0.01" placeholder="10.00" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} />
+                                            <Input 
+                                                type="number" 
+                                                step="0.01" 
+                                                placeholder="10.00" 
+                                                {...field} 
+                                                value={field.value ?? ""}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+                                                    field.onChange(value === "" ? 0 : parseFloat(value) || 0);
+                                                }} 
+                                            />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -569,7 +593,7 @@ export function AgentForm({ initialData, agentId }: AgentFormProps) {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Payment Terms</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} value={field.value && field.value !== "" ? field.value : undefined}>
                                             <FormControl>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select terms" />
@@ -593,7 +617,7 @@ export function AgentForm({ initialData, agentId }: AgentFormProps) {
                             render={({ field }) => (
                                 <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                                     <FormControl>
-                                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                                        <Checkbox checked={field.value ?? false} onCheckedChange={field.onChange} />
                                     </FormControl>
                                     <div className="space-y-1 leading-none">
                                         <FormLabel>VAT / GST Applicable</FormLabel>
@@ -622,13 +646,57 @@ export function AgentForm({ initialData, agentId }: AgentFormProps) {
                                     <FormItem>
                                         <FormLabel>Credit Limit</FormLabel>
                                         <FormControl>
-                                            <Input type="number" step="0.01" placeholder="0.00" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)} />
+                                            <Input 
+                                                type="number" 
+                                                step="0.01" 
+                                                placeholder="0.00" 
+                                                {...field} 
+                                                value={field.value ?? ""}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+                                                    field.onChange(value === "" ? undefined : parseFloat(value) || undefined);
+                                                }} 
+                                            />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
                         </div>
+                        <FormField
+                            control={form.control}
+                            name="commercial_terms.exclude_equipment_from_commission"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                    <FormControl>
+                                        <Checkbox checked={field.value ?? false} onCheckedChange={field.onChange} />
+                                    </FormControl>
+                                    <div className="space-y-1 leading-none">
+                                        <FormLabel>Exclude equipment from commission calculation</FormLabel>
+                                        <p className="text-sm text-muted-foreground">
+                                            When enabled, only dives and excursions will count toward commission (equipment excluded)
+                                        </p>
+                                    </div>
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="commercial_terms.include_manual_items_in_commission"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                    <FormControl>
+                                        <Checkbox checked={field.value ?? true} onCheckedChange={field.onChange} />
+                                    </FormControl>
+                                    <div className="space-y-1 leading-none">
+                                        <FormLabel>Include manual items in commission calculation</FormLabel>
+                                        <p className="text-sm text-muted-foreground">
+                                            When enabled, manually added invoice items (not linked to bookings) will be included in commission
+                                        </p>
+                                    </div>
+                                </FormItem>
+                            )}
+                        />
                     </CardContent>
                 </Card>
 
@@ -743,7 +811,7 @@ export function AgentForm({ initialData, agentId }: AgentFormProps) {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Payment Method</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value && field.value !== "" ? field.value : undefined}>
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select method" />

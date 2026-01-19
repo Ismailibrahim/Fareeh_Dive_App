@@ -44,7 +44,7 @@ export default function LoginPage() {
                 console.error("Validation errors:", errors);
                 console.error("Full error response:", err.response?.data);
                 
-                if (errors) {
+                if (errors && Object.keys(errors).length > 0) {
                     // Get the first error message
                     const firstErrorKey = Object.keys(errors)[0];
                     const firstError = errors[firstErrorKey];

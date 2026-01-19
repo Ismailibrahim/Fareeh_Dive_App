@@ -19,6 +19,11 @@ export interface Customer {
     departure_flight?: string;
     departure_flight_time?: string;
     departure_to?: string;
+    agent_id?: number;
+    agent?: {
+        id: number;
+        agent_name: string;
+    };
     emergency_contacts?: EmergencyContact[];
     created_at: string;
 }
@@ -39,6 +44,7 @@ export interface CustomerFormData {
     departure_flight?: string;
     departure_flight_time?: string;
     departure_to?: string;
+    agent_id?: number;
 }
 
 export interface PaginationParams {
@@ -85,5 +91,18 @@ export const customerService = {
 
     delete: async (id: number) => {
         await apiClient.delete(`/api/v1/customers/${id}`);
+    },
+
+    bulkAssignAgent: async (customerIds: number[], agentId: number | null) => {
+        const response = await apiClient.post<{
+            success_count: number;
+            failed_count: number;
+            errors?: Array<{ customer_id: number; error: string }>;
+            message: string;
+        }>("/api/v1/customers/bulk-assign-agent", {
+            customer_ids: customerIds,
+            agent_id: agentId,
+        });
+        return response.data;
     }
 };

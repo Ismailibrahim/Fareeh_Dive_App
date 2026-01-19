@@ -205,6 +205,18 @@ return new class extends Migration
     private function hasIndex(string $table, string $index): bool
     {
         $connection = Schema::getConnection();
+        $driver = $connection->getDriverName();
+
+        // SQLite (commonly used in tests) doesn't have information_schema
+        if ($driver === 'sqlite') {
+            return false;
+        }
+
+        // Only MySQL/MariaDB supports information_schema.statistics query below
+        if (!in_array($driver, ['mysql', 'mariadb'], true)) {
+            return false;
+        }
+
         $database = $connection->getDatabaseName();
         
         $result = $connection->select(
