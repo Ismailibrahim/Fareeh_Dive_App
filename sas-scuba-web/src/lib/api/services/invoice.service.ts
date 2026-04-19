@@ -27,6 +27,7 @@ export interface Invoice {
     dive_center_id: number;
     booking_id?: number;
     customer_id?: number;
+    agent_id?: number;
     booking?: Booking;
     customer?: any;
     invoice_no?: string;

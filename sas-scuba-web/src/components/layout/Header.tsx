@@ -40,6 +40,7 @@ export function Header({ title }: { title: string }) {
         },
         staleTime: 10 * 60 * 1000,
         retry: false,
+        enabled: typeof window !== 'undefined',
     });
 
     const handleLogout = async () => {

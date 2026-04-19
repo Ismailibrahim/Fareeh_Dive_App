@@ -132,4 +132,38 @@ export const authService = {
         const response = await apiClient.get('/api/v1/user');
         return response.data;
     },
+
+    async forgotPassword(email: string) {
+        const response = await apiClient.post('/api/v1/password/forgot', { email });
+        return response.data;
+    },
+
+    async resetPassword(data: {
+        email: string;
+        token: string;
+        password: string;
+        password_confirmation: string;
+    }) {
+        const response = await apiClient.post('/api/v1/password/reset', data);
+        return response.data;
+    },
+
+    async changePassword(data: {
+        current_password: string;
+        password: string;
+        password_confirmation: string;
+    }) {
+        const response = await apiClient.post('/api/v1/password/change', data);
+        return response.data;
+    },
+
+    async verifyEmail(email: string, token: string) {
+        const response = await apiClient.post('/api/v1/email/verify', { email, token });
+        return response.data;
+    },
+
+    async resendVerificationEmail() {
+        const response = await apiClient.post('/api/v1/email/resend');
+        return response.data;
+    },
 };

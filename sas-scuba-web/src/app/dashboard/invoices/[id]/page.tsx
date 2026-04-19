@@ -12,6 +12,7 @@ import { PaymentForm } from "@/components/payments/PaymentForm";
 import { InvoiceGenerationDialog } from "@/components/invoices/InvoiceGenerationDialog";
 import { AddInvoiceItemForm } from "@/components/invoices/AddInvoiceItemForm";
 import { TaxServiceChargeCard } from "@/components/invoices/TaxServiceChargeCard";
+import { InvoiceCommissionSection } from "@/components/invoices/InvoiceCommissionSection";
 import { DollarSign, FileText, Plus, Printer, Trash2 } from "lucide-react";
 import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
@@ -511,6 +512,14 @@ export default function InvoiceDetailPage() {
             {invoice.status !== 'Paid' && (
                 <TaxServiceChargeCard invoice={invoice} onUpdate={loadInvoice} />
             )}
+
+            {/* Commission Section */}
+            <div className="no-print">
+                <InvoiceCommissionSection
+                    invoiceId={invoiceId}
+                    agentId={(invoice as any).agent_id || invoice.booking?.agent_id || invoice.customer?.agent_id}
+                />
+            </div>
 
             {/* Payment Summary - Print Version */}
             {payments.length > 0 && (

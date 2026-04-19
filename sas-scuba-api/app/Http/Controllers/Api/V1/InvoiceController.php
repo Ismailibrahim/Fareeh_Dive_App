@@ -12,6 +12,8 @@ use App\Models\BookingEquipment;
 use App\Models\PriceListItem;
 use App\Models\Tax;
 use App\Services\TaxService;
+use App\Events\InvoiceCreated;
+use App\Events\InvoicePaid;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -177,9 +179,13 @@ class InvoiceController extends Controller
             $invoice->save();
 
             // Calculate totals will be done when items are added
-            $invoice->load(['booking.customer', 'customer', 'invoiceItems', 'payments']);
+            $invoice->load(['booking.customer', 'customer', 'invoiceItems', 'payments', 'agent']);
             
             DB::commit();
+            
+            // Fire InvoiceCreated event for automatic commission calculation
+            event(new InvoiceCreated($invoice));
+            
             return response()->json($invoice, 201);
         } catch (\Exception $e) {
             DB::rollBack();

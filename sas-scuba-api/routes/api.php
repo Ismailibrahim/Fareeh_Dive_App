@@ -5,10 +5,13 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 
 Route::prefix('v1')->group(function () {
-    // Auth Routes with strict rate limiting (5 requests per minute)
+    // Public auth routes with strict rate limiting (5 requests per minute)
     Route::middleware(['throttle:5,1'])->group(function () {
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
+        Route::post('/password/forgot', [\App\Http\Controllers\Api\V1\Auth\PasswordResetController::class, 'forgot']);
+        Route::post('/password/reset', [\App\Http\Controllers\Api\V1\Auth\PasswordResetController::class, 'reset']);
+        Route::post('/email/verify', [\App\Http\Controllers\Api\V1\Auth\EmailVerificationController::class, 'verify']);
     });
 
     // Authenticated routes with standard rate limiting (60 requests per minute)
@@ -16,6 +19,8 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/user', [AuthController::class, 'user']);
+        Route::post('/password/change', [\App\Http\Controllers\Api\V1\Auth\PasswordController::class, 'change']);
+        Route::post('/email/resend', [\App\Http\Controllers\Api\V1\Auth\EmailVerificationController::class, 'resend']);
         // Dive Center Settings
     Route::get('/dive-center', [App\Http\Controllers\Api\V1\DiveCenterController::class, 'show']);
     Route::put('/dive-center', [App\Http\Controllers\Api\V1\DiveCenterController::class, 'update']);
@@ -106,6 +111,8 @@ Route::prefix('v1')->group(function () {
         // Agent routes
         Route::apiResource('agents', \App\Http\Controllers\Api\V1\AgentController::class);
         Route::get('agents/{id}/performance', [\App\Http\Controllers\Api\V1\AgentReportController::class, 'performance']);
+        Route::get('commissions', [\App\Http\Controllers\Api\V1\AgentCommissionController::class, 'listAll']);
+        Route::get('commissions/{id}', [\App\Http\Controllers\Api\V1\AgentCommissionController::class, 'show']);
         Route::get('agents/{id}/commissions', [\App\Http\Controllers\Api\V1\AgentCommissionController::class, 'index']);
         Route::post('agents/{id}/commissions/calculate', [\App\Http\Controllers\Api\V1\AgentCommissionController::class, 'calculate']);
         Route::put('commissions/{id}', [\App\Http\Controllers\Api\V1\AgentCommissionController::class, 'update']);
@@ -170,6 +177,18 @@ Route::prefix('v1')->group(function () {
         Route::delete('dive-groups/{diveGroup}/members/{customer}', [\App\Http\Controllers\Api\V1\DiveGroupController::class, 'removeMember']);
         Route::post('dive-groups/{diveGroup}/book', [\App\Http\Controllers\Api\V1\DiveGroupController::class, 'bookGroup']);
         Route::post('dive-groups/{diveGroup}/invoice', [\App\Http\Controllers\Api\V1\DiveGroupController::class, 'generateInvoice']);
+        
+        // Waiver routes
+        Route::apiResource('waivers', \App\Http\Controllers\Api\V1\WaiverController::class);
+        
+        // Waiver Signature routes
+        Route::apiResource('waiver-signatures', \App\Http\Controllers\Api\V1\WaiverSignatureController::class);
+        Route::post('waiver-signatures/{signature}/verify', [\App\Http\Controllers\Api\V1\WaiverSignatureController::class, 'verify']);
+        Route::post('waiver-signatures/{signature}/invalidate', [\App\Http\Controllers\Api\V1\WaiverSignatureController::class, 'invalidate']);
+        
+        // Customer waiver status routes
+        Route::get('customers/{customer}/waivers/status', [\App\Http\Controllers\Api\V1\WaiverSignatureController::class, 'getCustomerWaiverStatus']);
+        Route::get('customers/{customer}/waivers/required', [\App\Http\Controllers\Api\V1\WaiverSignatureController::class, 'getRequiredWaivers']);
     });
 
     // Public pre-registration routes (no authentication required)

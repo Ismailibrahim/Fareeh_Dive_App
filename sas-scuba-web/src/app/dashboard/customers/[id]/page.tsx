@@ -12,6 +12,7 @@ import { useCustomer } from "@/lib/hooks/use-customers";
 import { CustomerCertificationsSection } from "@/components/customers/CustomerCertificationsSection";
 import { CustomerInsuranceSection } from "@/components/customers/CustomerInsuranceSection";
 import { CustomerAccommodationSection } from "@/components/customers/CustomerAccommodationSection";
+import { CustomerWaiversSection } from "@/components/customers/CustomerWaiversSection";
 import { safeFormatDate } from "@/lib/utils/date-format";
 
 export default function CustomerDetailPage() {
@@ -329,6 +330,9 @@ export default function CustomerDetailPage() {
 
                     {/* Accommodation Section */}
                     <CustomerAccommodationSection customerId={id} />
+
+                    {/* Waivers Section */}
+                    <CustomerWaiversSection customerId={id} />
                 </div>
             </div>
         </div>

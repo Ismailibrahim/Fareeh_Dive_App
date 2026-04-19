@@ -28,6 +28,7 @@ export interface User {
     phone: string | null;
     role: string | null;
     active: boolean | null;
+    email_verified_at?: string | null;
     created_at: string;
     updated_at: string;
     // Legacy field for backward compatibility

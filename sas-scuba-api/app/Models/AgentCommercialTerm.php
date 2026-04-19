@@ -18,6 +18,9 @@ class AgentCommercialTerm extends Model
         'credit_limit',
         'exclude_equipment_from_commission',
         'include_manual_items_in_commission',
+        'auto_calculate_on_invoice',
+        'auto_calculate_on_payment',
+        'calculation_trigger',
     ];
 
     protected $casts = [
@@ -26,6 +29,8 @@ class AgentCommercialTerm extends Model
         'credit_limit' => 'decimal:2',
         'exclude_equipment_from_commission' => 'boolean',
         'include_manual_items_in_commission' => 'boolean',
+        'auto_calculate_on_invoice' => 'boolean',
+        'auto_calculate_on_payment' => 'boolean',
     ];
 
     public function agent(): BelongsTo

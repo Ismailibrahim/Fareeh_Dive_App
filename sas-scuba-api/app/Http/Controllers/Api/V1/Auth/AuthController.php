@@ -7,7 +7,9 @@ use Illuminate\Http\Request;
 use App\Services\DiveCenterProvisioningService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -39,6 +41,21 @@ class AuthController extends Controller
             // Use session-based authentication for SPA
             Auth::login($user);
 
+            // Send email verification
+            $token = Str::random(64);
+            DB::table('email_verifications')->insert([
+                'email' => $user->email,
+                'token' => Hash::make($token),
+                'created_at' => now(),
+            ]);
+
+            // Log verification URL (TODO: Send actual email when Mail is configured)
+            $verifyUrl = config('app.frontend_url', 'http://localhost:3000') . '/verify-email?token=' . $token . '&email=' . urlencode($user->email);
+            Log::info('Verification email should be sent', [
+                'email' => $user->email,
+                'verify_url' => $verifyUrl,
+            ]);
+
             // Query user directly from database to avoid serialization issues
             $userData = DB::table('users')
                 ->select([
@@ -49,6 +66,7 @@ class AuthController extends Controller
                     'phone',
                     'role',
                     'active',
+                    'email_verified_at',
                     'created_at',
                     'updated_at',
                 ])
@@ -108,6 +126,7 @@ class AuthController extends Controller
                     'phone',
                     'role',
                     'active',
+                    'email_verified_at',
                     'created_at',
                     'updated_at',
                 ])
@@ -173,6 +192,7 @@ class AuthController extends Controller
                     'phone',
                     'role',
                     'active',
+                    'email_verified_at',
                     'created_at',
                     'updated_at',
                 ])

@@ -13,6 +13,7 @@ import * as z from "zod";
 import {
     Form,
     FormControl,
+    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -109,7 +110,33 @@ export default function EditPriceListItemPage() {
                     priceListItemService.getById(itemId),
                 ]);
                 setPriceList(priceListData);
-                setServiceTypes(serviceTypesData);
+                
+                // Filter to only show price list relevant service types
+                const priceListServiceTypes = [
+                    'Dive Course',
+                    'Dive Trip',
+                    'Dive Package',
+                    'Equipment Rental',
+                    'Excursion Trip',
+                ];
+                const filteredServiceTypes = serviceTypesData.filter(type => 
+                    priceListServiceTypes.includes(type.name)
+                );
+                // If any are missing, add them from the full list
+                priceListServiceTypes.forEach(typeName => {
+                    if (!filteredServiceTypes.find(t => t.name === typeName)) {
+                        const found = serviceTypesData.find(t => t.name === typeName);
+                        if (found) {
+                            filteredServiceTypes.push(found);
+                        }
+                    }
+                });
+                // Sort to match the order we want
+                const sortedServiceTypes = priceListServiceTypes
+                    .map(name => filteredServiceTypes.find(t => t.name === name))
+                    .filter(Boolean) as ServiceType[];
+                
+                setServiceTypes(sortedServiceTypes.length > 0 ? sortedServiceTypes : serviceTypesData);
                 setUnits(unitsData);
                 setItem(itemData);
                 
@@ -308,6 +335,9 @@ export default function EditPriceListItemPage() {
                                                             ))}
                                                         </SelectContent>
                                                     </Select>
+                                                    <FormDescription>
+                                                        Select a service type for pricing. Only price list service types are shown.
+                                                    </FormDescription>
                                                     <FormMessage />
                                                 </FormItem>
                                             )}

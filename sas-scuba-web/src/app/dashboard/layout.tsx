@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { authService } from '@/lib/api/services/auth.service';
@@ -14,6 +14,11 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     const router = useRouter();
+    const [isMounted, setIsMounted] = useState(false);
+    
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
     
     // Use React Query for auth check with caching
     const { data: user, isLoading, error } = useQuery({
@@ -36,6 +41,7 @@ export default function DashboardLayout({
         retry: false, // Don't retry on auth failures
         refetchOnWindowFocus: false, // Don't refetch on window focus
         refetchOnMount: false, // Don't refetch on component remount if data is fresh
+        enabled: isMounted, // Only run after hydration to prevent SSR errors
     });
 
     // Handle errors separately (React Query v5 doesn't support onError in useQuery)
@@ -50,8 +56,12 @@ export default function DashboardLayout({
                 console.error('Auth check failed:', {
                     status,
                     message: errorMessage,
-                    error: errorAny?.response?.data || errorAny,
+                    name: errorAny?.name,
+                    errMsg: errorAny?.message,
+                    code: errorAny?.code,
+                    stack: errorAny?.stack,
                 });
+                console.dir(errorAny);
             }
             
             // Handle different error scenarios
@@ -70,7 +80,7 @@ export default function DashboardLayout({
         }
     }, [error, router]);
 
-    if (isLoading) {
+    if (!isMounted || isLoading) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-900">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>

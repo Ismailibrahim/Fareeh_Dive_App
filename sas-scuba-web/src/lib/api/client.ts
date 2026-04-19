@@ -115,12 +115,18 @@ apiClient.interceptors.response.use(
         // Handle network errors with better messaging
         if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
             const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-            console.error(`Network Error: Unable to connect to API at ${baseURL}. Please ensure the backend server is running.`);
+            
+            // Only log error, don't throw if it's a network error that might be temporary
+            // This prevents the error from breaking the UI
+            console.warn(`Network Error: Unable to connect to API at ${baseURL}. Please ensure the backend server is running.`);
             
             // Don't redirect on network errors during login/register
             if (typeof window !== 'undefined' && window.location.pathname.includes('/login')) {
                 // Return a more descriptive error for login page
                 error.userMessage = `Cannot connect to server at ${baseURL}. Please ensure the backend API is running.`;
+            } else {
+                // For other pages, create a user-friendly error that doesn't break the app
+                error.userMessage = 'Unable to connect to server. Please check if the backend is running.';
             }
         }
         

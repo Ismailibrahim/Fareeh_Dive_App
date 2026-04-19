@@ -25,7 +25,6 @@ import { useQueryClient } from "@tanstack/react-query";
 const profileSchema = z.object({
     full_name: z.string().min(2, "Name must be at least 2 characters."),
     email: z.string().email("Please enter a valid email address."),
-    password: z.string().min(8, "Password must be at least 8 characters.").optional().or(z.literal("")),
     phone: z.string().optional(),
 });
 
@@ -47,7 +46,6 @@ export function ProfileForm({ user }: ProfileFormProps) {
         defaultValues: {
             full_name: user.full_name || "",
             email: user.email || "",
-            password: "",
             phone: user.phone || "",
         },
     });
@@ -61,7 +59,6 @@ export function ProfileForm({ user }: ProfileFormProps) {
             const payload: Partial<{
                 full_name: string;
                 email: string;
-                password: string;
                 phone?: string;
             }> = {
                 full_name: data.full_name,
@@ -69,18 +66,10 @@ export function ProfileForm({ user }: ProfileFormProps) {
                 phone: data.phone || undefined,
             };
 
-            // Only include password if it's been entered
-            if (data.password && data.password.length > 0) {
-                payload.password = data.password;
-            }
-
             await userService.update(user.id, payload);
             
             // Invalidate user query to refresh data
             queryClient.invalidateQueries({ queryKey: ['auth', 'user'] });
-            
-            // Reset password field
-            form.resetField('password');
             
             setSuccess(true);
             setTimeout(() => setSuccess(false), 5000);
@@ -177,44 +166,6 @@ export function ProfileForm({ user }: ProfileFormProps) {
                     </CardContent>
                 </Card>
 
-                {/* Security */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-xl flex items-center gap-2">
-                            <Shield className="h-5 w-5 text-primary" />
-                            Security
-                        </CardTitle>
-                        <CardDescription>
-                            Change your password to keep your account secure.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <FormField
-                            control={form.control}
-                            name="password"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>New Password (Optional)</FormLabel>
-                                    <FormControl>
-                                        <div className="relative">
-                                            <Shield className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                            <Input 
-                                                type="password" 
-                                                placeholder="Leave blank to keep current password" 
-                                                className="pl-9" 
-                                                {...field} 
-                                            />
-                                        </div>
-                                    </FormControl>
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                        Only enter a new password if you want to change it. Must be at least 8 characters.
-                                    </p>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    </CardContent>
-                </Card>
 
                 <div className="flex justify-end gap-4">
                     <Button type="button" variant="outline" size="lg" onClick={() => router.back()}>

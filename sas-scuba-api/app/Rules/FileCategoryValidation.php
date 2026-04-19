@@ -41,6 +41,10 @@ class FileCategoryValidation implements Rule
             'mimes' => ['pdf', 'jpeg', 'jpg', 'png'],
             'max_size' => 5 * 1024 * 1024, // 5MB
         ],
+        'waiver-signature' => [
+            'mimes' => ['png', 'jpg', 'jpeg'],
+            'max_size' => 2 * 1024 * 1024, // 2MB
+        ],
     ];
 
     public function __construct(string $category)

@@ -7,6 +7,7 @@ use App\Http\Controllers\Traits\AuthorizesDiveCenterAccess;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\Invoice;
+use App\Events\InvoicePaid;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -162,6 +163,8 @@ class PaymentController extends Controller
 
             // Update invoice status based on payments
             $totalPaid = $invoice->totalPaid();
+            $wasFullyPaid = $invoice->isFullyPaid();
+            
             if ($totalPaid >= $invoice->total) {
                 $invoice->update(['status' => 'Paid']);
             } elseif ($totalPaid > 0) {
@@ -169,6 +172,12 @@ class PaymentController extends Controller
             }
 
             DB::commit();
+
+            // Fire InvoicePaid event if invoice just became fully paid
+            if (!$wasFullyPaid && $invoice->isFullyPaid()) {
+                $invoice->load(['agent', 'booking', 'customer']);
+                event(new InvoicePaid($invoice));
+            }
 
             $payment->load(['invoice.booking.customer', 'paymentMethod']);
             return response()->json($payment, 201);

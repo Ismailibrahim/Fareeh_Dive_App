@@ -109,7 +109,10 @@ export default function LoginPage() {
                         <LoginForm onSubmit={onSubmit} loading={loading} />
                     )}
                 </CardContent>
-                <CardFooter className="flex justify-center">
+                <CardFooter className="flex flex-col items-center gap-2">
+                    <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+                        Forgot Password?
+                    </Link>
                     <p className="text-sm text-muted-foreground">
                         Don't have an account?{" "}
                         <Link href="/register" className="text-primary hover:underline">

@@ -12,8 +12,17 @@ class ServiceTypeSeeder extends Seeder
      */
     public function run(): void
     {
+        // Price list service types (matching the original enum values)
+        $priceListServiceTypes = [
+            'Dive Course',
+            'Dive Trip',
+            'Dive Package',
+            'Equipment Rental',
+            'Excursion Trip',
+        ];
+
         // Common equipment service types
-        $serviceTypes = [
+        $equipmentServiceTypes = [
             'Annual Service',
             'Visual Inspection',
             'Hydrostatic Test',
@@ -32,6 +41,9 @@ class ServiceTypeSeeder extends Seeder
             'Replacement',
             'Other',
         ];
+
+        // Combine all service types
+        $serviceTypes = array_merge($priceListServiceTypes, $equipmentServiceTypes);
 
         $this->command->info('Seeding service types...');
 

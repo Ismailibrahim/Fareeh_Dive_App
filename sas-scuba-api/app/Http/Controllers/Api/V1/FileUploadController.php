@@ -33,12 +33,12 @@ class FileUploadController extends Controller
         // Validate request
         $validator = Validator::make($request->all(), [
             'file' => ['required', 'file'],
-            'entityType' => ['required', 'string', 'in:customer,equipment,dive_site,invoice,equipment_item'],
+            'entityType' => ['required', 'string', 'in:customer,equipment,dive_site,invoice,equipment_item,waiver_signature'],
             'entityId' => ['required', 'string'],
             'category' => [
                 'required',
                 'string',
-                'in:customer-photo,dive-certificate,insurance-card,equipment-photo,dive-site-map,service-receipt,invoice'
+                'in:customer-photo,dive-certificate,insurance-card,equipment-photo,dive-site-map,service-receipt,invoice,waiver-signature'
             ],
         ]);
 
@@ -259,6 +259,7 @@ class FileUploadController extends Controller
             'equipment_item' => \App\Models\EquipmentItem::class,
             'dive_site' => \App\Models\DiveSite::class,
             'invoice' => \App\Models\Invoice::class,
+            'waiver_signature' => \App\Models\WaiverSignature::class,
         ];
 
         return $map[$entityType] ?? null;

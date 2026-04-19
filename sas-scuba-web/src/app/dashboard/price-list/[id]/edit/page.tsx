@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { Header } from "@/components/layout/Header";
@@ -21,10 +21,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { BulkPriceAdjustDialog } from "@/components/price-list/BulkPriceAdjustDialog";
 import { BulkUpdateTaxServiceDialog } from "@/components/price-list/BulkUpdateTaxServiceDialog";
+import { Filter } from "lucide-react";
 
 export default function PriceListEditPage() {
     const params = useParams();
@@ -37,6 +39,7 @@ export default function PriceListEditPage() {
     const [bulkAdjustDialogOpen, setBulkAdjustDialogOpen] = useState(false);
     const [bulkUpdateTaxServiceDialogOpen, setBulkUpdateTaxServiceDialogOpen] = useState(false);
     const [selectedItems, setSelectedItems] = useState<number[]>([]);
+    const [selectedServiceType, setSelectedServiceType] = useState<string>("all");
 
     const fetchPriceList = useCallback(async () => {
         if (!priceListId) return;
@@ -75,6 +78,22 @@ export default function PriceListEditPage() {
     const handleEditItem = (item: PriceListItem) => {
         router.push(`/dashboard/price-list/${priceListId}/items/${item.id}/edit`);
     };
+
+    // Get unique service types from price list items
+    const availableServiceTypes = priceList?.items 
+        ? Array.from(new Set(priceList.items.map(item => item.service_type).filter(Boolean)))
+            .sort()
+        : [];
+    
+    // Filter items by service type
+    const filteredItems = selectedServiceType === "all" 
+        ? (priceList?.items || [])
+        : (priceList?.items || []).filter(item => item.service_type === selectedServiceType);
+    
+    // Filter selected items to only include visible items
+    const visibleSelectedItems = selectedItems.filter(id => 
+        filteredItems.some(item => item.id === id)
+    );
 
 
     if (loading) {
@@ -201,16 +220,42 @@ export default function PriceListEditPage() {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            {priceList && (
-                                <PriceListItemTable
-                                    items={priceList.items || []}
-                                    baseCurrency={priceList.base_currency || "USD"}
-                                    onItemUpdated={handlePriceListUpdate}
-                                    onEditItem={handleEditItem}
-                                    selectedItems={selectedItems}
-                                    onSelectionChange={setSelectedItems}
-                                />
-                            )}
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-2">
+                                        <Filter className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm font-medium">Filter by Service Type:</span>
+                                    </div>
+                                    <Select value={selectedServiceType} onValueChange={setSelectedServiceType}>
+                                        <SelectTrigger className="w-[250px]">
+                                            <SelectValue placeholder="All Service Types" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Service Types</SelectItem>
+                                            {availableServiceTypes.map((type) => (
+                                                <SelectItem key={type} value={type}>
+                                                    {type}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {selectedServiceType !== "all" && (
+                                        <span className="text-sm text-muted-foreground">
+                                            ({filteredItems.length} {filteredItems.length === 1 ? 'item' : 'items'})
+                                        </span>
+                                    )}
+                                </div>
+                                {priceList && (
+                                    <PriceListItemTable
+                                        items={filteredItems}
+                                        baseCurrency={priceList.base_currency || "USD"}
+                                        onItemUpdated={handlePriceListUpdate}
+                                        onEditItem={handleEditItem}
+                                        selectedItems={selectedItems}
+                                        onSelectionChange={setSelectedItems}
+                                    />
+                                )}
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
@@ -287,7 +332,7 @@ export default function PriceListEditPage() {
                     open={bulkAdjustDialogOpen}
                     onOpenChange={setBulkAdjustDialogOpen}
                     priceList={priceList}
-                    selectedItemIds={selectedItems}
+                    selectedItemIds={visibleSelectedItems}
                     onSuccess={() => {
                         setSelectedItems([]);
                         handlePriceListUpdate();
@@ -298,7 +343,7 @@ export default function PriceListEditPage() {
                     open={bulkUpdateTaxServiceDialogOpen}
                     onOpenChange={setBulkUpdateTaxServiceDialogOpen}
                     priceListId={priceListId}
-                    selectedItemIds={selectedItems}
+                    selectedItemIds={visibleSelectedItems}
                     onSuccess={() => {
                         setSelectedItems([]);
                         handlePriceListUpdate();

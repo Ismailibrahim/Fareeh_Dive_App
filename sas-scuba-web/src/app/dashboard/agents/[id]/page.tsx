@@ -11,6 +11,7 @@ import { agentService, Agent } from "@/lib/api/services/agent.service";
 import { Badge } from "@/components/ui/badge";
 import { agentReportService } from "@/lib/api/services/agent-report.service";
 import { safeFormatDate } from "@/lib/utils/date-format";
+import { AgentCommissionsSection } from "@/components/agents/AgentCommissionsSection";
 
 export default function AgentDetailPage() {
     const params = useParams();
@@ -311,6 +312,9 @@ export default function AgentDetailPage() {
                         </Card>
                     )}
                 </div>
+
+                {/* Commissions Section */}
+                <AgentCommissionsSection agentId={id} />
 
                 <div className="flex gap-4">
                     <Link href={`/dashboard/agents/${id}/reports`}>

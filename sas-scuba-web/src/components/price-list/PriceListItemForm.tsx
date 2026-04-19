@@ -16,6 +16,7 @@ import {
 import {
     Form,
     FormControl,
+    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -142,7 +143,33 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
             try {
                 setLoadingServiceTypes(true);
                 const data = await serviceTypeService.getAll();
-                setServiceTypes(data);
+                
+                // Filter to only show price list relevant service types
+                const priceListServiceTypes = [
+                    'Dive Course',
+                    'Dive Trip',
+                    'Dive Package',
+                    'Equipment Rental',
+                    'Excursion Trip',
+                ];
+                const filteredServiceTypes = data.filter(type => 
+                    priceListServiceTypes.includes(type.name)
+                );
+                // If any are missing, add them from the full list
+                priceListServiceTypes.forEach(typeName => {
+                    if (!filteredServiceTypes.find(t => t.name === typeName)) {
+                        const found = data.find(t => t.name === typeName);
+                        if (found) {
+                            filteredServiceTypes.push(found);
+                        }
+                    }
+                });
+                // Sort to match the order we want
+                const sortedServiceTypes = priceListServiceTypes
+                    .map(name => filteredServiceTypes.find(t => t.name === name))
+                    .filter(Boolean) as ServiceType[];
+                
+                setServiceTypes(sortedServiceTypes.length > 0 ? sortedServiceTypes : data);
             } catch (error) {
                 console.error("Failed to load service types", error);
             } finally {
@@ -400,6 +427,11 @@ export function PriceListItemForm({ open, onOpenChange, initialData, baseCurrenc
                                                 ))}
                                             </SelectContent>
                                         </Select>
+                                        {!isEquipmentRental && (
+                                            <FormDescription>
+                                                Select a service type for pricing. Only price list service types are shown.
+                                            </FormDescription>
+                                        )}
                                         {isEquipmentRental && (
                                             <p className="text-sm text-muted-foreground">Service type is automatically set to Equipment Rental</p>
                                         )}

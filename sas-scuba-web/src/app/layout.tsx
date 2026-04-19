@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/lib/providers/query-provider";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { Toaster } from "sonner";
 // Note: date-protection.ts is removed as it was causing issues
 // All date handling is now done through safe date utilities
 
@@ -34,6 +35,7 @@ export default function RootLayout({
         <ErrorBoundary>
           <QueryProvider>
             {children}
+            <Toaster position="top-right" richColors />
           </QueryProvider>
         </ErrorBoundary>
       </body>

@@ -1,4 +1,4 @@
-# SAS Scuba - Stop All Services Script
+﻿# SAS Scuba - Stop All Services Script
 # Stops Redis, Laravel API, and Next.js Frontend servers
 
 Write-Host ""

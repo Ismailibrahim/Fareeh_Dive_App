@@ -15,6 +15,9 @@ class AgentCommission extends Model
         'calculated_at',
         'paid_at',
         'notes',
+        'payment_method_id',
+        'payment_reference',
+        'payment_notes',
     ];
 
     protected $casts = [
@@ -31,5 +34,10 @@ class AgentCommission extends Model
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    public function paymentMethod(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PaymentMethod::class);
     }
 }
