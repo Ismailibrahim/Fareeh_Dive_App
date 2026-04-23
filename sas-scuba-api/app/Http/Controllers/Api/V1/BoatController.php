@@ -55,8 +55,12 @@ class BoatController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'capacity' => 'nullable|integer|min:1',
+            'tank_capacity' => 'nullable|integer|min:0',
             'active' => 'boolean',
             'is_owned' => 'boolean',
+            'ownership_type' => 'nullable|string|in:Owned,Rented',
+            'rent_start_date' => 'nullable|date',
+            'rent_end_date' => 'nullable|date',
             'dive_center_id' => 'required|exists:dive_centers,id',
         ]);
 
@@ -90,8 +94,12 @@ class BoatController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'capacity' => 'nullable|integer|min:1',
+            'tank_capacity' => 'nullable|integer|min:0',
             'active' => 'boolean',
             'is_owned' => 'boolean',
+            'ownership_type' => 'nullable|string|in:Owned,Rented',
+            'rent_start_date' => 'nullable|date',
+            'rent_end_date' => 'nullable|date',
         ]);
 
         $boat->update($validated);

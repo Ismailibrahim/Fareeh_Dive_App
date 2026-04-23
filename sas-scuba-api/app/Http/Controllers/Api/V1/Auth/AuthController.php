@@ -150,11 +150,13 @@ class AuthController extends Controller
             throw $e;
         } catch (\Exception $e) {
             Log::error('AuthController::login - Error during login', [
-                'error' => $e->getMessage(),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
             ]);
             throw ValidationException::withMessages([
-                'email' => ['Login failed. Please try again.'],
+                'email' => ['Login failed: ' . $e->getMessage()],
             ]);
         }
     }

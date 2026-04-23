@@ -30,6 +30,9 @@ class FileUploadController extends Controller
         $user = $request->user();
         $tenantId = $user->dive_center_id;
 
+        \Illuminate\Support\Facades\Log::error('Upload Request Payload keys', array_keys($request->all()));
+        \Illuminate\Support\Facades\Log::error('Has File?', ['has_file' => $request->hasFile('file')]);
+
         // Validate request
         $validator = Validator::make($request->all(), [
             'file' => ['required', 'file'],
@@ -43,6 +46,7 @@ class FileUploadController extends Controller
         ]);
 
         if ($validator->fails()) {
+            \Illuminate\Support\Facades\Log::error('Validation failed', $validator->errors()->toArray());
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
@@ -63,6 +67,7 @@ class FileUploadController extends Controller
         );
 
         if ($categoryValidator->fails()) {
+            \Illuminate\Support\Facades\Log::error('Category validation failed', $categoryValidator->errors()->toArray());
             return response()->json([
                 'success' => false,
                 'message' => $categoryValidator->errors()->first('file')
@@ -222,6 +227,11 @@ class FileUploadController extends Controller
      */
     private function verifyEntityAccess(string $entityType, string $entityId, int $tenantId): void
     {
+        // Allow temporary files that aren't attached to an entity yet (used during creation)
+        if ($entityId === 'temp') {
+            return;
+        }
+
         $modelClass = $this->getModelClass($entityType);
         
         if (!$modelClass) {

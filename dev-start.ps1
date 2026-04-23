@@ -26,14 +26,14 @@ if (-not (Test-Path $PROJECT_WEB)) {
 
 # Start Laravel API Server
 Write-Host "📡 Starting Laravel API server on port $API_PORT..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PROJECT_API'; Write-Host 'Laravel API Server' -ForegroundColor Cyan; $env:PATH = '$LARAGON_PHP;$env:PATH'; php artisan serve --port=$API_PORT"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PROJECT_API'; Write-Host 'Laravel API Server' -ForegroundColor Cyan; & '$PHP_EXE' artisan serve --port=$API_PORT --host=0.0.0.0"
 
 # Wait a moment for API to start
 Start-Sleep -Seconds 2
 
 # Start Next.js Frontend Server
 Write-Host "🌐 Starting Next.js frontend server on port $WEB_PORT..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PROJECT_WEB'; Write-Host 'Next.js Frontend Server' -ForegroundColor Cyan; npm run dev"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PROJECT_WEB'; Write-Host 'Next.js Frontend Server' -ForegroundColor Cyan; npm run dev -- -H 0.0.0.0"
 
 Write-Host ""
 Write-Host "✅ Development servers starting..." -ForegroundColor Green

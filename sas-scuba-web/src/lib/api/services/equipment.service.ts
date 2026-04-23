@@ -1,4 +1,4 @@
-import apiClient from "../client";
+import apiClient, { getApiUrl } from "../client";
 
 export interface Equipment {
     id: number;
@@ -142,7 +142,7 @@ export const equipmentService = {
 
     downloadTemplate: async () => {
         try {
-            const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            const baseURL = getApiUrl();
             const url = `${baseURL}/api/v1/equipment/import-template`;
             
             // Use fetch directly to avoid axios interceptor issues with blob responses

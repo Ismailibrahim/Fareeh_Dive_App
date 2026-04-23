@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { LoginCredentials } from "@/types/auth";
 import { authService } from "@/lib/api/services/auth.service";
+import { getApiUrl } from "@/lib/api/client";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
@@ -33,7 +34,7 @@ export default function LoginPage() {
         } catch (err: any) {
             // Handle different error types
             if (err.code === 'ERR_NETWORK' || err.message === 'Network Error' || err.userMessage) {
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+                const apiUrl = getApiUrl();
                 setError(
                     err.userMessage || 
                     `Cannot connect to server at ${apiUrl}. Please ensure the backend API server is running.`

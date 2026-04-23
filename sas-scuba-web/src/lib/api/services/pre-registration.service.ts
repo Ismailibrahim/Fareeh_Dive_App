@@ -1,9 +1,9 @@
-import apiClient from "../client";
+import apiClient, { getApiUrl } from "../client";
 import axios from "axios";
 
 // Separate client for public endpoints (no authentication)
 const publicApiClient = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+    baseURL: getApiUrl(),
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

@@ -35,22 +35,34 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Pagination } from "@/components/ui/pagination";
 
 export default function DiveSitesPage() {
     const [diveSites, setDiveSites] = useState<DiveSite[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [meta, setMeta] = useState<any>(null);
 
     // Delete state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [diveSiteToDelete, setDiveSiteToDelete] = useState<DiveSite | null>(null);
 
-    const fetchDiveSites = async () => {
+    const fetchDiveSites = async (page = 1, search = "") => {
         setLoading(true);
         try {
-            const data = await diveSiteService.getAll();
-            const diveSitesList = Array.isArray(data) ? data : (data as any).data || [];
+            const response = await diveSiteService.getAll(page, search);
+            // Laravel paginated response structure
+            const diveSitesList = (response as any).data || [];
+            const paginationMeta = {
+                current_page: (response as any).current_page,
+                last_page: (response as any).last_page,
+                per_page: (response as any).per_page,
+                total: (response as any).total,
+            };
+            
             setDiveSites(diveSitesList);
+            setMeta(paginationMeta);
         } catch (error) {
             console.error("Failed to fetch dive sites", error);
         } finally {
@@ -58,19 +70,30 @@ export default function DiveSitesPage() {
         }
     };
 
+    // Use a simple effect-based debounce
     useEffect(() => {
-        fetchDiveSites();
-    }, []);
+        const handler = setTimeout(() => {
+            fetchDiveSites(1, searchTerm);
+            setCurrentPage(1);
+        }, 500);
+        return () => clearTimeout(handler);
+    }, [searchTerm]);
+
+    // Handle page change
+    const onPageChange = (page: number) => {
+        setCurrentPage(page);
+        fetchDiveSites(page, searchTerm);
+    };
 
     // Refresh data when page comes into focus
     useEffect(() => {
         const handleFocus = () => {
-            fetchDiveSites();
+            fetchDiveSites(currentPage, searchTerm);
         };
         
         window.addEventListener('focus', handleFocus);
         return () => window.removeEventListener('focus', handleFocus);
-    }, []);
+    }, [currentPage, searchTerm]);
 
     const handleDeleteClick = (diveSite: DiveSite) => {
         setDiveSiteToDelete(diveSite);
@@ -81,7 +104,8 @@ export default function DiveSitesPage() {
         if (!diveSiteToDelete) return;
         try {
             await diveSiteService.delete(diveSiteToDelete.id);
-            setDiveSites(diveSites.filter(ds => ds.id !== diveSiteToDelete.id));
+            // After delete, refresh the current page
+            fetchDiveSites(currentPage, searchTerm);
         } catch (error) {
             console.error("Failed to delete dive site", error);
         } finally {
@@ -90,11 +114,8 @@ export default function DiveSitesPage() {
         }
     };
 
-    const filteredDiveSites = diveSites.filter(diveSite =>
-        diveSite.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        diveSite.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        diveSite.location?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // We use diveSites directly now since searching is server-side
+    const displayedDiveSites = diveSites;
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -158,18 +179,38 @@ export default function DiveSitesPage() {
                                         </TableRow>
                                     ))}
                                 </>
-                            ) : filteredDiveSites.length === 0 ? (
+                            ) : displayedDiveSites.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={7} className="h-24 text-center">
                                         No dive sites found.
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredDiveSites.map((diveSite) => (
+                                displayedDiveSites.map((diveSite) => (
                                     <TableRow key={diveSite.id}>
                                         <TableCell className="font-medium">
-                                            <div className="flex items-center gap-2">
-                                                <MapPin className="h-4 w-4 text-muted-foreground" />
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-10 w-10 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0 border">
+                                                    {diveSite.attachment && (
+                                                        diveSite.attachment.toLowerCase().endsWith('.jpg') || 
+                                                        diveSite.attachment.toLowerCase().endsWith('.jpeg') || 
+                                                        diveSite.attachment.toLowerCase().endsWith('.png') ||
+                                                        diveSite.attachment.toLowerCase().includes('image')
+                                                    ) ? (
+                                                        <img 
+                                                            src={diveSite.attachment} 
+                                                            alt={diveSite.name} 
+                                                            className="h-full w-full object-cover"
+                                                            onError={(e) => {
+                                                                // If image fails to load, replace with icon
+                                                                (e.target as any).style.display = 'none';
+                                                                (e.target as any).parentElement.innerHTML = '<svg class="h-5 w-5 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <MapPin className="h-5 w-5 text-muted-foreground" />
+                                                    )}
+                                                </div>
                                                 {diveSite.name}
                                             </div>
                                         </TableCell>
@@ -274,23 +315,35 @@ export default function DiveSitesPage() {
                                 </Card>
                             ))}
                         </>
-                    ) : filteredDiveSites.length === 0 ? (
+                    ) : displayedDiveSites.length === 0 ? (
                         <Card>
                             <CardContent className="pt-6">
                                 <p className="text-center text-muted-foreground">No dive sites found.</p>
                             </CardContent>
                         </Card>
                     ) : (
-                        filteredDiveSites.map((diveSite) => (
+                        displayedDiveSites.map((diveSite) => (
                             <Card key={diveSite.id}>
                                 <CardHeader>
-                                    <div className="flex items-start justify-between">
-                                        <div>
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex-1 min-w-0">
                                             <CardDescription className="flex items-center gap-2 mb-1">
                                                 <MapPin className="h-4 w-4" />
                                                 Dive Site
                                             </CardDescription>
-                                            <p className="font-medium">{diveSite.name}</p>
+                                            <p className="font-medium truncate">{diveSite.name}</p>
+                                        </div>
+                                        <div className="h-12 w-12 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0 border">
+                                            {diveSite.attachment && (
+                                                diveSite.attachment.toLowerCase().endsWith('.jpg') || 
+                                                diveSite.attachment.toLowerCase().endsWith('.jpeg') || 
+                                                diveSite.attachment.toLowerCase().endsWith('.png') ||
+                                                diveSite.attachment.toLowerCase().includes('image')
+                                            ) ? (
+                                                <img src={diveSite.attachment} alt={diveSite.name} className="h-full w-full object-cover" />
+                                            ) : (
+                                                <MapPin className="h-6 w-6 text-muted-foreground" />
+                                            )}
                                         </div>
                                     </div>
                                 </CardHeader>
@@ -362,6 +415,17 @@ export default function DiveSitesPage() {
                         ))
                     )}
                 </div>
+
+                {/* Pagination */}
+                {!loading && meta && meta.last_page > 1 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={meta.last_page}
+                        onPageChange={onPageChange}
+                        itemsPerPage={meta.per_page}
+                        totalItems={meta.total}
+                    />
+                )}
             </div>
 
             {/* Delete Confirmation Dialog */}

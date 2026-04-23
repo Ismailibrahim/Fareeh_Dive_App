@@ -120,7 +120,7 @@ if (-not (Test-Path $PHP_EXE)) {
         Write-Host ""
     } else {
         Write-Host "  📡 Starting Laravel API server on port $API_PORT..." -ForegroundColor Cyan
-        Start-Process -FilePath $PHP_EXE -ArgumentList "artisan", "serve", "--port=$API_PORT", "--host=localhost" -WorkingDirectory $PROJECT_API
+        Start-Process -FilePath $PHP_EXE -ArgumentList "artisan", "serve", "--port=$API_PORT", "--host=0.0.0.0" -WorkingDirectory $PROJECT_API
         Start-Sleep -Seconds 3
         
         # Verify API started
@@ -152,7 +152,7 @@ if (-not (Test-Path $PROJECT_WEB)) {
         Write-Host ""
     } else {
         Write-Host "  📡 Starting Next.js Frontend server on port $WEB_PORT..." -ForegroundColor Cyan
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PROJECT_WEB'; Write-Host '========================================' -ForegroundColor Cyan; Write-Host '  Next.js Frontend Server - Port $WEB_PORT' -ForegroundColor Cyan; Write-Host '========================================' -ForegroundColor Cyan; Write-Host ''; npm run dev"
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PROJECT_WEB'; Write-Host '========================================' -ForegroundColor Cyan; Write-Host '  Next.js Frontend Server - Port $WEB_PORT' -ForegroundColor Cyan; Write-Host '========================================' -ForegroundColor Cyan; Write-Host ''; npx next dev -H 0.0.0.0"
         Start-Sleep -Seconds 3
         
         # Verify Frontend started

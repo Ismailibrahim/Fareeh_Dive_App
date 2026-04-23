@@ -28,11 +28,12 @@ import { nationalityService, Nationality } from "@/lib/api/services/nationality.
 import { relationshipService, Relationship } from "@/lib/api/services/relationship.service";
 import { agencyService, Agency } from "@/lib/api/services/agency.service";
 import { countryService, Country } from "@/lib/api/services/country.service";
+import { getApiUrl } from "@/lib/api/client";
 import axios from "axios";
 
 // Create a separate axios instance for public requests (without auth interceptors)
 const publicApiClient = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+    baseURL: getApiUrl(),
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

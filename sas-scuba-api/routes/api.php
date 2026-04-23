@@ -6,7 +6,7 @@ use App\Http\Controllers\Api\V1\Auth\AuthController;
 
 Route::prefix('v1')->group(function () {
     // Public auth routes with strict rate limiting (5 requests per minute)
-    Route::middleware(['throttle:5,1'])->group(function () {
+    Route::middleware(['throttle:60,1'])->group(function () {
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
         Route::post('/password/forgot', [\App\Http\Controllers\Api\V1\Auth\PasswordResetController::class, 'forgot']);

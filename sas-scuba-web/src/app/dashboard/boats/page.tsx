@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, MoreHorizontal, Ship, Plus } from "lucide-react";
+import { Search, MoreHorizontal, Ship, Plus, Database, Calendar, Clock } from "lucide-react";
+import { format } from "date-fns";
 import Link from "next/link";
 import {
     DropdownMenu,
@@ -125,8 +126,9 @@ export default function BoatsPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Name</TableHead>
-                                <TableHead>Capacity</TableHead>
-                                <TableHead>Ownership Type</TableHead>
+                                <TableHead>Capacities</TableHead>
+                                <TableHead>Ownership</TableHead>
+                                <TableHead>Rental Period</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
@@ -167,17 +169,49 @@ export default function BoatsPage() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            {boat.capacity ? `${boat.capacity} divers` : "-"}
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-1.5 text-sm">
+                                                    <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                                                    {boat.capacity ? `${boat.capacity} divers` : "-"}
+                                                </div>
+                                                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                                    <Database className="h-3.5 w-3.5" />
+                                                    {boat.tank_capacity ? `${boat.tank_capacity} tanks` : "-"}
+                                                </div>
+                                            </div>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant={boat.is_owned ? "default" : "outline"}>
-                                                {boat.is_owned ? "Owned" : "Rented"}
+                                            <Badge variant={boat.ownership_type === "Owned" ? "default" : "outline"}>
+                                                {boat.ownership_type}
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant={boat.active ? "default" : "secondary"}>
-                                                {boat.active ? "Active" : "Inactive"}
-                                            </Badge>
+                                            {boat.ownership_type === "Rented" ? (
+                                                <div className="flex flex-col gap-0.5 text-xs">
+                                                    <div className="flex items-center gap-1">
+                                                        <Calendar className="h-3 w-3" />
+                                                        {boat.rent_start_date ? format(new Date(boat.rent_start_date), "MMM d, yyyy") : "N/A"}
+                                                    </div>
+                                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                                        <Clock className="h-3 w-3" />
+                                                        {boat.rent_end_date ? format(new Date(boat.rent_end_date), "MMM d, yyyy") : "N/A"}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <span className="text-muted-foreground text-xs">N/A</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col gap-1">
+                                                <Badge variant={boat.active && !boat.is_rental_expired ? "default" : "secondary"}>
+                                                    {boat.active && !boat.is_rental_expired ? "Active" : "Inactive"}
+                                                </Badge>
+                                                {boat.is_rental_expired && (
+                                                    <Badge variant="destructive" className="text-[10px] py-0 h-4">
+                                                        Rental Expired
+                                                    </Badge>
+                                                )}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <DropdownMenu>
@@ -252,21 +286,48 @@ export default function BoatsPage() {
 
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div>
-                                        <span className="text-muted-foreground block text-xs">Capacity</span>
+                                        <span className="text-muted-foreground block text-xs">Person Capacity</span>
                                         <span>{boat.capacity ? `${boat.capacity} divers` : "-"}</span>
                                     </div>
                                     <div>
-                                        <span className="text-muted-foreground block text-xs">Ownership Type</span>
-                                        <Badge variant={boat.is_owned ? "default" : "outline"}>
-                                            {boat.is_owned ? "Owned" : "Rented"}
+                                        <span className="text-muted-foreground block text-xs">Tank Capacity</span>
+                                        <span>{boat.tank_capacity ? `${boat.tank_capacity} tanks` : "-"}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground block text-xs">Ownership</span>
+                                        <Badge variant={boat.ownership_type === "Owned" ? "default" : "outline"}>
+                                            {boat.ownership_type}
                                         </Badge>
                                     </div>
                                     <div>
                                         <span className="text-muted-foreground block text-xs">Status</span>
-                                        <Badge variant={boat.active ? "default" : "secondary"}>
-                                            {boat.active ? "Active" : "Inactive"}
-                                        </Badge>
+                                        <div className="flex flex-col gap-1">
+                                            <Badge variant={boat.active && !boat.is_rental_expired ? "default" : "secondary"} className="w-fit">
+                                                {boat.active && !boat.is_rental_expired ? "Active" : "Inactive"}
+                                            </Badge>
+                                            {boat.is_rental_expired && (
+                                                <Badge variant="destructive" className="w-fit text-[10px]">
+                                                    Rental Expired
+                                                </Badge>
+                                            )}
+                                        </div>
                                     </div>
+                                    {boat.ownership_type === "Rented" && (
+                                        <div className="col-span-2 pt-1 border-t border-dashed">
+                                            <span className="text-muted-foreground block text-xs mb-1">Rental Period</span>
+                                            <div className="flex items-center gap-4 text-xs">
+                                                <div className="flex items-center gap-1">
+                                                    <Calendar className="h-3 w-3" />
+                                                    {boat.rent_start_date ? format(new Date(boat.rent_start_date), "MMM d") : "?"}
+                                                </div>
+                                                <span>to</span>
+                                                <div className="flex items-center gap-1">
+                                                    <Clock className="h-3 w-3" />
+                                                    {boat.rent_end_date ? format(new Date(boat.rent_end_date), "MMM d, yyyy") : "?"}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </Card>
                         ))

@@ -66,7 +66,11 @@ export function DiveSiteForm({ initialData, diveSiteId }: DiveSiteFormProps) {
     const handleFileUpload = async (file: File) => {
         setUploading(true);
         try {
-            const result = await fileUploadService.upload(file);
+            const result = await fileUploadService.upload(file, {
+                entityType: 'dive_site',
+                entityId: diveSiteId ? String(diveSiteId) : 'temp',
+                category: 'dive-site-map'
+            });
             if (result.success) {
                 form.setValue('attachment', result.url);
                 setUploadedFile({ name: result.original_name || file.name, url: result.url });
@@ -311,30 +315,47 @@ export function DiveSiteForm({ initialData, diveSiteId }: DiveSiteFormProps) {
                                     <FormControl>
                                         <div className="space-y-4">
                                             {uploadedFile ? (
-                                                <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/50">
-                                                    <File className="h-5 w-5 text-muted-foreground" />
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-medium truncate">{uploadedFile.name}</p>
-                                                        {uploadedFile.url && (
-                                                            <a 
-                                                                href={uploadedFile.url} 
-                                                                target="_blank" 
-                                                                rel="noopener noreferrer"
-                                                                className="text-xs text-muted-foreground hover:underline"
-                                                            >
-                                                                View file
-                                                            </a>
-                                                        )}
+                                                <div className="flex flex-col gap-4 p-4 border rounded-lg bg-muted/50">
+                                                    <div className="flex items-center gap-4">
+                                                        <File className="h-5 w-5 text-muted-foreground" />
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium truncate">{uploadedFile.name}</p>
+                                                            {uploadedFile.url && (
+                                                                <a 
+                                                                    href={uploadedFile.url} 
+                                                                    target="_blank" 
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-xs text-muted-foreground hover:underline"
+                                                                >
+                                                                    View original file
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={removeFile}
+                                                            className="h-8 w-8"
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </Button>
                                                     </div>
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={removeFile}
-                                                        className="h-8 w-8"
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </Button>
+                                                    
+                                                    {uploadedFile.url && (
+                                                        uploadedFile.url.toLowerCase().endsWith('.jpg') || 
+                                                        uploadedFile.url.toLowerCase().endsWith('.jpeg') || 
+                                                        uploadedFile.url.toLowerCase().endsWith('.png') ||
+                                                        uploadedFile.url.toLowerCase().includes('image')
+                                                    ) && (
+                                                        <div className="relative aspect-video w-full max-w-md rounded-md overflow-hidden border bg-background">
+                                                            <img 
+                                                                src={uploadedFile.url} 
+                                                                alt="Dive site preview" 
+                                                                className="h-full w-full object-contain"
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ) : (
                                                 <div className="border-2 border-dashed rounded-lg p-6">

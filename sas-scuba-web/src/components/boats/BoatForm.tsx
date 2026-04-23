@@ -18,14 +18,19 @@ import { boatService, BoatFormData, Boat } from "@/lib/api/services/boat.service
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Ship, Users, Key } from "lucide-react";
+import { Ship, Users, Key, Calendar as CalendarIcon, Database } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
+import { cn } from "@/lib/utils";
 
 const boatSchema = z.object({
     name: z.string().min(1, "Boat name is required"),
     capacity: z.string().optional(),
+    tank_capacity: z.string().optional(),
     active: z.boolean().optional(),
-    is_owned: z.boolean().optional(),
+    ownership_type: z.enum(["Owned", "Rented"]),
+    rent_start_date: z.string().optional(),
+    rent_end_date: z.string().optional(),
 });
 
 interface BoatFormProps {
@@ -45,10 +50,15 @@ export function BoatForm({ initialData, boatId }: BoatFormProps) {
         defaultValues: {
             name: initialData?.name || "",
             capacity: initialData?.capacity ? String(initialData.capacity) : undefined,
+            tank_capacity: initialData?.tank_capacity ? String(initialData.tank_capacity) : undefined,
             active: initialData?.active ?? true,
-            is_owned: initialData?.is_owned ?? true,
+            ownership_type: initialData?.ownership_type || "Owned",
+            rent_start_date: initialData?.rent_start_date ? String(initialData.rent_start_date).split('T')[0] : undefined,
+            rent_end_date: initialData?.rent_end_date ? String(initialData.rent_end_date).split('T')[0] : undefined,
         },
     });
+
+    const ownershipType = form.watch("ownership_type");
 
     async function onSubmit(data: BoatFormValues) {
         setLoading(true);
@@ -56,8 +66,12 @@ export function BoatForm({ initialData, boatId }: BoatFormProps) {
             const payload: BoatFormData = {
                 name: data.name,
                 capacity: data.capacity && data.capacity !== "" ? parseInt(data.capacity) : undefined,
+                tank_capacity: data.tank_capacity && data.tank_capacity !== "" ? parseInt(data.tank_capacity) : undefined,
                 active: data.active ?? true,
-                is_owned: data.is_owned ?? true,
+                ownership_type: data.ownership_type,
+                is_owned: data.ownership_type === "Owned",
+                rent_start_date: data.ownership_type === "Rented" ? data.rent_start_date : undefined,
+                rent_end_date: data.ownership_type === "Rented" ? data.rent_end_date : undefined,
             };
 
             if (boatId) {
@@ -73,6 +87,11 @@ export function BoatForm({ initialData, boatId }: BoatFormProps) {
             setLoading(false);
         }
     }
+
+    const formatDateToString = (date: Date | null): string => {
+        if (!date) return "";
+        return date.toISOString().split('T')[0];
+    };
 
     return (
         <Form {...form}>
@@ -112,7 +131,7 @@ export function BoatForm({ initialData, boatId }: BoatFormProps) {
                                 name="capacity"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Capacity</FormLabel>
+                                        <FormLabel>Person Capacity</FormLabel>
                                         <FormControl>
                                             <div className="relative">
                                                 <Users className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -134,6 +153,33 @@ export function BoatForm({ initialData, boatId }: BoatFormProps) {
 
                             <FormField
                                 control={form.control}
+                                name="tank_capacity"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Tank Capacity</FormLabel>
+                                        <FormControl>
+                                            <div className="relative">
+                                                <Database className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                                <Input 
+                                                    type="number" 
+                                                    placeholder="e.g. 40" 
+                                                    className="pl-9" 
+                                                    {...field}
+                                                    value={field.value || ""}
+                                                    onChange={(e) => field.onChange(e.target.value)}
+                                                    min="0"
+                                                />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
                                 name="active"
                                 render={({ field }) => (
                                     <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
@@ -146,7 +192,7 @@ export function BoatForm({ initialData, boatId }: BoatFormProps) {
                                         <div className="space-y-1 leading-none">
                                             <FormLabel>Active</FormLabel>
                                             <p className="text-sm text-muted-foreground">
-                                                Check if this boat is currently active and available for use
+                                                Is this boat currently active?
                                             </p>
                                         </div>
                                     </FormItem>
@@ -156,7 +202,7 @@ export function BoatForm({ initialData, boatId }: BoatFormProps) {
 
                         <FormField
                             control={form.control}
-                            name="is_owned"
+                            name="ownership_type"
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Ownership Type</FormLabel>
@@ -164,26 +210,78 @@ export function BoatForm({ initialData, boatId }: BoatFormProps) {
                                         <div className="relative">
                                             <Key className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
                                             <Select
-                                                value={field.value ? "owned" : "rented"}
-                                                onValueChange={(value) => field.onChange(value === "owned")}
+                                                value={field.value}
+                                                onValueChange={field.onChange}
                                             >
                                                 <SelectTrigger className="pl-9">
                                                     <SelectValue placeholder="Select ownership type" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="owned">Owned</SelectItem>
-                                                    <SelectItem value="rented">Rented</SelectItem>
+                                                    <SelectItem value="Owned">Owned</SelectItem>
+                                                    <SelectItem value="Rented">Rented</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
                                     </FormControl>
-                                    <p className="text-sm text-muted-foreground">
-                                        Select whether this boat is owned by your dive center or rented from another party
-                                    </p>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
+
+                        {ownershipType === "Rented" && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 rounded-lg bg-slate-50 dark:bg-slate-900 border border-dashed border-primary/20">
+                                <FormField
+                                    control={form.control}
+                                    name="rent_start_date"
+                                    render={({ field }) => (
+                                        <FormItem className="flex flex-col">
+                                            <FormLabel>Rent Start Date</FormLabel>
+                                            <div className="relative">
+                                                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                                                <DatePicker
+                                                    selected={field.value}
+                                                    onChange={(date) => field.onChange(formatDateToString(date))}
+                                                    placeholderText="Select start date"
+                                                    wrapperClassName="w-full"
+                                                    className={cn(
+                                                        "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pl-9",
+                                                        !field.value && "text-muted-foreground"
+                                                    )}
+                                                />
+                                            </div>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="rent_end_date"
+                                    render={({ field }) => (
+                                        <FormItem className="flex flex-col">
+                                            <FormLabel>Rent End Date</FormLabel>
+                                            <div className="relative">
+                                                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                                                <DatePicker
+                                                    selected={field.value}
+                                                    onChange={(date) => field.onChange(formatDateToString(date))}
+                                                    placeholderText="Select end date"
+                                                    wrapperClassName="w-full"
+                                                    className={cn(
+                                                        "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pl-9",
+                                                        !field.value && "text-muted-foreground"
+                                                    )}
+                                                />
+                                            </div>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <div className="md:col-span-2 text-xs text-muted-foreground italic">
+                                    * Boat will automatically appear as Inactive once the Rent End Date is reached.
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 

@@ -5,8 +5,13 @@ export interface Boat {
     dive_center_id: number;
     name: string;
     capacity?: number;
+    tank_capacity?: number;
     active: boolean;
-    is_owned: boolean; // true = Owned, false = Rented
+    is_owned: boolean; // Keep for backward compatibility if needed
+    ownership_type: 'Owned' | 'Rented';
+    rent_start_date?: string;
+    rent_end_date?: string;
+    is_rental_expired?: boolean;
     created_at: string;
     updated_at: string;
 }
@@ -14,8 +19,12 @@ export interface Boat {
 export interface BoatFormData {
     name: string;
     capacity?: number;
+    tank_capacity?: number;
     active?: boolean;
     is_owned?: boolean;
+    ownership_type?: 'Owned' | 'Rented';
+    rent_start_date?: string;
+    rent_end_date?: string;
 }
 
 export const boatService = {

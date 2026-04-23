@@ -12,6 +12,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { fileService, FileInfo } from "@/lib/api/services/file.service";
+import { getMediaUrl } from "@/lib/api/client";
 import { Download, Trash2, File, Image as ImageIcon, FileText } from "lucide-react";
 import { safeFormatDate } from "@/lib/utils/date-format";
 import {
@@ -172,7 +173,7 @@ export function FileList({
                                             </div>
                                             {showPreview && file.mimeType.startsWith("image/") && (
                                                 <img
-                                                    src={file.url}
+                                                    src={getMediaUrl(file.url)}
                                                     alt={file.originalName}
                                                     className="mt-2 h-16 w-16 object-cover rounded"
                                                 />

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useDebouncedCallback } from "use-debounce";
 import { Header } from "@/components/layout/Header";
 import { EquipmentItem } from "@/lib/api/services/equipment-item.service";
+import { getMediaUrl } from "@/lib/api/client";
 import { Pagination } from "@/components/ui/pagination";
 import { useEquipmentItems, useDeleteEquipmentItem } from "@/lib/hooks/use-equipment-items";
 import { useEquipment } from "@/lib/hooks/use-equipment";
@@ -266,7 +267,7 @@ export default function EquipmentItemsPage() {
                                             {item.image_url ? (
                                                 <div className="relative w-12 h-12 rounded-md overflow-hidden border border-border">
                                                     <Image
-                                                        src={item.image_url}
+                                                        src={getMediaUrl(item.image_url)}
                                                         alt={item.equipment?.name || 'Equipment'}
                                                         fill
                                                         className="object-cover"
@@ -415,7 +416,7 @@ export default function EquipmentItemsPage() {
                                         {item.image_url ? (
                                             <div className="relative w-16 h-16 rounded-md overflow-hidden border border-border flex-shrink-0">
                                                 <Image
-                                                    src={item.image_url}
+                                                    src={getMediaUrl(item.image_url)}
                                                     alt={item.equipment?.name || 'Equipment'}
                                                     fill
                                                     className="object-cover"

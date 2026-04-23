@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TenantStorageUsage extends Model
 {
+    protected $table = 'tenant_storage_usage';
     protected $primaryKey = 'tenant_id';
     public $incrementing = false;
     protected $keyType = 'int';

@@ -66,7 +66,9 @@ export function EquipmentItemForm({ initialData, equipmentItemId }: EquipmentIte
                 // Add timestamp to bypass browser cache if needed
                 const data = await equipmentService.getAll({ per_page: 1000 });
                 const list = Array.isArray(data) ? data : (data as any).data || [];
-                setEquipment(list);
+                // Sort by name ASC
+                const sortedList = [...list].sort((a, b) => a.name.localeCompare(b.name));
+                setEquipment(sortedList);
                 
                 // If editing and initialData has equipment_id, load sizes and brands for that equipment
                 if (initialData?.equipment_id) {
@@ -92,8 +94,11 @@ export function EquipmentItemForm({ initialData, equipmentItemId }: EquipmentIte
             try {
                 const data = await locationService.getAll();
                 const list = Array.isArray(data) ? data : [];
-                // Filter to only show active locations
-                setLocations(list.filter((loc) => loc.active));
+                // Filter to only show active locations and sort by name
+                const filteredAndSorted = list
+                    .filter((loc) => loc.active)
+                    .sort((a, b) => a.name.localeCompare(b.name));
+                setLocations(filteredAndSorted);
             } catch (error) {
                 console.error("Failed to load locations", error);
             }
@@ -167,7 +172,7 @@ export function EquipmentItemForm({ initialData, equipmentItemId }: EquipmentIte
         // Update available sizes - handle both array and null/undefined
         const sizes = selectedEquipment.sizes;
         if (sizes && Array.isArray(sizes) && sizes.length > 0) {
-            setAvailableSizes(sizes);
+            setAvailableSizes([...sizes].sort());
         } else {
             setAvailableSizes([]);
         }
@@ -175,7 +180,7 @@ export function EquipmentItemForm({ initialData, equipmentItemId }: EquipmentIte
         // Update available brands - handle both array and null/undefined
         const brands = selectedEquipment.brands;
         if (brands && Array.isArray(brands) && brands.length > 0) {
-            setAvailableBrands(brands);
+            setAvailableBrands([...brands].sort());
         } else {
             setAvailableBrands([]);
         }
@@ -346,6 +351,7 @@ export function EquipmentItemForm({ initialData, equipmentItemId }: EquipmentIte
                                         <EquipmentItemImageUpload
                                             value={field.value}
                                             onChange={field.onChange}
+                                            equipmentItemId={equipmentItemId}
                                             onError={(error) => {
                                                 console.error('Image upload error:', error);
                                                 alert(error);

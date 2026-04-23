@@ -46,6 +46,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Eye, Check, X, Copy, ExternalLink, AlertCircle, User, Mail, Phone, Calendar, Award, Building, MapPin, Download, QrCode, Trash2, CheckCircle2 } from "lucide-react";
 import { preRegistrationService, PreRegistrationSubmission, PreRegistrationSubmissionDetail, PreRegistrationLink } from "@/lib/api/services/pre-registration.service";
+import { getFrontendUrl } from "@/lib/api/client";
 import { safeFormatDate } from "@/lib/utils/date-format";
 import dynamic from "next/dynamic";
 
@@ -485,11 +486,11 @@ export default function PreRegistrationsPage() {
                                             <TableRow key={link.id}>
                                                 <TableCell>
                                                     <div className="flex items-center gap-2">
-                                                        <Input value={link.url} readOnly className="font-mono text-sm" />
+                                                        <Input value={getFrontendUrl(link.url)} readOnly className="font-mono text-sm" />
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            onClick={() => copyLink(link.url)}
+                                                            onClick={() => copyLink(getFrontendUrl(link.url))}
                                                         >
                                                             <Copy className="h-4 w-4" />
                                                         </Button>
@@ -669,8 +670,8 @@ export default function PreRegistrationsPage() {
                             <div>
                                 <Label>Registration URL</Label>
                                 <div className="flex gap-2 mt-2">
-                                    <Input value={newLink.url} readOnly />
-                                    <Button variant="outline" onClick={() => copyLink(newLink.url)}>
+                                    <Input value={getFrontendUrl(newLink.url)} readOnly />
+                                    <Button variant="outline" onClick={() => copyLink(getFrontendUrl(newLink.url))}>
                                         <Copy className="h-4 w-4" />
                                     </Button>
                                 </div>
@@ -698,7 +699,7 @@ export default function PreRegistrationsPage() {
                                         }}
                                     >
                                         <QRCode
-                                            value={newLink.url}
+                                            value={getFrontendUrl(newLink.url)}
                                             size={256}
                                             level="H"
                                             style={{ height: "auto", maxWidth: "100%", width: "100%" }}
@@ -721,7 +722,7 @@ export default function PreRegistrationsPage() {
                                 <Button
                                     variant="outline"
                                     onClick={() => {
-                                        const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(newLink.url)}`;
+                                        const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(getFrontendUrl(newLink.url))}`;
                                         window.open(whatsappUrl, "_blank");
                                     }}
                                 >
@@ -730,7 +731,7 @@ export default function PreRegistrationsPage() {
                                 <Button
                                     variant="outline"
                                     onClick={() => {
-                                        window.location.href = `mailto:?body=${encodeURIComponent(newLink.url)}`;
+                                        window.location.href = `mailto:?body=${encodeURIComponent(getFrontendUrl(newLink.url))}`;
                                     }}
                                 >
                                     Share via Email
@@ -1065,14 +1066,14 @@ export default function PreRegistrationsPage() {
                                                 <TableCell className="font-medium">{index + 1}</TableCell>
                                                 <TableCell>
                                                     <div className="flex items-center gap-2">
-                                                        <Input value={link.url} readOnly className="font-mono text-sm" />
+                                                        <Input value={getFrontendUrl(link.url)} readOnly className="font-mono text-sm" />
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() => copyLink(link.url)}
+                                                        onClick={() => copyLink(getFrontendUrl(link.url))}
                                                     >
                                                         <Copy className="h-4 w-4" />
                                                     </Button>
@@ -1138,7 +1139,7 @@ export default function PreRegistrationsPage() {
                             {linkToDelete && (
                                 <>
                                     <br />
-                                    <strong className="font-mono text-xs mt-2 block">{linkToDelete.url}</strong>
+                                    <strong className="font-mono text-xs mt-2 block">{getFrontendUrl(linkToDelete.url)}</strong>
                                 </>
                             )}
                             and it will no longer be accessible.

@@ -6,13 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Upload, X, Image as ImageIcon } from "lucide-react";
 import { fileUploadService } from "@/lib/api/services/file-upload.service";
 import { resizeImage } from "@/lib/utils/image-resize";
+import { getMediaUrl } from "@/lib/api/client";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 interface EquipmentItemImageUploadProps {
     value?: string;
     onChange: (url: string) => void;
     onError?: (error: string) => void;
     disabled?: boolean;
+    equipmentItemId?: string | number;
+    compact?: boolean;
 }
 
 export function EquipmentItemImageUpload({
@@ -20,6 +24,8 @@ export function EquipmentItemImageUpload({
     onChange,
     onError,
     disabled = false,
+    equipmentItemId,
+    compact = false,
 }: EquipmentItemImageUploadProps) {
     const [uploading, setUploading] = useState(false);
     const [preview, setPreview] = useState<string | null>(value || null);
@@ -50,7 +56,12 @@ export function EquipmentItemImageUpload({
             const resizedFile = await resizeImage(file, 300);
             
             // Upload resized image
-            const result = await fileUploadService.upload(resizedFile, 'equipment-items');
+            const result = await fileUploadService.upload(resizedFile, {
+                folder: 'equipment-items',
+                entityType: 'equipment_item',
+                entityId: equipmentItemId ? String(equipmentItemId) : 'temp',
+                category: 'equipment-photo'
+            });
             
             if (result.success) {
                 onChange(result.url);
@@ -89,13 +100,79 @@ export function EquipmentItemImageUpload({
         fileInputRef.current?.click();
     };
 
+    if (compact) {
+        return (
+            <div className="flex items-center gap-2">
+                <div className="relative flex-shrink-0">
+                    <div className={cn(
+                        "relative w-10 h-10 rounded-md border border-border overflow-hidden bg-muted flex items-center justify-center",
+                        !preview && "border-dashed border-muted-foreground/25"
+                    )}>
+                        {preview ? (
+                            <Image
+                                src={getMediaUrl(preview)}
+                                alt="Thumb"
+                                fill
+                                className="object-cover"
+                                sizes="40px"
+                            />
+                        ) : (
+                            <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                        )}
+                        {uploading && (
+                            <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <Input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png"
+                        onChange={handleFileChange}
+                        disabled={disabled || uploading}
+                        className="hidden"
+                    />
+                    <div className="flex items-center gap-1">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={handleButtonClick}
+                            disabled={disabled || uploading}
+                            title={preview ? 'Replace image' : 'Upload image'}
+                        >
+                            <Upload className="h-4 w-4" />
+                        </Button>
+                        {preview && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={handleRemove}
+                                disabled={disabled || uploading}
+                                title="Remove image"
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-4">
             {preview ? (
                 <div className="relative inline-block">
                     <div className="relative w-40 h-40 rounded-lg border-2 border-border overflow-hidden bg-muted">
                         <Image
-                            src={preview}
+                            src={getMediaUrl(preview)}
                             alt="Equipment thumbnail"
                             fill
                             className="object-cover"

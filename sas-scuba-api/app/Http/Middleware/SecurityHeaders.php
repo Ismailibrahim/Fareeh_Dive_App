@@ -43,6 +43,7 @@ class SecurityHeaders
         ]);
         
         $connectSrc = "'self' " . implode(' ', $frontendUrls);
+        /* Disable CSP in development as it interferes with localhost/127.0.0.1/LAN switching
         $csp = "default-src 'self'; " .
                "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " .
                "style-src 'self' 'unsafe-inline'; " .
@@ -52,6 +53,7 @@ class SecurityHeaders
                "frame-ancestors 'none';";
         
         $response->headers->set('Content-Security-Policy', $csp);
+        */
         
         return $response;
     }

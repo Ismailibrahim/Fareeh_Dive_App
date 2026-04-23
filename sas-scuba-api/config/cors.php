@@ -19,16 +19,17 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => array_filter([
-        env('FRONTEND_URL', 'http://localhost:3000'),
-        env('APP_URL', null),
-        // Support multiple origins from environment variable (comma-separated)
-        ...(env('CORS_ALLOWED_ORIGINS') ? explode(',', env('CORS_ALLOWED_ORIGINS')) : []),
-    ]),
+    'allowed_origins' => [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://192.168.1.185:3000',
+        'http://localhost:8000',
+        'http://127.0.0.1:8000',
+        'http://192.168.1.185:8000',
+    ],
 
     'allowed_origins_patterns' => [
-        // Allow any subdomain of the main domain
-        env('CORS_ALLOWED_ORIGIN_PATTERN', null),
+        '#^https?://(192\.168\.|10\.|172\.)\d{1,3}\.\d{1,3}(:\d+)?$#',
     ],
 
     'allowed_headers' => ['*'],

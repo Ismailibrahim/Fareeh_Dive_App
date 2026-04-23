@@ -19,16 +19,40 @@ class DiveSiteController extends Controller
         $user = $request->user();
         $diveCenterId = $user->dive_center_id;
         
-        if ($diveCenterId) {
-            // Cache dive sites for 30 minutes (1800 seconds)
-            $cacheKey = "dive_sites_{$diveCenterId}";
-            return Cache::remember($cacheKey, 1800, function () use ($diveCenterId) {
+        $perPage = $request->get('per_page', 20);
+        $search = $request->get('search');
+        $page = $request->get('page', 1);
+        
+        // Get cache version
+        $version = Cache::get("dive_sites_{$diveCenterId}_version", 1);
+        
+        // Cache key based on parameters and version
+        $cacheKey = "dive_sites_{$diveCenterId}_v{$version}_{$perPage}_p{$page}_" . md5($search);
+        $shouldCache = empty($search);
+        
+        if ($shouldCache && $diveCenterId) {
+            return Cache::remember($cacheKey, 1800, function () use ($diveCenterId, $perPage) {
                 return DiveSite::where('dive_center_id', $diveCenterId)
                     ->orderBy('name')
-                    ->paginate(20);
+                    ->paginate($perPage);
             });
         }
-        return DiveSite::paginate(20);
+        
+        $query = DiveSite::query();
+        
+        if ($diveCenterId) {
+            $query->where('dive_center_id', $diveCenterId);
+        }
+        
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('location', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+        
+        return $query->orderBy('name')->paginate($perPage);
     }
 
     /**
@@ -52,8 +76,8 @@ class DiveSiteController extends Controller
 
         $diveSite = DiveSite::create($validated);
         
-        // Clear dive sites cache for this dive center
-        Cache::forget("dive_sites_{$diveSite->dive_center_id}");
+        // Increment cache version to invalidate all paginated results for this dive center
+        Cache::increment("dive_sites_{$diveSite->dive_center_id}_version");
         
         return response()->json($diveSite, 201);
     }
@@ -90,8 +114,8 @@ class DiveSiteController extends Controller
 
         $diveSite->update($validated);
         
-        // Clear dive sites cache for this dive center
-        Cache::forget("dive_sites_{$diveSite->dive_center_id}");
+        // Increment cache version to invalidate all paginated results for this dive center
+        Cache::increment("dive_sites_{$diveSite->dive_center_id}_version");
         
         return response()->json($diveSite);
     }
@@ -107,8 +131,8 @@ class DiveSiteController extends Controller
         $diveCenterId = $diveSite->dive_center_id;
         $diveSite->delete();
         
-        // Clear dive sites cache for this dive center
-        Cache::forget("dive_sites_{$diveCenterId}");
+        // Increment cache version to invalidate all paginated results for this dive center
+        Cache::increment("dive_sites_{$diveCenterId}_version");
         
         return response()->noContent();
     }

@@ -70,7 +70,7 @@ class EquipmentController extends Controller
                 }
             }
 
-            $equipment = $query->with('equipmentItems')->paginate($perPage);
+            $equipment = $query->with('equipmentItems')->orderBy('name')->paginate($perPage);
         }
 
         return $equipment;
@@ -81,7 +81,8 @@ class EquipmentController extends Controller
      */
     public function store(Request $request)
     {
-        $request->merge(['dive_center_id' => $request->user()->dive_center_id]);
+        $user = $request->user();
+        $request->merge(['dive_center_id' => $user->dive_center_id]);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',

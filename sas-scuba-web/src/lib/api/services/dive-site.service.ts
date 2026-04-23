@@ -27,8 +27,8 @@ export interface DiveSiteFormData {
 }
 
 export const diveSiteService = {
-    getAll: async (page = 1) => {
-        const response = await apiClient.get<{ data: DiveSite[]; meta: any }>(`/api/v1/dive-sites?page=${page}`);
+    getAll: async (page = 1, search = "") => {
+        const response = await apiClient.get<{ data: DiveSite[]; meta: any }>(`/api/v1/dive-sites?page=${page}&search=${encodeURIComponent(search)}`);
         return response.data;
     },
 

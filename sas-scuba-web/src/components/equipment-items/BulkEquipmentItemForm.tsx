@@ -11,6 +11,7 @@ import {
     FormItem,
     FormLabel,
     FormMessage,
+    FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,6 +25,7 @@ import { Package, Ruler, Hash, CheckCircle, Barcode, Tag, Palette, CalendarIcon,
 import { Checkbox } from "@/components/ui/checkbox";
 import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
 import { cn } from "@/lib/utils";
+import { EquipmentItemImageUpload } from "./EquipmentItemImageUpload";
 import {
     Table,
     TableBody,
@@ -44,6 +46,7 @@ const templateSchema = z.object({
     service_interval_days: z.string().optional(),
     last_service_date: z.string().optional(),
     next_service_date: z.string().optional(),
+    image_url: z.string().optional(),
 });
 
 const itemRowSchema = z.object({
@@ -107,7 +110,9 @@ export function BulkEquipmentItemForm() {
             try {
                 const data = await equipmentService.getAll();
                 const list = Array.isArray(data) ? data : (data as any).data || [];
-                setEquipment(list);
+                // Sort by name ASC
+                const sortedList = [...list].sort((a, b) => a.name.localeCompare(b.name));
+                setEquipment(sortedList);
             } catch (error) {
                 console.error("Failed to load equipment", error);
             }
@@ -120,7 +125,11 @@ export function BulkEquipmentItemForm() {
             try {
                 const data = await locationService.getAll();
                 const list = Array.isArray(data) ? data : [];
-                setLocations(list.filter((loc) => loc.active));
+                // Sort by name ASC
+                const sortedList = list
+                    .filter((loc) => loc.active)
+                    .sort((a, b) => a.name.localeCompare(b.name));
+                setLocations(sortedList);
             } catch (error) {
                 console.error("Failed to load locations", error);
             }
@@ -140,6 +149,7 @@ export function BulkEquipmentItemForm() {
                 service_interval_days: "",
                 last_service_date: "",
                 next_service_date: "",
+                image_url: "",
             },
             items: [],
         },
@@ -161,12 +171,12 @@ export function BulkEquipmentItemForm() {
         if (selectedEquipmentId) {
             const selectedEquipment = equipment.find((eq) => String(eq.id) === selectedEquipmentId);
             if (selectedEquipment?.sizes && selectedEquipment.sizes.length > 0) {
-                setAvailableSizes(selectedEquipment.sizes);
+                setAvailableSizes([...selectedEquipment.sizes].sort());
             } else {
                 setAvailableSizes([]);
             }
             if (selectedEquipment?.brands && selectedEquipment.brands.length > 0) {
-                setAvailableBrands(selectedEquipment.brands);
+                setAvailableBrands([...selectedEquipment.brands].sort());
             } else {
                 setAvailableBrands([]);
             }
@@ -221,7 +231,7 @@ export function BulkEquipmentItemForm() {
             inventory_code: "",
             brand: "",
             color: "",
-            image_url: "",
+            image_url: form.getValues('template.image_url') || "",
         });
     };
 
@@ -406,6 +416,30 @@ export function BulkEquipmentItemForm() {
                                             <SelectItem value="Maintenance">Maintenance</SelectItem>
                                         </SelectContent>
                                     </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <FormField
+                            control={form.control}
+                            name="template.image_url"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Template Image</FormLabel>
+                                    <FormControl>
+                                        <EquipmentItemImageUpload
+                                            value={field.value}
+                                            onChange={field.onChange}
+                                            onError={(error) => {
+                                                console.error('Image upload error:', error);
+                                                alert(error);
+                                            }}
+                                        />
+                                    </FormControl>
+                                    <FormDescription>
+                                        This image will be used for all new items by default.
+                                    </FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -721,7 +755,15 @@ export function BulkEquipmentItemForm() {
                                                             render={({ field }) => (
                                                                 <FormItem>
                                                                     <FormControl>
-                                                                        <Input placeholder="Image URL" {...field} />
+                                                                        <EquipmentItemImageUpload
+                                                                            value={field.value}
+                                                                            onChange={field.onChange}
+                                                                            compact
+                                                                            onError={(error) => {
+                                                                                console.error('Image upload error:', error);
+                                                                                alert(error);
+                                                                            }}
+                                                                        />
                                                                     </FormControl>
                                                                     <FormMessage />
                                                                 </FormItem>
