@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { priceListService, PriceListFormData, PriceList } from "@/lib/api/services/price-list.service";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,7 @@ import { FileText, DollarSign } from "lucide-react";
 const priceListSchema = z.object({
     name: z.string().min(1, "Name is required").max(255, "Name must be less than 255 characters"),
     notes: z.string().optional(),
+    is_default: z.boolean().default(false),
 });
 
 interface PriceListFormProps {
@@ -38,6 +40,7 @@ export function PriceListForm({ initialData, priceListId, onSuccess }: PriceList
         defaultValues: {
             name: initialData?.name || "",
             notes: initialData?.notes || "",
+            is_default: initialData?.is_default || false,
         },
     });
 
@@ -126,6 +129,28 @@ export function PriceListForm({ initialData, priceListId, onSuccess }: PriceList
                                         />
                                     </FormControl>
                                     <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="is_default"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                                    <FormControl>
+                                        <Checkbox
+                                            checked={field.value}
+                                            onCheckedChange={field.onChange}
+                                        />
+                                    </FormControl>
+                                    <div className="space-y-1 leading-none">
+                                        <FormLabel>
+                                            Set as Default Price List
+                                        </FormLabel>
+                                        <CardDescription>
+                                            This list will be used automatically for customers who don't have a specific price list assigned.
+                                        </CardDescription>
+                                    </div>
                                 </FormItem>
                             )}
                         />

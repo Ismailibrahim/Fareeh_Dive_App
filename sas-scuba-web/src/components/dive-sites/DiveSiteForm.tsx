@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MapPin, Ruler, FileText, Navigation, Users, Upload, X, File } from "lucide-react";
 import { fileUploadService } from "@/lib/api/services/file-upload.service";
+import { getMediaUrl } from "@/lib/api/client";
 
 const diveSiteSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters."),
@@ -119,7 +120,7 @@ export function DiveSiteForm({ initialData, diveSiteId }: DiveSiteFormProps) {
                 longitude: data.longitude ? parseFloat(data.longitude) : undefined,
                 location: data.location || undefined,
                 pax_capacity: data.pax_capacity ? parseInt(data.pax_capacity) : undefined,
-                attachment: data.attachment || undefined,
+                attachment: data.attachment || null,
             };
 
             if (diveSiteId) {
@@ -322,7 +323,7 @@ export function DiveSiteForm({ initialData, diveSiteId }: DiveSiteFormProps) {
                                                             <p className="text-sm font-medium truncate">{uploadedFile.name}</p>
                                                             {uploadedFile.url && (
                                                                 <a 
-                                                                    href={uploadedFile.url} 
+                                                                    href={getMediaUrl(uploadedFile.url)} 
                                                                     target="_blank" 
                                                                     rel="noopener noreferrer"
                                                                     className="text-xs text-muted-foreground hover:underline"
@@ -350,7 +351,7 @@ export function DiveSiteForm({ initialData, diveSiteId }: DiveSiteFormProps) {
                                                     ) && (
                                                         <div className="relative aspect-video w-full max-w-md rounded-md overflow-hidden border bg-background">
                                                             <img 
-                                                                src={uploadedFile.url} 
+                                                                src={getMediaUrl(uploadedFile.url)} 
                                                                 alt="Dive site preview" 
                                                                 className="h-full w-full object-contain"
                                                             />

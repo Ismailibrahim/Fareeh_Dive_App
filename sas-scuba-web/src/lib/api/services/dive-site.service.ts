@@ -23,7 +23,7 @@ export interface DiveSiteFormData {
     longitude?: number;
     location?: string;
     pax_capacity?: number;
-    attachment?: string;
+    attachment?: string | null;
 }
 
 export const diveSiteService = {

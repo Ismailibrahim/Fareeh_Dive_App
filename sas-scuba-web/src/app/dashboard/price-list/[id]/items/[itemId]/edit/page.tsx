@@ -32,6 +32,7 @@ import { unitService, Unit } from "@/lib/api/services/unit.service";
 import { Tag, DollarSign, Package, Calendar } from "lucide-react";
 import { PriceTierManager } from "@/components/price-list/PriceTierManager";
 import { DatePicker } from "@/components/ui/date-picker";
+import { taxService, Tax } from "@/lib/api/services/tax.service";
 
 const schema = z.object({
     service_type: z.string().min(1, "Service type is required"),
@@ -49,7 +50,7 @@ const schema = z.object({
     valid_until: z.string().optional(),
     applicable_to: z.enum(['ALL', 'MEMBER', 'NON_MEMBER', 'GROUP', 'CORPORATE']).optional(),
     unit: z.string().optional(),
-    tax_percentage: z.number().min(0).max(100).optional(),
+    tax_percentage: z.coerce.number().min(0).max(100).optional(),
     tax_inclusive: z.boolean().optional(),
     service_charge_inclusive: z.boolean().optional(),
     sort_order: z.number().optional(),
@@ -79,6 +80,7 @@ export default function EditPriceListItemPage() {
     const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
     const [equipmentItems, setEquipmentItems] = useState<EquipmentItem[]>([]);
     const [units, setUnits] = useState<Unit[]>([]);
+    const [taxes, setTaxes] = useState<Tax[]>([]);
 
     const form = useForm<z.infer<typeof schema>>({
         resolver: zodResolver(schema),
@@ -103,13 +105,21 @@ export default function EditPriceListItemPage() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [priceListData, serviceTypesData, unitsData, itemData] = await Promise.all([
+                const [priceListData, serviceTypesData, unitsData, itemData, taxesData] = await Promise.all([
                     priceListService.getById(priceListId),
                     serviceTypeService.getAll(),
                     unitService.getAll(),
                     priceListItemService.getById(itemId),
+                    taxService.getAll(),
                 ]);
                 setPriceList(priceListData);
+                
+                // Only keep T-GST/TGST taxes
+                const tgstTaxes = taxesData.filter(t => 
+                    t.name.toUpperCase().includes('T-GST') || 
+                    t.name.toUpperCase().includes('TGST')
+                );
+                setTaxes(tgstTaxes);
                 
                 // Filter to only show price list relevant service types
                 const priceListServiceTypes = [
@@ -146,8 +156,8 @@ export default function EditPriceListItemPage() {
                     equipment_item_id: itemData.equipment_item_id || undefined,
                     name: itemData.name || "",
                     description: itemData.description || "",
-                    price: itemData.price || 0,
-                    base_price: itemData.base_price || itemData.price || undefined,
+                    price: itemData.price ? Math.round(itemData.price * 100) / 100 : 0,
+                    base_price: itemData.base_price ? Math.round(itemData.base_price * 100) / 100 : (itemData.price ? Math.round(itemData.price * 100) / 100 : undefined),
                     pricing_model: itemData.pricing_model || 'SINGLE',
                     min_dives: itemData.min_dives || 1,
                     max_dives: itemData.max_dives || 1,
@@ -156,7 +166,7 @@ export default function EditPriceListItemPage() {
                     valid_until: itemData.valid_until || undefined,
                     applicable_to: itemData.applicable_to || 'ALL',
                     unit: itemData.unit || undefined,
-                    tax_percentage: itemData.tax_percentage || undefined,
+                    tax_percentage: itemData.tax_percentage ? Math.round(itemData.tax_percentage * 100) / 100 : undefined,
                     tax_inclusive: itemData.tax_inclusive ?? false,
                     service_charge_inclusive: itemData.service_charge_inclusive ?? false,
                     sort_order: itemData.sort_order || 0,
@@ -437,7 +447,7 @@ export default function EditPriceListItemPage() {
                                                             <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                                             <Input
                                                                 type="number"
-                                                                step="0.01"
+                                                                step="any"
                                                                 min="0"
                                                                 placeholder="0.00"
                                                                 className="pl-9"
@@ -482,28 +492,33 @@ export default function EditPriceListItemPage() {
                                         />
                                     </div>
 
-                                    <FormField
-                                        control={form.control}
-                                        name="tax_percentage"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Tax Percentage (%)</FormLabel>
-                                                <FormControl>
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        max="100"
-                                                        placeholder="0.00"
-                                                        {...field}
-                                                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
-                                                        value={field.value || ""}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                        <FormField
+                                            control={form.control}
+                                            name="tax_percentage"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>T-GST (%)</FormLabel>
+                                                    <FormControl>
+                                                        <Input
+                                                            type="number"
+                                                            step="any"
+                                                            min="0"
+                                                            max="100"
+                                                            placeholder="0.00"
+                                                            {...field}
+                                                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                                                            value={field.value || ""}
+                                                            readOnly
+                                                            className="bg-slate-100 dark:bg-slate-800 cursor-not-allowed"
+                                                        />
+                                                    </FormControl>
+                                                    <FormDescription>
+                                                        T-GST is fixed based on your system settings.
+                                                    </FormDescription>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
 
                                     {/* Dive Pricing Configuration */}
                                     <div className="space-y-4 border-t pt-4">

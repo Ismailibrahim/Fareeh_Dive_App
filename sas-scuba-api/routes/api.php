@@ -88,6 +88,8 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('dive-sites', \App\Http\Controllers\Api\V1\DiveSiteController::class);
         Route::apiResource('dive-logs', \App\Http\Controllers\Api\V1\DiveLogController::class);
         Route::get('customers/{customer}/dive-logs', [\App\Http\Controllers\Api\V1\DiveLogController::class, 'indexByCustomer']);
+        Route::get('customers/{customer}/equipment-request', [\App\Http\Controllers\Api\V1\CustomerEquipmentRequestController::class, 'show']);
+        Route::put('customers/{customer}/equipment-request', [\App\Http\Controllers\Api\V1\CustomerEquipmentRequestController::class, 'update']);
         Route::apiResource('equipment-items.service-history', \App\Http\Controllers\Api\V1\EquipmentServiceHistoryController::class)->except(['index']);
         Route::get('equipment-items/{equipmentItem}/service-history', [\App\Http\Controllers\Api\V1\EquipmentServiceHistoryController::class, 'index']);
         Route::post('equipment-items/bulk-service', [\App\Http\Controllers\Api\V1\EquipmentServiceHistoryController::class, 'bulkStore']);
@@ -98,6 +100,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('relationships', \App\Http\Controllers\Api\V1\RelationshipController::class);
         Route::apiResource('agencies', \App\Http\Controllers\Api\V1\AgencyController::class);
         Route::apiResource('service-providers', \App\Http\Controllers\Api\V1\ServiceProviderController::class);
+        Route::apiResource('settings/equipment-types', \App\Http\Controllers\Api\V1\Settings\EquipmentTypeController::class);
         Route::apiResource('categories', \App\Http\Controllers\Api\V1\CategoryController::class);
         Route::apiResource('locations', \App\Http\Controllers\Api\V1\LocationController::class);
         Route::apiResource('suppliers', \App\Http\Controllers\Api\V1\SupplierController::class);
@@ -135,11 +138,11 @@ Route::prefix('v1')->group(function () {
         Route::post('/price-lists/{id}/duplicate', [\App\Http\Controllers\Api\V1\PriceListController::class, 'duplicate']);
         
         // Price list items routes
-        Route::apiResource('price-list-items', \App\Http\Controllers\Api\V1\PriceListItemController::class);
+        Route::get('/price-list-items/suggest-price', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'suggestPrice']);
+        Route::apiResource('price-list-items', \App\Http\Controllers\Api\V1\PriceListItemController::class)->parameters(['price-list-items' => 'priceListItem']);
         Route::post('/price-list-items/bulk', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'bulkUpdate']);
         Route::post('/price-lists/{priceListId}/items/bulk-adjust-prices', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'bulkAdjustPrices']);
         Route::post('/price-lists/{priceListId}/items/bulk-update-tax-service', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'bulkUpdateTaxService']);
-        Route::get('/price-list-items/suggest-price', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'suggestPrice']);
         
         // Price list item tiers routes
         Route::get('/price-list-items/{priceListItem}/tiers', [\App\Http\Controllers\Api\V1\PriceListItemController::class, 'getTiers']);
@@ -163,6 +166,7 @@ Route::prefix('v1')->group(function () {
         Route::post('package-bookings/{packageBooking}/create-bookings', [\App\Http\Controllers\Api\V1\PackageBookingController::class, 'createBookings']);
         Route::apiResource('invoices', \App\Http\Controllers\Api\V1\InvoiceController::class);
         Route::post('invoices/generate-from-booking', [\App\Http\Controllers\Api\V1\InvoiceController::class, 'generateFromBooking']);
+        Route::post('invoices/generate-bulk', [\App\Http\Controllers\Api\V1\InvoiceController::class, 'generateFromMultipleBookings']);
         Route::post('invoices/{invoice}/add-damage-charge', [\App\Http\Controllers\Api\V1\InvoiceController::class, 'addDamageCharge']);
         Route::post('invoices/{invoice}/add-item', [\App\Http\Controllers\Api\V1\InvoiceController::class, 'addItem']);
         Route::delete('invoices/{invoice}/items/{invoiceItem}', [\App\Http\Controllers\Api\V1\InvoiceController::class, 'deleteItem']);
@@ -185,6 +189,9 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('waiver-signatures', \App\Http\Controllers\Api\V1\WaiverSignatureController::class);
         Route::post('waiver-signatures/{signature}/verify', [\App\Http\Controllers\Api\V1\WaiverSignatureController::class, 'verify']);
         Route::post('waiver-signatures/{signature}/invalidate', [\App\Http\Controllers\Api\V1\WaiverSignatureController::class, 'invalidate']);
+        
+        // Dashboard routes
+        Route::get('/dashboard/stats', [\App\Http\Controllers\Api\V1\DashboardController::class, 'stats']);
         
         // Customer waiver status routes
         Route::get('customers/{customer}/waivers/status', [\App\Http\Controllers\Api\V1\WaiverSignatureController::class, 'getCustomerWaiverStatus']);

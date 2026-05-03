@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Header } from "@/components/layout/Header";
 import { BookingEquipment, bookingEquipmentService } from "@/lib/api/services/booking-equipment.service";
 import {
@@ -13,10 +13,11 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, MoreHorizontal, Calendar, Plus, Package, DollarSign, ShoppingBasket, Eye } from "lucide-react";
+import { Search, MoreHorizontal, Calendar, Plus, Package, DollarSign, ShoppingBasket, Eye, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -38,9 +39,14 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function BookingEquipmentPage() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const bookingIdParam = searchParams.get('booking_id');
+    const searchParam = searchParams.get('search');
+
     const [bookingEquipment, setBookingEquipment] = useState<BookingEquipment[]>([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState("");
+    const [searchTerm, setSearchTerm] = useState(searchParam || "");
 
     // Delete state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -91,14 +97,29 @@ export default function BookingEquipmentPage() {
         }
     };
 
-    const filteredBookingEquipment = bookingEquipment.filter(be =>
-        be.booking?.customer?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        be.equipment_item?.equipment?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        be.equipment_item?.size?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        be.basket?.basket_no?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        be.customer_equipment_brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        be.customer_equipment_type?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const clearFilters = () => {
+        router.push('/dashboard/booking-equipment');
+        setSearchTerm("");
+    };
+
+    const filteredBookingEquipment = useMemo(() => {
+        return bookingEquipment.filter(be => {
+            // Filter by booking ID if provided in URL
+            if (bookingIdParam && String(be.booking_id) !== bookingIdParam) {
+                return false;
+            }
+
+            const searchLower = searchTerm.toLowerCase();
+            return (
+                be.booking?.customer?.full_name?.toLowerCase().includes(searchLower) ||
+                be.equipment_item?.equipment?.name?.toLowerCase().includes(searchLower) ||
+                be.equipment_item?.size?.toLowerCase().includes(searchLower) ||
+                be.basket?.basket_no?.toLowerCase().includes(searchLower) ||
+                be.customer_equipment_brand?.toLowerCase().includes(searchLower) ||
+                be.customer_equipment_type?.toLowerCase().includes(searchLower)
+            );
+        });
+    }, [bookingEquipment, searchTerm, bookingIdParam]);
 
     return (
         <div className="flex flex-col min-h-screen">

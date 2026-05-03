@@ -101,6 +101,7 @@ class CustomerController extends Controller
             'departure_flight_time' => 'nullable|string|regex:/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/',
             'departure_to' => 'nullable|string|max:255',
             'agent_id' => 'nullable|exists:agents,id',
+            'price_list_id' => 'nullable|exists:price_lists,id',
             'dive_center_id' => 'required|exists:dive_centers,id',
         ]);
 
@@ -129,7 +130,7 @@ class CustomerController extends Controller
         // Verify customer belongs to user's dive center
         $this->authorizeDiveCenterAccess($customer, 'Unauthorized access to this customer');
         
-        $customer->load(['emergencyContacts', 'agent:id,agent_name']);
+        $customer->load(['emergencyContacts', 'agent:id,agent_name', 'priceList:id,name']);
         return $customer;
     }
 
@@ -171,6 +172,7 @@ class CustomerController extends Controller
                 }],
                 'departure_to' => 'nullable|string|max:255',
                 'agent_id' => 'nullable|exists:agents,id',
+                'price_list_id' => 'nullable|exists:price_lists,id',
             ]);
 
             // Validate agent belongs to same dive center if provided

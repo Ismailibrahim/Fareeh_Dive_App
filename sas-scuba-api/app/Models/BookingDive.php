@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class BookingDive extends Model
 {
     protected $fillable = [
+        'parent_id',
         'booking_id',
         'dive_site_id',
         'boat_id',
@@ -96,6 +97,16 @@ class BookingDive extends Model
     public function getInvoiceItem()
     {
         return $this->invoiceItems()->first();
+    }
+
+    public function parent()
+    {
+        return $this->belongsTo(BookingDive::class, 'parent_id');
+    }
+
+    public function additionalItems()
+    {
+        return $this->hasMany(BookingDive::class, 'parent_id');
     }
 }
 

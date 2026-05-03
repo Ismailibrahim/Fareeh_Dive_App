@@ -18,11 +18,12 @@ import { customerService, CustomerFormData, Customer } from "@/lib/api/services/
 import { nationalityService, Nationality } from "@/lib/api/services/nationality.service";
 import { countryService, Country } from "@/lib/api/services/country.service";
 import { agentService, Agent } from "@/lib/api/services/agent.service";
+import { priceListService, PriceList } from "@/lib/api/services/price-list.service";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { User, Mail, Phone, CreditCard, Flag, MapPin, Globe, Plane, Building2 } from "lucide-react";
+import { User, Mail, Phone, CreditCard, Flag, MapPin, Globe, Plane, Building2, Receipt } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { safeParseDate } from "@/lib/utils/date-format";
 
@@ -43,6 +44,7 @@ const customerSchema = z.object({
     departure_flight_time: z.string().optional(),
     departure_to: z.string().optional(),
     agent_id: z.string().optional().or(z.literal("")),
+    price_list_id: z.string().optional().or(z.literal("")),
 });
 
 // Form values type (matches schema)
@@ -62,6 +64,8 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
     const [loadingCountries, setLoadingCountries] = useState(true);
     const [agents, setAgents] = useState<Agent[]>([]);
     const [loadingAgents, setLoadingAgents] = useState(true);
+    const [priceLists, setPriceLists] = useState<PriceList[]>([]);
+    const [loadingPriceLists, setLoadingPriceLists] = useState(true);
 
     useEffect(() => {
         const fetchNationalities = async () => {
@@ -106,6 +110,20 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
         fetchAgents();
     }, []);
 
+    useEffect(() => {
+        const fetchPriceLists = async () => {
+            try {
+                const data = await priceListService.getAll(1, 100);
+                setPriceLists(data.data || []);
+            } catch (error) {
+                console.error("Failed to fetch price lists", error);
+            } finally {
+                setLoadingPriceLists(false);
+            }
+        };
+        fetchPriceLists();
+    }, []);
+
     // Helper function to convert date string to YYYY-MM-DD format
     const formatDateForPicker = (dateString: string | undefined): string => {
         if (!dateString) return "";
@@ -136,6 +154,7 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
             departure_flight_time: initialData?.departure_flight_time || "",
             departure_to: initialData?.departure_to || "",
             agent_id: initialData?.agent_id ? String(initialData.agent_id) : "",
+            price_list_id: initialData?.price_list_id ? String(initialData.price_list_id) : "",
         },
     });
 
@@ -156,6 +175,7 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
                 gender: data.gender || undefined,
                 date_of_birth: data.date_of_birth || undefined,
                 agent_id: data.agent_id && data.agent_id !== "" && data.agent_id !== "none" ? Number(data.agent_id) : undefined,
+                price_list_id: data.price_list_id && data.price_list_id !== "" && data.price_list_id !== "none" ? Number(data.price_list_id) : undefined,
             };
             
             if (customerId) {
@@ -239,6 +259,48 @@ export function CustomerForm({ initialData, customerId }: CustomerFormProps) {
                                                 {agents.map((agent) => (
                                                     <SelectItem key={agent.id} value={String(agent.id)}>
                                                         {agent.agent_name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        )}
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="price_list_id"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Default Price List</FormLabel>
+                                    <Select 
+                                        onValueChange={(value) => {
+                                            field.onChange(value === "none" ? "" : value);
+                                        }} 
+                                        value={field.value === "" ? "none" : (field.value && field.value !== "" ? field.value : undefined)}
+                                        disabled={loadingPriceLists || priceLists.length === 0}
+                                    >
+                                        <FormControl>
+                                            <div className="relative">
+                                                <Receipt className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                                                <SelectTrigger className="pl-9">
+                                                    <SelectValue placeholder={
+                                                        loadingPriceLists 
+                                                            ? "Loading..." 
+                                                            : priceLists.length === 0 
+                                                            ? "No price lists available" 
+                                                            : "Select a price list (optional)"
+                                                    } />
+                                                </SelectTrigger>
+                                            </div>
+                                        </FormControl>
+                                        {priceLists.length > 0 && (
+                                            <SelectContent>
+                                                <SelectItem value="none">None</SelectItem>
+                                                {priceLists.map((priceList) => (
+                                                    <SelectItem key={priceList.id} value={String(priceList.id)}>
+                                                        {priceList.name}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>

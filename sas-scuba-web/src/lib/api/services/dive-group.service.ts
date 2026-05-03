@@ -41,6 +41,7 @@ export interface BookGroupRequest {
     booking_date?: string;
     number_of_divers?: number;
     status?: 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled';
+    extra_dive_site_ids?: number[];
 }
 
 export interface GenerateInvoiceRequest {

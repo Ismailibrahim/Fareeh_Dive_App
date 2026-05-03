@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Pagination } from "@/components/ui/pagination";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { formatPrice } from "@/lib/utils/currency";
 import {
@@ -54,6 +55,15 @@ export function PriceListItemTable({
     const [itemToDelete, setItemToDelete] = useState<PriceListItem | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [internalSelectedItems, setInternalSelectedItems] = useState<number[]>(selectedItems);
+    
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 15;
+
+    // Reset page when items change significantly (e.g. filtering)
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [items.length]);
 
     // Sync internal state with prop
     useEffect(() => {
@@ -101,6 +111,9 @@ export function PriceListItemTable({
         }
     };
 
+    // Calculate pagination
+    const totalPages = Math.ceil(items.length / itemsPerPage);
+    const paginatedItems = items.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
     return (
         <>
@@ -135,7 +148,7 @@ export function PriceListItemTable({
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            items.map((item) => (
+                            paginatedItems.map((item) => (
                                 <TableRow key={item.id}>
                                     <TableCell>
                                         <Checkbox
@@ -195,6 +208,18 @@ export function PriceListItemTable({
                     </TableBody>
                 </Table>
             </div>
+            
+            {items.length > 0 && totalPages > 1 && (
+                <div className="mt-4">
+                    <Pagination 
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                        itemsPerPage={itemsPerPage}
+                        totalItems={items.length}
+                    />
+                </div>
+            )}
 
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <AlertDialogContent>

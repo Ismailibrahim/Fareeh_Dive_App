@@ -5,6 +5,7 @@ export interface PriceList {
     dive_center_id: number;
     name: string;
     notes?: string;
+    is_default: boolean;
     created_at: string;
     updated_at: string;
     items?: PriceListItem[];
@@ -14,6 +15,7 @@ export interface PriceList {
 export interface PriceListFormData {
     name: string;
     notes?: string;
+    is_default?: boolean;
 }
 
 export interface PriceListItem {

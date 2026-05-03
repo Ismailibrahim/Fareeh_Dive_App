@@ -20,7 +20,7 @@ import { boatService, Boat } from "@/lib/api/services/boat.service";
 import { priceListItemService } from "@/lib/api/services/price-list-item.service";
 import { PriceListItem } from "@/lib/api/services/price-list.service";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
 import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
 
 interface BookGroupDialogProps {
@@ -43,6 +43,7 @@ export function BookGroupDialog({
     const [boats, setBoats] = useState<Boat[]>([]);
     const [priceListItems, setPriceListItems] = useState<PriceListItem[]>([]);
     const [selectedPriceItem, setSelectedPriceItem] = useState<PriceListItem | null>(null);
+    const [extraDiveSiteIds, setExtraDiveSiteIds] = useState<number[]>([]);
 
     const [formData, setFormData] = useState<BookGroupRequest>({
         booking_type: 'individual',
@@ -104,6 +105,7 @@ export function BookGroupDialog({
             const request: BookGroupRequest = {
                 ...formData,
                 booking_type: bookingType,
+                extra_dive_site_ids: extraDiveSiteIds.filter(id => id > 0),
             };
 
             const result = await diveGroupService.bookGroup(groupId, request);
@@ -251,6 +253,65 @@ export function BookGroupDialog({
                             onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value ? parseFloat(e.target.value) : undefined }))}
                             placeholder="Enter price"
                         />
+                    </div>
+
+                    {/* Extra Dive Sites */}
+                    <div className="space-y-3 pt-2 border-t">
+                        <div className="flex items-center justify-between">
+                            <Label className="text-sm font-semibold flex items-center gap-2">
+                                <Plus className="h-4 w-4 text-primary" />
+                                Extra Dive Sites
+                            </Label>
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setExtraDiveSiteIds([...extraDiveSiteIds, 0])}
+                            >
+                                <Plus className="h-3 w-3 mr-1" /> Add Site
+                            </Button>
+                        </div>
+                        
+                        {extraDiveSiteIds.length === 0 && (
+                            <p className="text-xs text-muted-foreground italic">No extra sites added. Use this for 2-tank or 3-tank trips.</p>
+                        )}
+
+                        {extraDiveSiteIds.map((siteId, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                                <div className="flex-1">
+                                    <Select
+                                        value={siteId.toString()}
+                                        onValueChange={(value) => {
+                                            const newIds = [...extraDiveSiteIds];
+                                            newIds[index] = parseInt(value);
+                                            setExtraDiveSiteIds(newIds);
+                                        }}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select extra site" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {diveSites.map((site) => (
+                                                <SelectItem key={site.id} value={site.id.toString()}>
+                                                    {site.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                        const newIds = extraDiveSiteIds.filter((_, i) => i !== index);
+                                        setExtraDiveSiteIds(newIds);
+                                    }}
+                                >
+                                    <X className="h-4 w-4 text-destructive" />
+                                </Button>
+                            </div>
+                        ))}
                     </div>
 
                     {/* Number of Divers */}

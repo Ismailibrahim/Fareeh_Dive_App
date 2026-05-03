@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { DiveSite, diveSiteService } from "@/lib/api/services/dive-site.service";
+import { getMediaUrl } from "@/lib/api/client";
 import {
     Table,
     TableBody,
@@ -98,6 +99,16 @@ export default function DiveSitesPage() {
     const handleDeleteClick = (diveSite: DiveSite) => {
         setDiveSiteToDelete(diveSite);
         setDeleteDialogOpen(true);
+    };
+
+    const handleRemovePhoto = async (diveSite: DiveSite) => {
+        if (!confirm(`Are you sure you want to remove the photo for "${diveSite.name}"?`)) return;
+        try {
+            await diveSiteService.update(diveSite.id, { attachment: null });
+            fetchDiveSites(currentPage, searchTerm);
+        } catch (error) {
+            console.error("Failed to remove photo", error);
+        }
     };
 
     const confirmDelete = async () => {
@@ -198,7 +209,7 @@ export default function DiveSitesPage() {
                                                         diveSite.attachment.toLowerCase().includes('image')
                                                     ) ? (
                                                         <img 
-                                                            src={diveSite.attachment} 
+                                                            src={getMediaUrl(diveSite.attachment)} 
                                                             alt={diveSite.name} 
                                                             className="h-full w-full object-cover"
                                                             onError={(e) => {
@@ -277,6 +288,12 @@ export default function DiveSitesPage() {
                                                             Edit
                                                         </Link>
                                                     </DropdownMenuItem>
+                                                    {diveSite.attachment && (
+                                                        <DropdownMenuItem onClick={() => handleRemovePhoto(diveSite)}>
+                                                            Remove Photo
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    <DropdownMenuSeparator />
                                                     <DropdownMenuItem
                                                         className="text-destructive"
                                                         onClick={() => handleDeleteClick(diveSite)}
@@ -340,7 +357,7 @@ export default function DiveSitesPage() {
                                                 diveSite.attachment.toLowerCase().endsWith('.png') ||
                                                 diveSite.attachment.toLowerCase().includes('image')
                                             ) ? (
-                                                <img src={diveSite.attachment} alt={diveSite.name} className="h-full w-full object-cover" />
+                                                <img src={getMediaUrl(diveSite.attachment)} alt={diveSite.name} className="h-full w-full object-cover" />
                                             ) : (
                                                 <MapPin className="h-6 w-6 text-muted-foreground" />
                                             )}
@@ -395,16 +412,26 @@ export default function DiveSitesPage() {
                                             <p className="text-sm">{diveSite.description}</p>
                                         </div>
                                     )}
-                                    <div className="flex gap-2 pt-2">
-                                        <Link href={`/dashboard/dive-sites/${diveSite.id}/edit`} className="flex-1">
+                                    <div className="flex flex-wrap gap-2 pt-2">
+                                        <Link href={`/dashboard/dive-sites/${diveSite.id}/edit`} className="flex-1 min-w-[80px]">
                                             <Button variant="outline" className="w-full" size="sm">
                                                 Edit
                                             </Button>
                                         </Link>
+                                        {diveSite.attachment && (
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                className="flex-1 min-w-[80px] text-destructive hover:text-destructive"
+                                                onClick={() => handleRemovePhoto(diveSite)}
+                                            >
+                                                Remove Photo
+                                            </Button>
+                                        )}
                                         <Button
                                             variant="destructive"
                                             size="sm"
-                                            className="flex-1"
+                                            className="flex-1 min-w-[80px]"
                                             onClick={() => handleDeleteClick(diveSite)}
                                         >
                                             Delete

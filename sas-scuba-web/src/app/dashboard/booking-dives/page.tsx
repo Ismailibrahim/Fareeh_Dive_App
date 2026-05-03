@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, MoreHorizontal, Calendar, Plus, MapPin, Ship, Clock, Users, Eye, Gauge, Filter } from "lucide-react";
+import { Search, MoreHorizontal, Calendar, Plus, MapPin, Ship, Clock, Users, Eye, Gauge, Filter, FileText, Edit, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
     Select,
@@ -45,6 +45,18 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { InvoiceGenerationDialog } from "@/components/invoices/InvoiceGenerationDialog";
+import { EquipmentPreparationCard } from "@/components/booking-dives/EquipmentPreparationCard";
+import { Checkbox } from "@/components/ui/checkbox";
+import { BulkInvoiceGenerationDialog } from "@/components/invoices/BulkInvoiceGenerationDialog";
+import { AnimatePresence, motion } from "framer-motion";
 
 export default function BookingDivesPage() {
     const router = useRouter();
@@ -56,6 +68,19 @@ export default function BookingDivesPage() {
     // Delete state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [bookingDiveToDelete, setBookingDiveToDelete] = useState<BookingDive | null>(null);
+    
+    // Invoice state
+    const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+    const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
+
+    // Equipment state
+    const [equipmentDialogOpen, setEquipmentDialogOpen] = useState(false);
+    const [selectedCustomerIds, setSelectedCustomerIds] = useState<number[]>([]);
+    const [selectedCustomerNames, setSelectedCustomerNames] = useState<Record<number, string>>({});
+
+    // Bulk selection state
+    const [selectedBookingIds, setSelectedBookingIds] = useState<number[]>([]);
+    const [bulkInvoiceDialogOpen, setBulkInvoiceDialogOpen] = useState(false);
 
     useEffect(() => {
         const fetchBookingDives = async () => {
@@ -100,6 +125,49 @@ export default function BookingDivesPage() {
             setDeleteDialogOpen(false);
             setBookingDiveToDelete(null);
         }
+    };
+
+    const handleViewEquipment = (bookingDive: BookingDive) => {
+        if (bookingDive.booking?.customer_id) {
+            setSelectedCustomerIds([bookingDive.booking.customer_id]);
+            if (bookingDive.booking.customer?.full_name) {
+                setSelectedCustomerNames({
+                    [bookingDive.booking.customer_id]: bookingDive.booking.customer.full_name
+                });
+            }
+            setEquipmentDialogOpen(true);
+        } else {
+            console.warn("No customer ID found for this booking dive");
+        }
+    };
+
+    const handleGenerateInvoice = (bookingId: number) => {
+        setSelectedBookingId(bookingId);
+        setInvoiceDialogOpen(true);
+    };
+
+    const toggleSelection = (bookingId: number) => {
+        setSelectedBookingIds(prev => 
+            prev.includes(bookingId) 
+                ? prev.filter(id => id !== bookingId) 
+                : [...prev, bookingId]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedBookingIds.length === filteredBookingDives.length) {
+            setSelectedBookingIds([]);
+        } else {
+            const allFilteredIds = filteredBookingDives.map(bd => bd.booking_id);
+            // Get unique booking IDs
+            const uniqueIds = Array.from(new Set(allFilteredIds));
+            setSelectedBookingIds(uniqueIds);
+        }
+    };
+
+    const handleBulkInvoice = () => {
+        if (selectedBookingIds.length === 0) return;
+        setBulkInvoiceDialogOpen(true);
     };
 
     const getStatusVariant = (status?: string) => {
@@ -174,6 +242,12 @@ export default function BookingDivesPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-[40px]">
+                                    <Checkbox 
+                                        checked={selectedBookingIds.length > 0 && selectedBookingIds.length === Array.from(new Set(filteredBookingDives.map(bd => bd.booking_id))).length}
+                                        onCheckedChange={toggleSelectAll}
+                                    />
+                                </TableHead>
                                 <TableHead>Booking</TableHead>
                                 <TableHead>Group</TableHead>
                                 <TableHead>Dive Site</TableHead>
@@ -181,6 +255,7 @@ export default function BookingDivesPage() {
                                 <TableHead>Dive Date</TableHead>
                                 <TableHead>Dive Time</TableHead>
                                 <TableHead>Status</TableHead>
+                                <TableHead>Billed</TableHead>
                                 <TableHead>Duration</TableHead>
                                 <TableHead>Max Depth</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
@@ -214,7 +289,13 @@ export default function BookingDivesPage() {
                                 </TableRow>
                             ) : (
                                 filteredBookingDives.map((bookingDive) => (
-                                    <TableRow key={bookingDive.id}>
+                                <TableRow key={bookingDive.id} data-state={selectedBookingIds.includes(bookingDive.booking_id) ? "selected" : undefined}>
+                                        <TableCell>
+                                            <Checkbox 
+                                                checked={selectedBookingIds.includes(bookingDive.booking_id)}
+                                                onCheckedChange={() => toggleSelection(bookingDive.booking_id)}
+                                            />
+                                        </TableCell>
                                         <TableCell className="font-medium">
                                             <div className="flex items-center gap-2">
                                                 <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -270,6 +351,17 @@ export default function BookingDivesPage() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
+                                            {bookingDive.invoice_items_count && bookingDive.invoice_items_count > 0 ? (
+                                                <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-200">
+                                                    Yes
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="text-muted-foreground">
+                                                    No
+                                                </Badge>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
                                             {bookingDive.dive_duration ? (
                                                 <span>{bookingDive.dive_duration} min</span>
                                             ) : (
@@ -303,10 +395,21 @@ export default function BookingDivesPage() {
                                                             View Details
                                                         </Link>
                                                     </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleViewEquipment(bookingDive)}>
+                                                        <Package className="h-4 w-4 mr-2" />
+                                                        View Equipment
+                                                    </DropdownMenuItem>
                                                     <DropdownMenuItem asChild>
                                                         <Link href={`/dashboard/booking-dives/${bookingDive.id}/edit`}>
+                                                            <Edit className="h-4 w-4 mr-2" />
                                                             Edit
                                                         </Link>
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleGenerateInvoice(bookingDive.booking_id)}
+                                                    >
+                                                        <FileText className="h-4 w-4 mr-2" />
+                                                        Generate Invoice
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
                                                         className="text-destructive"
@@ -354,15 +457,21 @@ export default function BookingDivesPage() {
                         </Card>
                     ) : (
                         filteredBookingDives.map((bookingDive) => (
-                            <Card key={bookingDive.id}>
-                                <CardHeader>
+                            <Card key={bookingDive.id} className={selectedBookingIds.includes(bookingDive.booking_id) ? "border-primary bg-primary/5" : ""}>
+                                <CardHeader className="pb-2">
                                     <div className="flex items-start justify-between">
-                                        <div>
-                                            <CardDescription className="flex items-center gap-2 mb-1">
-                                                <Calendar className="h-4 w-4" />
-                                                Booking
-                                            </CardDescription>
-                                            <p className="font-medium">{bookingDive.booking?.customer?.full_name || `Booking #${bookingDive.booking_id}`}</p>
+                                        <div className="flex items-center gap-3">
+                                            <Checkbox 
+                                                checked={selectedBookingIds.includes(bookingDive.booking_id)}
+                                                onCheckedChange={() => toggleSelection(bookingDive.booking_id)}
+                                            />
+                                            <div>
+                                                <CardDescription className="flex items-center gap-2 mb-1">
+                                                    <Calendar className="h-4 w-4" />
+                                                    Booking
+                                                </CardDescription>
+                                                <p className="font-medium">{bookingDive.booking?.customer?.full_name || `Booking #${bookingDive.booking_id}`}</p>
+                                            </div>
                                         </div>
                                     </div>
                                 </CardHeader>
@@ -412,11 +521,25 @@ export default function BookingDivesPage() {
                                             <p>{bookingDive.dive_time}</p>
                                         </div>
                                     )}
-                                    <div>
-                                        <CardDescription className="mb-1">Status</CardDescription>
-                                        <Badge variant={getStatusVariant(bookingDive.status)} className="w-fit">
-                                            {bookingDive.status || 'Scheduled'}
-                                        </Badge>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <CardDescription className="mb-1">Status</CardDescription>
+                                            <Badge variant={getStatusVariant(bookingDive.status)} className="w-fit">
+                                                {bookingDive.status || 'Scheduled'}
+                                            </Badge>
+                                        </div>
+                                        <div className="text-right">
+                                            <CardDescription className="mb-1">Billed</CardDescription>
+                                            {bookingDive.invoice_items_count && bookingDive.invoice_items_count > 0 ? (
+                                                <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-200">
+                                                    Yes
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="text-muted-foreground">
+                                                    No
+                                                </Badge>
+                                            )}
+                                        </div>
                                     </div>
                                     {(bookingDive.dive_duration || bookingDive.max_depth) && (
                                         <div className="grid grid-cols-2 gap-4">
@@ -450,6 +573,15 @@ export default function BookingDivesPage() {
                                             </Button>
                                         </Link>
                                         <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="flex-1"
+                                            onClick={() => handleGenerateInvoice(bookingDive.booking_id)}
+                                        >
+                                            <FileText className="h-4 w-4 mr-2" />
+                                            Invoice
+                                        </Button>
+                                        <Button
                                             variant="destructive"
                                             size="sm"
                                             className="flex-1"
@@ -480,6 +612,79 @@ export default function BookingDivesPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            
+            {/* Invoice Generation Dialog */}
+            {selectedBookingId && (
+                <InvoiceGenerationDialog
+                    open={invoiceDialogOpen}
+                    onOpenChange={setInvoiceDialogOpen}
+                    bookingId={selectedBookingId}
+                />
+            )}
+
+            <Dialog open={equipmentDialogOpen} onOpenChange={setEquipmentDialogOpen}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl">
+                    <DialogHeader className="sr-only">
+                        <DialogTitle>Equipment Preparation</DialogTitle>
+                        <DialogDescription>
+                            View equipment requirements for the selected customer(s).
+                        </DialogDescription>
+                    </DialogHeader>
+                    <EquipmentPreparationCard 
+                        customerIds={selectedCustomerIds} 
+                        customerNames={selectedCustomerNames}
+                    />
+                </DialogContent>
+            </Dialog>
+
+            {/* Bulk Action Bar */}
+            <AnimatePresence>
+                {selectedBookingIds.length > 0 && (
+                    <motion.div 
+                        initial={{ y: 100, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 100, opacity: 0 }}
+                        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] md:w-auto"
+                    >
+                        <div className="bg-primary text-primary-foreground px-6 py-4 rounded-full shadow-2xl flex items-center gap-6 border border-primary-foreground/20">
+                            <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="bg-white/20 text-white border-none hover:bg-white/30">
+                                    {selectedBookingIds.length}
+                                </Badge>
+                                <span className="text-sm font-medium whitespace-nowrap">Bookings Selected</span>
+                            </div>
+                            <div className="h-6 w-px bg-white/20" />
+                            <div className="flex items-center gap-2">
+                                <Button 
+                                    size="sm" 
+                                    variant="secondary" 
+                                    className="bg-white text-primary hover:bg-white/90 rounded-full h-9 px-4"
+                                    onClick={handleBulkInvoice}
+                                >
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    Combine into Invoice
+                                </Button>
+                                <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="text-white hover:bg-white/10 rounded-full h-9"
+                                    onClick={() => setSelectedBookingIds([])}
+                                >
+                                    Cancel
+                                </Button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Bulk Invoice Dialog */}
+            <BulkInvoiceGenerationDialog 
+                open={bulkInvoiceDialogOpen}
+                onOpenChange={setBulkInvoiceDialogOpen}
+                bookingIds={selectedBookingIds}
+                onSuccess={() => setSelectedBookingIds([])}
+            />
         </div>
     );
 }

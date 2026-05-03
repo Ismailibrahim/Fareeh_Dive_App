@@ -248,21 +248,30 @@ class InvoiceController extends Controller
 
             $subtotal = 0;
 
-            // Add completed dives
+            // Add dives (not cancelled and not already invoiced)
             if ($includeDives) {
-                $completedDives = $booking->bookingDives()
-                    ->where('status', 'Completed')
+                $dives = $booking->bookingDives()
+                    ->whereIn('status', ['Scheduled', 'In Progress', 'Completed'])
                     ->whereDoesntHave('invoiceItems')
                     ->with(['diveSite', 'priceListItem'])
                     ->get();
 
-                foreach ($completedDives as $dive) {
+                foreach ($dives as $dive) {
                     $price = $dive->price ?? 0;
+                    
+                    // Determine description
+                    $siteName = $dive->diveSite->name ?? 'Unknown';
+                    $actualDate = $dive->dive_date ?: $booking->booking_date;
+                    $dateStr = $actualDate ? date('M d, Y', strtotime($actualDate)) : '';
+                    $itemName = $dive->priceListItem->name ?? 'Dive';
+                    
+                    $description = $dateStr ? "{$itemName} - {$siteName} ({$dateStr})" : "{$itemName} - {$siteName}";
+                    
                     $item = InvoiceItem::create([
                         'invoice_id' => $invoice->id,
                         'booking_dive_id' => $dive->id,
                         'price_list_item_id' => $dive->price_list_item_id,
-                        'description' => 'Dive - ' . ($dive->diveSite->name ?? 'Unknown') . ' - ' . ($dive->dive_date ? date('M d, Y', strtotime($dive->dive_date)) : ''),
+                        'description' => $description,
                         'quantity' => 1,
                         'unit_price' => $price,
                         'total' => $price,
@@ -271,7 +280,7 @@ class InvoiceController extends Controller
                 }
             }
 
-            // Add equipment rentals
+            // Add equipment rentals (not already invoiced)
             if ($includeEquipment) {
                 $equipment = $booking->bookingEquipment()
                     ->whereDoesntHave('invoiceItems')
@@ -292,15 +301,15 @@ class InvoiceController extends Controller
                 }
             }
 
-            // Add completed excursions
+            // Add excursions (not cancelled and not already invoiced)
             if ($includeExcursions) {
-                $completedExcursions = $booking->bookingExcursions()
-                    ->where('status', 'Completed')
+                $excursions = $booking->bookingExcursions()
+                    ->whereIn('status', ['Scheduled', 'In Progress', 'Completed'])
                     ->whereDoesntHave('invoiceItems')
                     ->with(['excursion', 'priceListItem'])
                     ->get();
 
-                foreach ($completedExcursions as $excursion) {
+                foreach ($excursions as $excursion) {
                     $price = $excursion->price ?? 0;
                     $item = InvoiceItem::create([
                         'invoice_id' => $invoice->id,
@@ -1594,6 +1603,243 @@ class InvoiceController extends Controller
                 'message' => 'Failed to delete item from invoice',
                 'error' => $e->getMessage(),
                 'trace' => config('app.debug') ? $e->getTraceAsString() : null
+            ], 500);
+        }
+    }
+
+    /**
+     * Generate invoice from multiple bookings.
+     */
+    public function generateFromMultipleBookings(Request $request)
+    {
+        $user = $request->user();
+        $diveCenterId = $user->dive_center_id;
+
+        $validated = $request->validate([
+            'booking_ids' => 'required|array|min:1',
+            'booking_ids.*' => 'exists:bookings,id',
+            'customer_id' => 'required|exists:customers,id',
+            'invoice_type' => 'nullable|in:Advance,Final,Full',
+            'include_dives' => 'nullable|boolean',
+            'include_equipment' => 'nullable|boolean',
+            'include_excursions' => 'nullable|boolean',
+            'tax_percentage' => 'nullable|numeric|min:0|max:100',
+        ]);
+
+        $bookingIds = $validated['booking_ids'];
+        $primaryCustomerId = $validated['customer_id'];
+        
+        // Validate all bookings belong to dive center
+        $bookings = Booking::whereIn('id', $bookingIds)
+            ->where('dive_center_id', $diveCenterId)
+            ->with(['diveCenter', 'customer'])
+            ->get();
+            
+        if ($bookings->count() !== count(array_unique($bookingIds))) {
+            return response()->json([
+                'message' => 'Some bookings were not found or do not belong to your dive center'
+            ], 422);
+        }
+
+        // Validate primary customer belongs to dive center
+        $primaryCustomer = \App\Models\Customer::where('id', $primaryCustomerId)
+            ->where('dive_center_id', $diveCenterId)
+            ->firstOrFail();
+
+        $includeDives = $validated['include_dives'] ?? true;
+        $includeEquipment = $validated['include_equipment'] ?? true;
+        $includeExcursions = $validated['include_excursions'] ?? true;
+        $invoiceType = $validated['invoice_type'] ?? 'Full';
+        
+        $diveCenter = \App\Models\DiveCenter::find($diveCenterId);
+        $diveCenterSettings = $diveCenter->settings ?? [];
+        $defaultTaxPercentage = $diveCenterSettings['tax_percentage'] ?? 0;
+        $taxPercentage = $validated['tax_percentage'] ?? $defaultTaxPercentage;
+
+        DB::beginTransaction();
+        try {
+            $invoice = Invoice::create([
+                'dive_center_id' => $diveCenterId,
+                'customer_id' => $primaryCustomerId,
+                'agent_id' => $primaryCustomer->agent_id ?? null,
+                'invoice_no' => null,
+                'invoice_date' => now()->toDateString(),
+                'invoice_type' => $invoiceType,
+                'status' => 'Draft',
+                'currency' => $diveCenter->currency ?? 'USD',
+            ]);
+
+            $invoice->invoice_no = $invoice->generateInvoiceNumber();
+            $invoice->save();
+
+            $subtotal = 0;
+
+            foreach ($bookings as $booking) {
+                $customerName = $booking->customer->full_name;
+
+                // Add dives
+                if ($includeDives) {
+                    $dives = $booking->bookingDives()
+                        ->whereIn('status', ['Scheduled', 'In Progress', 'Completed'])
+                        ->whereDoesntHave('invoiceItems')
+                        ->with(['diveSite', 'priceListItem'])
+                        ->get();
+
+                    foreach ($dives as $dive) {
+                        $price = $dive->price ?? 0;
+                        $siteName = $dive->diveSite->name ?? 'Unknown';
+                        $actualDate = $dive->dive_date ?: $booking->booking_date;
+                        $dateStr = $actualDate ? date('M d, Y', strtotime($actualDate)) : '';
+                        $itemName = $dive->priceListItem->name ?? 'Dive';
+                        
+                        $description = "{$itemName} - {$siteName}" . ($dateStr ? " ({$dateStr})" : "") . " [{$customerName}]";
+                        
+                        InvoiceItem::create([
+                            'invoice_id' => $invoice->id,
+                            'booking_dive_id' => $dive->id,
+                            'price_list_item_id' => $dive->price_list_item_id,
+                            'description' => $description,
+                            'quantity' => 1,
+                            'unit_price' => $price,
+                            'total' => $price,
+                        ]);
+                        $subtotal += $price;
+                    }
+                }
+
+                // Add equipment rentals
+                if ($includeEquipment) {
+                    $equipment = $booking->bookingEquipment()
+                        ->whereDoesntHave('invoiceItems')
+                        ->with(['equipmentItem.equipment'])
+                        ->get();
+
+                    foreach ($equipment as $eq) {
+                        $price = $eq->price ?? 0;
+                        $eqName = $eq->equipmentItem->equipment->name ?? 'Equipment';
+                        $eqSize = $eq->equipmentItem->size ? " - {$eq->equipmentItem->size}" : "";
+                        
+                        InvoiceItem::create([
+                            'invoice_id' => $invoice->id,
+                            'booking_equipment_id' => $eq->id,
+                            'description' => "{$eqName}{$eqSize} [{$customerName}]",
+                            'quantity' => 1,
+                            'unit_price' => $price,
+                            'total' => $price,
+                        ]);
+                        $subtotal += $price;
+                    }
+                }
+
+                // Add excursions
+                if ($includeExcursions) {
+                    $excursions = $booking->bookingExcursions()
+                        ->whereIn('status', ['Scheduled', 'In Progress', 'Completed'])
+                        ->whereDoesntHave('invoiceItems')
+                        ->with(['excursion', 'priceListItem'])
+                        ->get();
+
+                    foreach ($excursions as $excursion) {
+                        $price = $excursion->price ?? 0;
+                        $qty = $excursion->number_of_participants ?? 1;
+                        $exName = $excursion->excursion->name ?? 'Unknown';
+                        $exDate = $excursion->excursion_date ? date('M d, Y', strtotime($excursion->excursion_date)) : '';
+                        
+                        $description = "Excursion - {$exName}" . ($exDate ? " ({$exDate})" : "") . " [{$customerName}]";
+                        
+                        InvoiceItem::create([
+                            'invoice_id' => $invoice->id,
+                            'booking_excursion_id' => $excursion->id,
+                            'price_list_item_id' => $excursion->price_list_item_id,
+                            'description' => $description,
+                            'quantity' => $qty,
+                            'unit_price' => $price,
+                            'total' => $price * $qty,
+                        ]);
+                        $subtotal += $price * $qty;
+                    }
+                }
+            }
+
+            $subtotal = round($subtotal, 2);
+            
+            // Tax Calculation logic (same as generateFromBooking)
+            $taxCalculationMode = 'exclusive';
+            if ($diveCenter && $diveCenter->settings) {
+                $settings = is_array($diveCenter->settings) ? $diveCenter->settings : json_decode($diveCenter->settings, true);
+                if (isset($settings['tax_calculation_mode'])) {
+                    $taxCalculationMode = $settings['tax_calculation_mode'];
+                }
+            }
+            
+            $serviceChargePercentage = 0;
+            if ($diveCenter && $diveCenter->settings) {
+                $settings = is_array($diveCenter->settings) ? $diveCenter->settings : json_decode($diveCenter->settings, true);
+                if (isset($settings['service_charge_percentage'])) {
+                    $serviceChargePercentage = (float) $settings['service_charge_percentage'];
+                }
+            }
+            if ($serviceChargePercentage <= 0) {
+                $serviceChargePercentage = $this->getTaxService()->getServiceChargePercentage();
+            }
+            
+            if ($taxPercentage <= 0) {
+                $taxPercentage = $this->getTaxService()->getTGSTPercentage();
+            }
+            
+            if ($taxCalculationMode === 'inclusive') {
+                $scDecimal = $serviceChargePercentage > 0 ? ($serviceChargePercentage / 100) : 0;
+                $tgstDecimal = $taxPercentage > 0 ? ($taxPercentage / 100) : 0;
+                
+                $serviceCharge = 0;
+                $tax = 0;
+                $total = $subtotal;
+                
+                if ($subtotal > 0 && ($scDecimal > 0 || $tgstDecimal > 0)) {
+                    $denominator = (1 + $scDecimal) * (1 + $tgstDecimal);
+                    if ($denominator > 0 && $denominator != 1) {
+                        $baseAmount = round($subtotal / $denominator, 2);
+                        $serviceCharge = round($baseAmount * $scDecimal, 2);
+                        $tax = round(($baseAmount + $serviceCharge) * $tgstDecimal, 2);
+                        $total = round($baseAmount + $serviceCharge + $tax, 2);
+                        
+                        $roundingDiff = $subtotal - $total;
+                        if (abs($roundingDiff) > 0.01) {
+                            $tax = round($tax + $roundingDiff, 2);
+                            $total = round($baseAmount + $serviceCharge + $tax, 2);
+                        }
+                    }
+                }
+            } else {
+                $serviceCharge = 0;
+                if ($serviceChargePercentage > 0) {
+                    $serviceCharge = round($subtotal * ($serviceChargePercentage / 100), 2);
+                }
+                $tax = 0;
+                if ($taxPercentage > 0) {
+                    $tax = round(($subtotal + $serviceCharge) * ($taxPercentage / 100), 2);
+                }
+                $total = round($subtotal + $serviceCharge + $tax, 2);
+            }
+            
+            $invoice->update([
+                'subtotal' => $subtotal,
+                'tax' => $tax,
+                'service_charge' => $serviceCharge,
+                'discount' => 0,
+                'total' => $total,
+            ]);
+
+            DB::commit();
+
+            $invoice->load(['customer', 'invoiceItems.bookingDive', 'invoiceItems.bookingEquipment', 'invoiceItems.bookingExcursion', 'payments']);
+            return response()->json($invoice, 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Bulk invoice generation failed: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to generate bulk invoice',
+                'error' => $e->getMessage()
             ], 500);
         }
     }

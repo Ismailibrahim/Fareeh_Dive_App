@@ -69,12 +69,21 @@ class PriceListController extends Controller
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'notes' => 'nullable|string',
+                'is_default' => 'nullable|boolean',
             ]);
+
+            // If this is set as default, unmark other default price lists for this dive center
+            if (!empty($validated['is_default'])) {
+                PriceList::where('dive_center_id', $diveCenterId)
+                    ->where('is_default', true)
+                    ->update(['is_default' => false]);
+            }
 
             $priceList = PriceList::create([
                 'dive_center_id' => $diveCenterId,
                 'name' => $validated['name'],
                 'notes' => $validated['notes'] ?? null,
+                'is_default' => $validated['is_default'] ?? false,
             ]);
 
             $priceList->load('items');
@@ -161,7 +170,16 @@ class PriceListController extends Controller
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'notes' => 'nullable|string',
+                'is_default' => 'nullable|boolean',
             ]);
+
+            // If this is set as default, unmark other default price lists for this dive center
+            if (!empty($validated['is_default'])) {
+                PriceList::where('dive_center_id', $diveCenterId)
+                    ->where('id', '!=', $id)
+                    ->where('is_default', true)
+                    ->update(['is_default' => false]);
+            }
 
             $priceList->update($validated);
             $priceList->load('items');
@@ -189,6 +207,7 @@ class PriceListController extends Controller
             // Verify price list belongs to user's dive center
             $this->authorizeDiveCenterAccess($priceList, 'Unauthorized access to this price list');
 
+            $diveCenterId = $priceList->dive_center_id;
             $priceList->delete();
 
             // Invalidate price lists cache for this dive center

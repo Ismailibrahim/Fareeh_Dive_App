@@ -42,8 +42,6 @@ export default function LoginPage() {
             } else if (err.response?.status === 422) {
                 // Laravel validation errors
                 const errors = err.response?.data?.errors;
-                console.error("Validation errors:", errors);
-                console.error("Full error response:", err.response?.data);
                 
                 if (errors && Object.keys(errors).length > 0) {
                     // Get the first error message
@@ -56,6 +54,8 @@ export default function LoginPage() {
                 } else {
                     setError("Invalid email or password. Please try again.");
                 }
+                // Use console.log for expected errors to avoid triggering Next.js error overlay
+                console.log("Validation failure:", err.response?.data);
             } else if (err.response?.status === 419) {
                 // CSRF token mismatch
                 setError("CSRF token validation failed. Please refresh the page and try again.");
@@ -70,8 +70,15 @@ export default function LoginPage() {
             } else {
                 setError("Login failed. Please check your credentials and try again.");
             }
-            console.error("Login Error:", err);
-            console.error("Error response data:", err.response?.data);
+            
+            // Log as debug info rather than error to avoid the intrusive dev overlay
+            if (process.env.NODE_ENV === 'development') {
+                console.debug("Login Attempt Details:", {
+                    status: err.response?.status,
+                    message: err.message,
+                    data: err.response?.data
+                });
+            }
         } finally {
             setLoading(false);
         }

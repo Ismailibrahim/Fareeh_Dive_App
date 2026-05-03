@@ -37,9 +37,10 @@ interface CustomerAccommodationFormProps {
     initialData?: CustomerAccommodation;
     onSave: () => void;
     onCancel: () => void;
+    hideHeader?: boolean;
 }
 
-export function CustomerAccommodationForm({ customerId, initialData, onSave, onCancel }: CustomerAccommodationFormProps) {
+export function CustomerAccommodationForm({ customerId, initialData, onSave, onCancel, hideHeader = false }: CustomerAccommodationFormProps) {
     const createMutation = useCreateCustomerAccommodation();
     const updateMutation = useUpdateCustomerAccommodation();
     
@@ -96,17 +97,19 @@ export function CustomerAccommodationForm({ customerId, initialData, onSave, onC
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-xl flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-primary" />
-                    {initialData ? "Edit Accommodation Details" : "Add Accommodation Details"}
-                </CardTitle>
-                <CardDescription>
-                    {initialData ? "Update accommodation information." : "Add accommodation details for this customer."}
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
+        <Card className={hideHeader ? "border-0 shadow-none" : ""}>
+            {!hideHeader && (
+                <CardHeader>
+                    <CardTitle className="text-xl flex items-center gap-2">
+                        <Building2 className="h-5 w-5 text-primary" />
+                        {initialData ? "Edit Accommodation Details" : "Add Accommodation Details"}
+                    </CardTitle>
+                    <CardDescription>
+                        {initialData ? "Update accommodation information." : "Add accommodation details for this customer."}
+                    </CardDescription>
+                </CardHeader>
+            )}
+            <CardContent className={hideHeader ? "p-0" : ""}>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                         <FormField

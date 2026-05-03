@@ -29,7 +29,7 @@ export function useCustomer(id: number | string | null) {
         queryKey: customerKeys.detail(id!),
         queryFn: () => customerService.getById(id!),
         enabled: !!id, // Only fetch if id is provided
-        staleTime: 10 * 60 * 1000, // 10 minutes - customer data persists longer
+        staleTime: 30 * 1000, // 30 seconds - faster updates when metadata changes
         gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache longer
         refetchOnMount: false, // Don't refetch when component remounts if data is fresh
     });

@@ -4,6 +4,7 @@ import { useRef, useState, useEffect } from "react";
 import SignatureCanvas from "react-signature-canvas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { getMediaUrl } from "@/lib/api/client";
 
 interface DigitalSignatureProps {
     onSignatureChange?: (signatureData: string | null) => void;
@@ -69,7 +70,7 @@ export function DigitalSignature({
                     <div className="mt-4">
                         <p className="text-sm text-muted-foreground mb-2">Current Signature:</p>
                         <img
-                            src={initialSignature}
+                            src={getMediaUrl(initialSignature)}
                             alt="Signature"
                             className="border rounded max-w-full h-auto"
                         />

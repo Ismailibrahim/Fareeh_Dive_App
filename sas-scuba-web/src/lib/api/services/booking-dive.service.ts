@@ -56,6 +56,8 @@ export interface BookingDive {
         };
         role: string;
     }>;
+    additionalItems?: BookingDive[];
+    invoice_items_count?: number;
     created_at: string;
     updated_at: string;
 }
@@ -78,6 +80,8 @@ export interface BookingDiveFormData {
     status?: 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled';
     completed_at?: string;
     dive_log_notes?: string;
+    additional_items?: Array<{ id?: number; price_list_item_id: number; price: number; dive_site_id?: number }>;
+    extra_dive_site_ids?: number[];
 }
 
 export const bookingDiveService = {

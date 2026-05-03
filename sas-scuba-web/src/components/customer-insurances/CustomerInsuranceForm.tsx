@@ -20,13 +20,14 @@ import { CustomerInsuranceFormData } from "@/lib/api/services/customer-insurance
 import { useCreateCustomerInsurance, useUpdateCustomerInsurance } from "@/lib/hooks/use-customer-insurances";
 import { customerService, Customer } from "@/lib/api/services/customer.service";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarIcon, Shield, User, Phone, FileText, Upload, X, CheckCircle2 } from "lucide-react";
+import { CalendarIcon, Shield, User, Phone, FileText, Upload, X, CheckCircle2, Eye, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { safeParseDate } from "@/lib/utils/date-format";
 import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
 import { fileUploadService } from "@/lib/api/services/file-upload.service";
 import { Switch } from "@/components/ui/switch";
+import { getMediaUrl } from "@/lib/api/client";
 
 const insuranceSchema = z.object({
     customer_id: z.string().min(1, "Customer is required"),
@@ -45,9 +46,11 @@ interface CustomerInsuranceFormProps {
     insuranceId?: number;
     disableCustomerSelect?: boolean;
     redirectToCustomer?: boolean;
+    onSuccess?: () => void;
+    onCancel?: () => void;
 }
 
-export function CustomerInsuranceForm({ initialData, insuranceId, disableCustomerSelect = false, redirectToCustomer = false }: CustomerInsuranceFormProps) {
+export function CustomerInsuranceForm({ initialData, insuranceId, disableCustomerSelect = false, redirectToCustomer = false, onSuccess, onCancel }: CustomerInsuranceFormProps) {
     const router = useRouter();
     const createMutation = useCreateCustomerInsurance();
     const updateMutation = useUpdateCustomerInsurance();
@@ -89,14 +92,28 @@ export function CustomerInsuranceForm({ initialData, insuranceId, disableCustome
             form.setValue('customer_id', String(initialData.customer_id));
         }
         if (initialData?.file_url) {
-            setUploadedFile({ name: 'Current file', url: initialData.file_url });
+            setUploadedFile({ 
+                name: initialData.file_url.split('/').pop() || 'Current file', 
+                url: initialData.file_url 
+            });
         }
     }, [initialData, insuranceId, form]);
+
+    const fileUrl = form.watch('file_url');
+    const isImage = (url: string) => /\.(jpg|jpeg|png|webp|gif)$/i.test(url);
+    const isPDF = (url: string) => /\.pdf$/i.test(url);
 
     const handleFileUpload = async (file: File) => {
         setUploading(true);
         try {
-            const result = await fileUploadService.upload(file);
+            // Pass entity metadata for insurance uploads
+            // entityType must be 'customer', category must be 'insurance-card'
+            const result = await fileUploadService.upload(file, {
+                entityType: 'customer',
+                entityId: String(form.getValues('customer_id')),
+                category: 'insurance-card'
+            });
+
             if (result.success) {
                 form.setValue('file_url', result.url);
                 setUploadedFile({ name: result.original_name, url: result.url });
@@ -136,8 +153,9 @@ export function CustomerInsuranceForm({ initialData, insuranceId, disableCustome
 
     async function onSubmit(data: InsuranceFormValues) {
         try {
+            const customerId = parseInt(data.customer_id);
             const payload: CustomerInsuranceFormData = {
-                customer_id: parseInt(data.customer_id),
+                customer_id: customerId,
                 insurance_provider: data.insurance_provider && data.insurance_provider.trim() !== '' ? data.insurance_provider.trim() : undefined,
                 insurance_no: data.insurance_no && data.insurance_no.trim() !== '' ? data.insurance_no.trim() : undefined,
                 insurance_hotline_no: data.insurance_hotline_no && data.insurance_hotline_no.trim() !== '' ? data.insurance_hotline_no.trim() : undefined,
@@ -148,22 +166,42 @@ export function CustomerInsuranceForm({ initialData, insuranceId, disableCustome
 
             console.log('Submitting insurance:', payload);
 
-            let customerId: number | null = null;
-            if (insuranceId) {
-                const result = await updateMutation.mutateAsync({ id: insuranceId, data: payload });
-                customerId = result.customer_id;
+            let finalInsuranceId = insuranceId;
+            
+            // If we are "creating" but the customer already has an insurance record, switch to update
+            // This prevents the "Duplicate entry" SQL error (500)
+            if (!finalInsuranceId) {
+                try {
+                    const existingInsurances = await customerInsuranceService.getAll(customerId);
+                    if (existingInsurances && existingInsurances.length > 0) {
+                        console.log('Found existing insurance, switching to update mode');
+                        finalInsuranceId = existingInsurances[0].id;
+                    }
+                } catch (err) {
+                    console.warn('Could not check for existing insurance', err);
+                }
+            }
+
+            let resultCustomerId: number | null = null;
+            if (finalInsuranceId) {
+                const result = await updateMutation.mutateAsync({ id: finalInsuranceId, data: payload });
+                resultCustomerId = result.customer_id;
             } else {
                 const newInsurance = await createMutation.mutateAsync(payload);
-                customerId = newInsurance.customer_id;
+                resultCustomerId = newInsurance.customer_id;
             }
             
             // Redirect based on context
-            if (redirectToCustomer && customerId) {
-                router.push(`/dashboard/customers/${customerId}`);
+            if (onSuccess) {
+                onSuccess();
+            } else if (redirectToCustomer && resultCustomerId) {
+                router.push(`/dashboard/customers/${resultCustomerId}`);
             } else {
                 router.push("/dashboard/customer-insurances");
             }
-            router.refresh();
+            if (!onSuccess) {
+                router.refresh();
+            }
         } catch (error: any) {
             console.error("Failed to save insurance", error);
             console.error("Error response:", error?.response?.data);
@@ -338,33 +376,97 @@ export function CustomerInsuranceForm({ initialData, insuranceId, disableCustome
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-6">
-                        {uploadedFile ? (
-                            <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
-                                <div className="flex items-center gap-3">
-                                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                    <div>
-                                        <p className="text-sm font-medium">{uploadedFile.name}</p>
-                                        <a 
-                                            href={uploadedFile.url} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="text-xs text-primary hover:underline"
+                        {fileUrl && (
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className="bg-primary/10 p-2 rounded-md">
+                                            {isPDF(fileUrl) ? (
+                                                <FileText className="h-5 w-5 text-primary" />
+                                            ) : isImage(fileUrl) ? (
+                                                <Shield className="h-5 w-5 text-primary" />
+                                            ) : (
+                                                <FileText className="h-5 w-5 text-primary" />
+                                            )}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium truncate">
+                                                {uploadedFile?.name || fileUrl.split('/').pop() || 'Insurance Document'}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {isPDF(fileUrl) ? 'PDF Document' : isImage(fileUrl) ? 'Image File' : 'Attachment'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => window.open(getMediaUrl(fileUrl), '_blank')}
+                                            className="h-8 gap-1.5"
                                         >
-                                            View file
-                                        </a>
+                                            <ExternalLink className="h-3.5 w-3.5" />
+                                            Open
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={removeFile}
+                                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
                                     </div>
                                 </div>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={removeFile}
-                                    className="text-destructive hover:text-destructive"
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button>
+
+                                {isImage(fileUrl) && (
+                                    <div className="relative aspect-video w-full overflow-hidden rounded-lg border bg-muted/20 group">
+                                        <img 
+                                            src={getMediaUrl(fileUrl)} 
+                                            alt="Insurance Preview" 
+                                            className="h-full w-full object-contain transition-transform group-hover:scale-[1.02]"
+                                        />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <Button 
+                                                type="button"
+                                                variant="secondary" 
+                                                size="sm" 
+                                                className="gap-2"
+                                                onClick={() => window.open(getMediaUrl(fileUrl), '_blank')}
+                                            >
+                                                <Eye className="h-4 w-4" />
+                                                View Full Size
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {isPDF(fileUrl) && (
+                                    <div className="w-full rounded-lg border bg-muted/20 p-8 flex flex-col items-center justify-center gap-4 text-center">
+                                        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                                            <FileText className="h-8 w-8 text-primary" />
+                                        </div>
+                                        <div>
+                                            <p className="font-medium">PDF Insurance Document Attached</p>
+                                            <p className="text-sm text-muted-foreground mt-1">PDF previews are not supported in this view.</p>
+                                        </div>
+                                        <Button 
+                                            type="button"
+                                            variant="outline" 
+                                            className="gap-2"
+                                            onClick={() => window.open(getMediaUrl(fileUrl), '_blank')}
+                                        >
+                                            <ExternalLink className="h-4 w-4" />
+                                            Open PDF to View
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
-                        ) : (
+                        )}
+
+                        {!fileUrl && (
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium mb-2">
@@ -421,7 +523,7 @@ export function CustomerInsuranceForm({ initialData, insuranceId, disableCustome
                 </Card>
 
                 <div className="flex justify-end gap-4">
-                    <Button type="button" variant="outline" size="lg" onClick={() => router.back()}>
+                    <Button type="button" variant="outline" size="lg" onClick={() => onCancel ? onCancel() : router.back()}>
                         Cancel
                     </Button>
                     <Button type="submit" size="lg" disabled={loading}>

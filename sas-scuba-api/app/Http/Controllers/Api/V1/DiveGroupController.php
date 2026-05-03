@@ -301,6 +301,8 @@ class DiveGroupController extends Controller
             'booking_date' => 'nullable|date',
             'number_of_divers' => 'nullable|integer|min:1',
             'status' => 'nullable|in:Scheduled,In Progress,Completed,Cancelled',
+            'extra_dive_site_ids' => 'nullable|array',
+            'extra_dive_site_ids.*' => 'exists:dive_sites,id',
         ]);
 
         $user = $request->user();
@@ -340,6 +342,23 @@ class DiveGroupController extends Controller
                         'status' => $validated['status'] ?? 'Scheduled',
                     ]);
 
+                    // Add extra dive sites for each individual booking
+                    if (!empty($validated['extra_dive_site_ids'])) {
+                        foreach ($validated['extra_dive_site_ids'] as $extraSiteId) {
+                            BookingDive::create([
+                                'parent_id' => $bookingDive->id,
+                                'booking_id' => $booking->id,
+                                'dive_site_id' => $extraSiteId,
+                                'boat_id' => $validated['boat_id'] ?? null,
+                                'dive_date' => $validated['dive_date'] ?? null,
+                                'dive_time' => $validated['dive_time'] ?? null,
+                                'price_list_item_id' => $validated['price_list_item_id'] ?? null,
+                                'price' => 0,
+                                'status' => $validated['status'] ?? 'Scheduled',
+                            ]);
+                        }
+                    }
+
                     $bookings[] = $booking;
                     $bookingDives[] = $bookingDive;
                 }
@@ -368,6 +387,23 @@ class DiveGroupController extends Controller
                     'price' => $validated['price'] ?? null,
                     'status' => $validated['status'] ?? 'Scheduled',
                 ]);
+
+                    // Add extra dive sites for the group booking
+                    if (!empty($validated['extra_dive_site_ids'])) {
+                        foreach ($validated['extra_dive_site_ids'] as $extraSiteId) {
+                            BookingDive::create([
+                                'parent_id' => $bookingDive->id,
+                                'booking_id' => $booking->id,
+                                'dive_site_id' => $extraSiteId,
+                                'boat_id' => $validated['boat_id'] ?? null,
+                                'dive_date' => $validated['dive_date'] ?? null,
+                                'dive_time' => $validated['dive_time'] ?? null,
+                                'price_list_item_id' => $validated['price_list_item_id'] ?? null,
+                                'price' => 0,
+                                'status' => $validated['status'] ?? 'Scheduled',
+                            ]);
+                        }
+                    }
 
                 $bookings[] = $booking;
                 $bookingDives[] = $bookingDive;

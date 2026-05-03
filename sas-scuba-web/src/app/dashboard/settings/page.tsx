@@ -26,6 +26,7 @@ const LocationsList = lazy(() => import("@/components/settings/LocationsList").t
 const CategoriesList = lazy(() => import("@/components/settings/CategoriesList").then(m => ({ default: m.CategoriesList })));
 const ServiceProvidersList = lazy(() => import("@/components/settings/ServiceProvidersList").then(m => ({ default: m.ServiceProvidersList })));
 const SuppliersList = lazy(() => import("@/components/settings/SuppliersList").then(m => ({ default: m.SuppliersList })));
+const EquipmentTypesList = lazy(() => import("@/components/settings/EquipmentTypesList").then(m => ({ default: m.EquipmentTypesList })));
 
 // Loading skeleton for accordion items
 const DropdownItemSkeleton = () => (
@@ -258,6 +259,14 @@ export default function SettingsPage() {
                                             <AccordionContent>
                                                 <Suspense fallback={<DropdownItemSkeleton />}>
                                                     <SuppliersList />
+                                                </Suspense>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                        <AccordionItem value="equipment-types">
+                                            <AccordionTrigger>Equipment Item List</AccordionTrigger>
+                                            <AccordionContent>
+                                                <Suspense fallback={<DropdownItemSkeleton />}>
+                                                    <EquipmentTypesList />
                                                 </Suspense>
                                             </AccordionContent>
                                         </AccordionItem>

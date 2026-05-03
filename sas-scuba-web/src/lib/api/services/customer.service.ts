@@ -24,6 +24,11 @@ export interface Customer {
         id: number;
         agent_name: string;
     };
+    price_list_id?: number;
+    price_list?: {
+        id: number;
+        name: string;
+    };
     emergency_contacts?: EmergencyContact[];
     created_at: string;
 }
@@ -45,6 +50,7 @@ export interface CustomerFormData {
     departure_flight_time?: string;
     departure_to?: string;
     agent_id?: number;
+    price_list_id?: number | null;
 }
 
 export interface PaginationParams {
@@ -61,6 +67,19 @@ export interface PaginatedResponse<T> {
     last_page: number;
     from: number;
     to: number;
+}
+
+export interface EquipmentRequestItem {
+    equipment_type_name: string;
+    rent: boolean;
+    own: boolean;
+    note: string;
+}
+
+export interface EquipmentRequestData {
+    expected_return_date?: string | null;
+    notes?: string | null;
+    items: EquipmentRequestItem[];
 }
 
 export const customerService = {
@@ -103,6 +122,16 @@ export const customerService = {
             customer_ids: customerIds,
             agent_id: agentId,
         });
+        return response.data;
+    },
+
+    getEquipmentRequest: async (customerId: string | number) => {
+        const response = await apiClient.get(`/api/v1/customers/${customerId}/equipment-request`);
+        return response.data;
+    },
+
+    updateEquipmentRequest: async (customerId: string | number, data: EquipmentRequestData) => {
+        const response = await apiClient.put(`/api/v1/customers/${customerId}/equipment-request`, data);
         return response.data;
     }
 };

@@ -24,13 +24,14 @@ class PriceListItemController extends Controller
             return response()->json(['message' => 'Dive center not found'], 404);
         }
 
-        $priceList = PriceList::where('dive_center_id', $diveCenterId)->first();
+        $query = PriceListItem::whereHas('priceList', function($q) use ($diveCenterId) {
+            $q->where('dive_center_id', $diveCenterId);
+        });
 
-        if (!$priceList) {
-            return response()->json(['data' => []]);
+        // Filter by specific price list if provided
+        if ($request->has('price_list_id')) {
+            $query->where('price_list_id', $request->input('price_list_id'));
         }
-
-        $query = PriceListItem::where('price_list_id', $priceList->id);
 
         // Filter by service type if provided
         if ($request->has('service_type')) {
@@ -42,7 +43,12 @@ class PriceListItemController extends Controller
             $query->where('is_active', $request->boolean('is_active'));
         }
 
-        return response()->json($query->orderBy('sort_order')->orderBy('name')->get());
+        $items = $query->with('priceList:id,name')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json($items);
     }
 
     /**

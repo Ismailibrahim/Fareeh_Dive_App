@@ -39,9 +39,10 @@ interface EmergencyContactFormProps {
     initialData?: EmergencyContact;
     onSave: () => void;
     onCancel: () => void;
+    hideHeader?: boolean;
 }
 
-export function EmergencyContactForm({ customerId, initialData, onSave, onCancel }: EmergencyContactFormProps) {
+export function EmergencyContactForm({ customerId, initialData, onSave, onCancel, hideHeader = false }: EmergencyContactFormProps) {
     const createMutation = useCreateEmergencyContact();
     const updateMutation = useUpdateEmergencyContact();
     const [relationships, setRelationships] = useState<Relationship[]>([]);
@@ -104,17 +105,19 @@ export function EmergencyContactForm({ customerId, initialData, onSave, onCancel
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-xl flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-primary" />
-                    {initialData ? "Edit Emergency Contact" : "Add Emergency Contact"}
-                </CardTitle>
-                <CardDescription>
-                    {initialData ? "Update emergency contact information." : "Add a new emergency contact for this customer."}
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
+        <Card className={hideHeader ? "border-0 shadow-none" : ""}>
+            {!hideHeader && (
+                <CardHeader>
+                    <CardTitle className="text-xl flex items-center gap-2">
+                        <AlertCircle className="h-5 w-5 text-primary" />
+                        {initialData ? "Edit Emergency Contact" : "Add Emergency Contact"}
+                    </CardTitle>
+                    <CardDescription>
+                        {initialData ? "Update emergency contact information." : "Add a new emergency contact for this customer."}
+                    </CardDescription>
+                </CardHeader>
+            )}
+            <CardContent className={hideHeader ? "p-0" : ""}>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

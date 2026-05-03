@@ -20,7 +20,8 @@ class BookingDiveController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = BookingDive::with(['booking.customer', 'booking.diveGroup', 'diveSite', 'boat', 'priceListItem']);
+        $query = BookingDive::whereNull('parent_id')
+            ->with(['booking.customer', 'booking.diveGroup', 'diveSite', 'boat', 'priceListItem']);
 
         if ($user->dive_center_id) {
             // Use join instead of whereHas for better performance
@@ -29,7 +30,9 @@ class BookingDiveController extends Controller
                   ->select('booking_dives.*');
         }
 
-        return $query->orderBy('booking_dives.created_at', 'desc')->paginate(20);
+        return $query->withCount('invoiceItems')
+            ->orderBy('booking_dives.created_at', 'desc')
+            ->paginate(20);
     }
 
     /**
@@ -43,6 +46,8 @@ class BookingDiveController extends Controller
         $validated = $request->validate([
             'booking_id' => 'nullable|exists:bookings,id',
             'customer_id' => 'nullable|exists:customers,id',
+            'customer_ids' => 'nullable|array',
+            'customer_ids.*' => 'exists:customers,id',
             'dive_group_id' => 'nullable|exists:dive_groups,id',
             'booking_date' => 'nullable|date',
             'number_of_divers' => 'nullable|integer|min:1',
@@ -51,7 +56,7 @@ class BookingDiveController extends Controller
             'dive_site_id' => 'required|exists:dive_sites,id',
             'boat_id' => 'nullable|exists:boats,id',
             'dive_date' => 'nullable|date',
-            'dive_time' => 'nullable|date_format:H:i',
+            'dive_time' => 'nullable|regex:/^([0-9]{2}:[0-9]{2})(:[0-9]{2})?$/',
             'price_list_item_id' => 'nullable|exists:price_list_items,id',
             'price' => 'nullable|numeric|min:0',
             'dive_duration' => 'nullable|integer|min:1|max:600',
@@ -59,7 +64,110 @@ class BookingDiveController extends Controller
             'status' => 'nullable|in:Scheduled,In Progress,Completed,Cancelled',
             'completed_at' => 'nullable|date',
             'dive_log_notes' => 'nullable|string',
+            'additional_items' => 'nullable|array',
+            'additional_items.*.price_list_item_id' => 'required|exists:price_list_items,id',
+            'additional_items.*.price' => 'required|numeric|min:0',
+            'additional_items.*.dive_site_id' => 'nullable|exists:dive_sites,id',
+            'extra_dive_site_ids' => 'nullable|array',
+            'extra_dive_site_ids.*' => 'exists:dive_sites,id',
         ]);
+
+        // Handle multiple customer quick booking (Walk-in Group)
+        if (isset($validated['customer_ids']) && !empty($validated['customer_ids'])) {
+            $customers = \App\Models\Customer::whereIn('id', $validated['customer_ids'])
+                ->where('dive_center_id', $diveCenterId)
+                ->get();
+
+            if ($customers->isEmpty()) {
+                return response()->json(['message' => 'No valid customers found'], 422);
+            }
+
+            DB::beginTransaction();
+            try {
+                $bookings = [];
+                $bookingDives = [];
+                $pricingService = new DivePricingService($diveCenterId);
+
+                foreach ($customers as $customer) {
+                    $booking = Booking::create([
+                        'dive_center_id' => $diveCenterId,
+                        'customer_id' => $customer->id,
+                        'agent_id' => $customer->agent_id ?? null,
+                        'booking_date' => $validated['booking_date'] ?? $validated['dive_date'] ?? now()->toDateString(),
+                        'number_of_divers' => 1,
+                        'status' => 'Pending',
+                    ]);
+
+                    $diveData = [
+                        'booking_id' => $booking->id,
+                        'dive_site_id' => $validated['dive_site_id'],
+                        'boat_id' => $validated['boat_id'] ?? null,
+                        'dive_date' => $validated['dive_date'] ?? null,
+                        'dive_time' => $validated['dive_time'] ?? null,
+                        'dive_duration' => $validated['dive_duration'] ?? null,
+                        'max_depth' => $validated['max_depth'] ?? null,
+                        'status' => $validated['status'] ?? 'Scheduled',
+                        'dive_log_notes' => $validated['dive_log_notes'] ?? null,
+                    ];
+
+                    // pricing logic (similar to group booking)
+                    if (isset($validated['price_list_item_id'])) {
+                        $diveData['price_list_item_id'] = $validated['price_list_item_id'];
+                        $diveData['price'] = $validated['price'] ?? 0;
+                    } else {
+                        $existingDiveCount = $booking->bookingDives()->count();
+                        $newDiveCount = $existingDiveCount + 1;
+                        $customerType = $pricingService->getCustomerType($customer);
+                        $priceListItem = $pricingService->getBestPrice(
+                            $newDiveCount,
+                            'Dive Trip',
+                            $customerType,
+                            $validated['dive_date'] ?? now()->toDateString()
+                        );
+                        
+                        if ($priceListItem) {
+                            $diveData['price_list_item_id'] = $priceListItem->id;
+                            if ($priceListItem->pricing_model === 'TIERED') {
+                                $diveData['price'] = $pricingService->calculateTieredPrice($newDiveCount, $priceListItem);
+                            } else {
+                                $diveData['price'] = $priceListItem->base_price ?? $priceListItem->price;
+                            }
+                        }
+                    }
+
+                    $bookingDive = BookingDive::create($diveData);
+
+                    // Add extra dive sites if provided
+                    if (!empty($validated['extra_dive_site_ids'])) {
+                        foreach ($validated['extra_dive_site_ids'] as $extraSiteId) {
+                            BookingDive::create([
+                                'parent_id' => $bookingDive->id,
+                                'booking_id' => $booking->id,
+                                'dive_site_id' => $extraSiteId,
+                                'boat_id' => $validated['boat_id'] ?? null,
+                                'dive_date' => $validated['dive_date'] ?? null,
+                                'dive_time' => $validated['dive_time'] ?? null,
+                                'price' => 0,
+                                'status' => $validated['status'] ?? 'Scheduled',
+                            ]);
+                        }
+                    }
+
+                    $bookings[] = $booking;
+                    $bookingDives[] = $bookingDive;
+                }
+
+                DB::commit();
+                return response()->json([
+                    'message' => 'Multiple bookings created successfully',
+                    'bookings' => $bookings,
+                    'booking_dives' => $bookingDives,
+                ], 201);
+            } catch (\Exception $e) {
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to create multiple bookings', 'error' => $e->getMessage()], 500);
+            }
+        }
 
         // Handle dive group booking
         if (isset($validated['dive_group_id'])) {
@@ -180,6 +288,7 @@ class BookingDiveController extends Controller
         }
 
         // Walk-in support: Auto-create booking if booking_id not provided
+        \Log::info('Incoming BookingDive store request', $validated);
         $bookingId = $validated['booking_id'] ?? null;
         
         if (!$bookingId && isset($validated['customer_id'])) {
@@ -242,8 +351,8 @@ class BookingDiveController extends Controller
                     $q->where('dive_center_id', $diveCenterId);
                 })
                 ->firstOrFail();
-        } else {
-            // Auto-select best price based on dive count
+        } elseif (empty($validated['additional_items'])) {
+            // Auto-select best price based on dive count if no manual price and no additional items
             $pricingService = new DivePricingService();
             
             // Count existing dives for this booking
@@ -307,6 +416,17 @@ class BookingDiveController extends Controller
             }
         }
 
+        // Handle additional items promotion to main if main is empty
+        $additionalItems = $validated['additional_items'] ?? [];
+        if (!$priceListItem && !empty($additionalItems) && !isset($validated['price_list_item_id'])) {
+            $firstItem = array_shift($additionalItems);
+            $diveData['price_list_item_id'] = $firstItem['price_list_item_id'];
+            $diveData['price'] = $firstItem['price'];
+            if (!empty($firstItem['dive_site_id'])) {
+                $diveData['dive_site_id'] = $firstItem['dive_site_id'];
+            }
+        }
+
         // Auto-set completed_at if status is Completed
         if ($diveData['status'] === 'Completed' && !$diveData['completed_at']) {
             $diveData['completed_at'] = now();
@@ -315,6 +435,40 @@ class BookingDiveController extends Controller
         DB::beginTransaction();
         try {
             $bookingDive = BookingDive::create($diveData);
+            
+            // Add extra dive sites for the main service
+            if (!empty($validated['extra_dive_site_ids'])) {
+                foreach ($validated['extra_dive_site_ids'] as $extraSiteId) {
+                    $childData = $diveData;
+                    $childData['parent_id'] = $bookingDive->id;
+                    $childData['dive_site_id'] = $extraSiteId;
+                    $childData['price'] = 0; // Extra sites for the same service are free
+                    // Clear dive log fields for child sites as they will be filled later
+                    $childData['dive_duration'] = null;
+                    $childData['max_depth'] = null;
+                    $childData['dive_log_notes'] = null;
+                    $childData['status'] = 'Scheduled';
+                    
+                    BookingDive::create($childData);
+                }
+            }
+            
+            // Add remaining additional items
+            if (!empty($additionalItems)) {
+                foreach ($additionalItems as $item) {
+                    $child = BookingDive::create([
+                        'parent_id' => $bookingDive->id,
+                        'booking_id' => $bookingId,
+                        'dive_site_id' => !empty($item['dive_site_id']) ? $item['dive_site_id'] : $validated['dive_site_id'],
+                        'dive_date' => $validated['dive_date'] ?? null,
+                        'dive_time' => $validated['dive_time'] ?? null,
+                        'price_list_item_id' => $item['price_list_item_id'],
+                        'price' => $item['price'],
+                        'status' => $validated['status'] ?? 'Scheduled',
+                    ]);
+                    \Log::info('Created child dive', ['id' => $child->id, 'site_id' => $child->dive_site_id]);
+                }
+            }
             
             // Update package dive counter if package dive
             if ($divePackage) {
@@ -352,7 +506,7 @@ class BookingDiveController extends Controller
         }
         $this->authorizeDiveCenterAccess($bookingDive->booking, 'Unauthorized access to this dive');
         
-        $bookingDive->load(['booking.customer', 'booking.diveGroup', 'diveSite', 'boat', 'priceListItem', 'bookingInstructors.user']);
+        $bookingDive->load(['booking.customer', 'booking.diveGroup', 'diveSite', 'boat', 'priceListItem', 'bookingInstructors.user', 'additionalItems.priceListItem']);
         return $bookingDive;
     }
 
@@ -376,7 +530,7 @@ class BookingDiveController extends Controller
             'dive_site_id' => 'sometimes|exists:dive_sites,id',
             'boat_id' => 'nullable|exists:boats,id',
             'dive_date' => 'nullable|date',
-            'dive_time' => 'nullable|date_format:H:i',
+            'dive_time' => 'nullable|regex:/^([0-9]{2}:[0-9]{2})(:[0-9]{2})?$/',
             'price_list_item_id' => 'nullable|exists:price_list_items,id',
             'price' => 'nullable|numeric|min:0',
             'dive_duration' => 'nullable|integer|min:1|max:600',
@@ -384,6 +538,13 @@ class BookingDiveController extends Controller
             'status' => 'nullable|in:Scheduled,In Progress,Completed,Cancelled',
             'completed_at' => 'nullable|date',
             'dive_log_notes' => 'nullable|string',
+            'additional_items' => 'nullable|array',
+            'additional_items.*.id' => 'nullable|exists:booking_dives,id',
+            'additional_items.*.price_list_item_id' => 'required|exists:price_list_items,id',
+            'additional_items.*.price' => 'required|numeric|min:0',
+            'additional_items.*.dive_site_id' => 'nullable|exists:dive_sites,id',
+            'extra_dive_site_ids' => 'nullable|array',
+            'extra_dive_site_ids.*' => 'exists:dive_sites,id',
         ]);
 
         // Validate price_list_item belongs to same dive center if provided
@@ -400,8 +561,91 @@ class BookingDiveController extends Controller
             $validated['completed_at'] = now();
         }
 
-        $bookingDive->update($validated);
-        $bookingDive->load(['booking.customer', 'diveSite', 'boat', 'priceListItem', 'bookingInstructors.user']);
+        // Handle additional items promotion to main if main is empty
+        $additionalItems = $validated['additional_items'] ?? null;
+        $extraDiveSiteIds = $validated['extra_dive_site_ids'] ?? null;
+        $updateData = collect($validated)->except(['additional_items', 'extra_dive_site_ids'])->toArray();
+        
+        if ((!isset($updateData['price_list_item_id']) || $updateData['price_list_item_id'] === null) && !empty($additionalItems)) {
+            $firstItem = array_shift($additionalItems);
+            $updateData['price_list_item_id'] = $firstItem['price_list_item_id'];
+            $updateData['price'] = $firstItem['price'];
+            if (!empty($firstItem['dive_site_id'])) {
+                $updateData['dive_site_id'] = $firstItem['dive_site_id'];
+            }
+        }
+
+        $bookingDive->update($updateData);
+
+        // Sync basic dive details to existing additional items
+        $bookingDive->additionalItems()->update([
+            'booking_id' => $bookingDive->booking_id,
+            'dive_date' => $bookingDive->dive_date,
+            'dive_time' => $bookingDive->dive_time,
+            'status' => $bookingDive->status,
+        ]);
+
+        // Update additional items
+        if ($additionalItems !== null) {
+            $items = $additionalItems;
+            $existingIds = [];
+
+            foreach ($items as $item) {
+                if (isset($item['id'])) {
+                    // Update existing extra item
+                    $extraItem = BookingDive::where('id', $item['id'])
+                        ->where('parent_id', $bookingDive->id)
+                        ->first();
+                    if ($extraItem) {
+                        $extraItem->update([
+                            'price_list_item_id' => $item['price_list_item_id'],
+                            'price' => $item['price'],
+                            'dive_site_id' => !empty($item['dive_site_id']) ? $item['dive_site_id'] : $bookingDive->dive_site_id,
+                        ]);
+                        $existingIds[] = $extraItem->id;
+                    }
+                } else {
+                    // Create new extra item
+                    $newExtra = BookingDive::create([
+                        'parent_id' => $bookingDive->id,
+                        'booking_id' => $bookingDive->booking_id,
+                        'dive_site_id' => !empty($item['dive_site_id']) ? $item['dive_site_id'] : $bookingDive->dive_site_id,
+                        'dive_date' => $bookingDive->dive_date,
+                        'dive_time' => $bookingDive->dive_time,
+                        'price_list_item_id' => $item['price_list_item_id'],
+                        'price' => $item['price'],
+                        'status' => $bookingDive->status,
+                    ]);
+                    $existingIds[] = $newExtra->id;
+                }
+            }
+
+            // Delete extra items not in the list
+            $bookingDive->additionalItems()->whereNotIn('id', $existingIds)->delete();
+        }
+
+        // Update extra dive sites (price 0)
+        if ($extraDiveSiteIds !== null) {
+            // For extra sites, we treat them as children with price 0
+            // We'll sync them by deleting existing price-0 children and re-creating
+            // (Simpler than trying to match IDs for 0-price items)
+            $bookingDive->additionalItems()->where('price', 0)->delete();
+            
+            foreach ($extraDiveSiteIds as $extraSiteId) {
+                BookingDive::create([
+                    'parent_id' => $bookingDive->id,
+                    'booking_id' => $bookingDive->booking_id,
+                    'dive_site_id' => $extraSiteId,
+                    'dive_date' => $bookingDive->dive_date,
+                    'dive_time' => $bookingDive->dive_time,
+                    'price_list_item_id' => $bookingDive->price_list_item_id,
+                    'price' => 0,
+                    'status' => $bookingDive->status,
+                ]);
+            }
+        }
+
+        $bookingDive->load(['booking.customer', 'diveSite', 'boat', 'priceListItem', 'bookingInstructors.user', 'additionalItems.priceListItem']);
         
         return response()->json($bookingDive);
     }

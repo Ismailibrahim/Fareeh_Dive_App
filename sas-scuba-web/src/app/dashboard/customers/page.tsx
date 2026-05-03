@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, MoreHorizontal, User as UserIcon, Plus, Award, AlertCircle, Building2 } from "lucide-react";
+import { Search, MoreHorizontal, User as UserIcon, Plus, Award, AlertCircle, Building2, Shield, Hotel, Plane } from "lucide-react";
 import Link from "next/link";
 import { safeFormatDate } from "@/lib/utils/date-format";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -41,6 +41,11 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { DepartureInfoDialog } from "@/components/customers/DepartureInfoDialog";
+import { AddCertificationDialog } from "@/components/customers/AddCertificationDialog";
+import { AddInsuranceDialog } from "@/components/customers/AddInsuranceDialog";
+import { AddEmergencyContactDialog } from "@/components/customers/AddEmergencyContactDialog";
+import { AddAccommodationDialog } from "@/components/customers/AddAccommodationDialog";
 
 export default function CustomersPage() {
     const [searchTerm, setSearchTerm] = useState("");
@@ -54,6 +59,16 @@ export default function CustomersPage() {
     // Selection state
     const [selectedCustomers, setSelectedCustomers] = useState<Set<number>>(new Set());
     const [assignAgentDialogOpen, setAssignAgentDialogOpen] = useState(false);
+
+    // Quick links state
+    const [departureInfoDialogOpen, setDepartureInfoDialogOpen] = useState(false);
+    const [customerForDepartureInfo, setCustomerForDepartureInfo] = useState<Customer | null>(null);
+
+    const [certificationDialogOpen, setCertificationDialogOpen] = useState(false);
+    const [insuranceDialogOpen, setInsuranceDialogOpen] = useState(false);
+    const [emergencyContactDialogOpen, setEmergencyContactDialogOpen] = useState(false);
+    const [accommodationDialogOpen, setAccommodationDialogOpen] = useState(false);
+    const [customerForQuickAction, setCustomerForQuickAction] = useState<Customer | null>(null);
 
     // Debounce search term (500ms delay)
     const debouncedSearch = useDebouncedCallback((value: string) => {
@@ -142,6 +157,19 @@ export default function CustomersPage() {
 
     const handleAssignAgentSuccess = () => {
         setSelectedCustomers(new Set());
+    };
+
+    const handleDepartureInfoClick = (customer: Customer) => {
+        setCustomerForDepartureInfo(customer);
+        setDepartureInfoDialogOpen(true);
+    };
+
+    const handleQuickAction = (customer: Customer, action: 'certification' | 'insurance' | 'emergency' | 'accommodation') => {
+        setCustomerForQuickAction(customer);
+        if (action === 'certification') setCertificationDialogOpen(true);
+        if (action === 'insurance') setInsuranceDialogOpen(true);
+        if (action === 'emergency') setEmergencyContactDialogOpen(true);
+        if (action === 'accommodation') setAccommodationDialogOpen(true);
     };
 
     return (
@@ -288,6 +316,11 @@ export default function CustomersPage() {
                                                     <CustomerActions
                                                         customerId={customer.id}
                                                         onDelete={() => handleDeleteClick(customer)}
+                                                        onDepartureInfoClick={() => handleDepartureInfoClick(customer)}
+                                                        onCertificationClick={() => handleQuickAction(customer, 'certification')}
+                                                        onInsuranceClick={() => handleQuickAction(customer, 'insurance')}
+                                                        onEmergencyContactClick={() => handleQuickAction(customer, 'emergency')}
+                                                        onAccommodationClick={() => handleQuickAction(customer, 'accommodation')}
                                                     />
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
@@ -367,6 +400,11 @@ export default function CustomersPage() {
                                             <CustomerActions
                                                 customerId={customer.id}
                                                 onDelete={() => handleDeleteClick(customer)}
+                                                onDepartureInfoClick={() => handleDepartureInfoClick(customer)}
+                                                onCertificationClick={() => handleQuickAction(customer, 'certification')}
+                                                onInsuranceClick={() => handleQuickAction(customer, 'insurance')}
+                                                onEmergencyContactClick={() => handleQuickAction(customer, 'emergency')}
+                                                onAccommodationClick={() => handleQuickAction(customer, 'accommodation')}
                                             />
                                         </DropdownMenuContent>
                                     </DropdownMenu>
@@ -421,11 +459,57 @@ export default function CustomersPage() {
                 selectedCustomerIds={Array.from(selectedCustomers)}
                 onSuccess={handleAssignAgentSuccess}
             />
+
+            <DepartureInfoDialog
+                open={departureInfoDialogOpen}
+                onOpenChange={setDepartureInfoDialogOpen}
+                customer={customerForDepartureInfo}
+            />
+
+            <AddCertificationDialog
+                open={certificationDialogOpen}
+                onOpenChange={setCertificationDialogOpen}
+                customer={customerForQuickAction}
+            />
+
+            <AddInsuranceDialog
+                open={insuranceDialogOpen}
+                onOpenChange={setInsuranceDialogOpen}
+                customer={customerForQuickAction}
+            />
+
+            <AddEmergencyContactDialog
+                open={emergencyContactDialogOpen}
+                onOpenChange={setEmergencyContactDialogOpen}
+                customer={customerForQuickAction}
+            />
+
+            <AddAccommodationDialog
+                open={accommodationDialogOpen}
+                onOpenChange={setAccommodationDialogOpen}
+                customer={customerForQuickAction}
+            />
         </div>
     );
 }
 
-function CustomerActions({ customerId, onDelete }: { customerId: number | string, onDelete: () => void }) {
+function CustomerActions({ 
+    customerId, 
+    onDelete,
+    onDepartureInfoClick,
+    onCertificationClick,
+    onInsuranceClick,
+    onEmergencyContactClick,
+    onAccommodationClick
+}: { 
+    customerId: number | string, 
+    onDelete: () => void,
+    onDepartureInfoClick: () => void,
+    onCertificationClick: () => void,
+    onInsuranceClick: () => void,
+    onEmergencyContactClick: () => void,
+    onAccommodationClick: () => void
+}) {
     return (
         <>
             <DropdownMenuItem asChild>
@@ -438,17 +522,56 @@ function CustomerActions({ customerId, onDelete }: { customerId: number | string
                     Edit
                 </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-                <Link href={`/dashboard/customer-certifications/create?customer_id=${customerId}`} className="cursor-pointer flex w-full items-center">
-                    <Award className="mr-2 h-4 w-4" />
-                    Add Certification
-                </Link>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+                className="cursor-pointer flex w-full items-center"
+                onSelect={(e) => {
+                    e.preventDefault();
+                    onCertificationClick();
+                }}
+            >
+                <Award className="mr-2 h-4 w-4" />
+                Add Certification
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-                <Link href={`/dashboard/emergency-contacts/create?customer_id=${customerId}`} className="cursor-pointer flex w-full items-center">
-                    <AlertCircle className="mr-2 h-4 w-4" />
-                    Add Emergency Contact
-                </Link>
+            <DropdownMenuItem 
+                className="cursor-pointer flex w-full items-center"
+                onSelect={(e) => {
+                    e.preventDefault();
+                    onEmergencyContactClick();
+                }}
+            >
+                <AlertCircle className="mr-2 h-4 w-4" />
+                Add Emergency Contact
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+                className="cursor-pointer flex w-full items-center"
+                onSelect={(e) => {
+                    e.preventDefault();
+                    onInsuranceClick();
+                }}
+            >
+                <Shield className="mr-2 h-4 w-4" />
+                Add Insurance
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+                className="cursor-pointer flex w-full items-center"
+                onSelect={(e) => {
+                    e.preventDefault();
+                    onAccommodationClick();
+                }}
+            >
+                <Hotel className="mr-2 h-4 w-4" />
+                Add Accommodation
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+                className="cursor-pointer flex w-full items-center"
+                onSelect={(e) => {
+                    e.preventDefault();
+                    onDepartureInfoClick();
+                }}
+            >
+                <Plane className="mr-2 h-4 w-4" />
+                Departure Information
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

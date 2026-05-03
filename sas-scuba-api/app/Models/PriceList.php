@@ -10,6 +10,11 @@ class PriceList extends Model
         'dive_center_id',
         'name',
         'notes',
+        'is_default',
+    ];
+
+    protected $casts = [
+        'is_default' => 'boolean',
     ];
 
     /**

@@ -69,7 +69,7 @@ export default function EditBookingDivePage() {
                     </div>
                 </div>
 
-                <div className="mx-auto max-w-3xl">
+                <div className="mx-auto max-w-6xl">
                     <BookingDiveForm initialData={bookingDive} bookingDiveId={id} />
                 </div>
             </div>

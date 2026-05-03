@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { BulkAddEquipmentDialog } from "@/components/booking-equipment/BulkAddEquipmentDialog";
 import { EquipmentReturnDialog } from "@/components/booking-equipment/EquipmentReturnDialog";
 import { EquipmentTemplates } from "@/components/booking-equipment/EquipmentTemplates";
+import { AssignEquipmentDialog } from "@/components/booking-equipment/AssignEquipmentDialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
@@ -25,6 +26,8 @@ export default function BasketDetailPage() {
     const [loading, setLoading] = useState(true);
     const [bulkAddDialogOpen, setBulkAddDialogOpen] = useState(false);
     const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+    const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+    const [equipmentToAssign, setEquipmentToAssign] = useState<any>(null);
     const [equipmentSourceFilter, setEquipmentSourceFilter] = useState<string>('');
     const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<Set<number>>(new Set());
 
@@ -485,12 +488,25 @@ export default function BasketDetailPage() {
                                             {Number(equipment.price || 0) > 0 && (
                                                 <p className="font-semibold">${Number(equipment.price || 0).toFixed(2)}</p>
                                             )}
+                                            {equipment.equipment_source === 'Center' && !equipment.equipment_item_id && basket.status === 'Active' && (
+                                                <Button 
+                                                    size="sm" 
+                                                    variant="default"
+                                                    onClick={() => {
+                                                        setEquipmentToAssign(equipment);
+                                                        setAssignDialogOpen(true);
+                                                    }}
+                                                >
+                                                    Tag Inventory
+                                                </Button>
+                                            )}
                                             <Badge 
                                                 variant={
                                                     equipment.assignment_status === 'Returned' ? 'default' :
                                                     equipment.assignment_status === 'Checked Out' ? 'secondary' :
                                                     equipment.assignment_status === 'Lost' ? 'destructive' : 'outline'
                                                 }
+
                                             >
                                                 {equipment.assignment_status}
                                             </Badge>
@@ -527,6 +543,16 @@ export default function BasketDetailPage() {
                     }}
                 />
             )}
+
+            {/* Assign Dialog */}
+            <AssignEquipmentDialog
+                open={assignDialogOpen}
+                onOpenChange={setAssignDialogOpen}
+                equipment={equipmentToAssign}
+                onSuccess={() => {
+                    loadBasket();
+                }}
+            />
             </div>
         </div>
     );

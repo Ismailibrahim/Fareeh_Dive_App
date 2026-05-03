@@ -24,7 +24,7 @@ export default function CreateBookingDivePage() {
                     </div>
                 </div>
 
-                <div className="mx-auto max-w-3xl">
+                <div className="mx-auto max-w-6xl">
                     <BookingDiveForm />
                 </div>
             </div>

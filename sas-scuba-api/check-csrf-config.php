@@ -38,25 +38,37 @@ if (empty($statefulDomains)) {
 // Check if frontend URL is in stateful domains
 $frontendUrl = env('FRONTEND_URL');
 if ($frontendUrl) {
-    $frontendDomain = parse_url($frontendUrl, PHP_URL_HOST);
-    $frontendPort = parse_url($frontendUrl, PHP_URL_PORT);
-    $frontendDomainWithPort = $frontendPort ? "{$frontendDomain}:{$frontendPort}" : $frontendDomain;
-    
-    $found = false;
-    foreach ($statefulDomains as $domain) {
-        if ($domain === $frontendDomain || $domain === $frontendDomainWithPort || 
-            $domain === $frontendUrl || str_contains($domain, $frontendDomain)) {
-            $found = true;
-            break;
+    $frontendUrls = array_map('trim', explode(',', $frontendUrl));
+    $allFound = true;
+    $missing = [];
+
+    foreach ($frontendUrls as $url) {
+        $frontendDomain = parse_url($url, PHP_URL_HOST);
+        $frontendPort = parse_url($url, PHP_URL_PORT);
+        $frontendDomainWithPort = $frontendPort ? "{$frontendDomain}:{$frontendPort}" : $frontendDomain;
+        
+        $found = false;
+        foreach ($statefulDomains as $domain) {
+            if ($domain === $frontendDomain || $domain === $frontendDomainWithPort || 
+                $domain === $url || str_contains($domain, $frontendDomain)) {
+                $found = true;
+                break;
+            }
+        }
+        
+        if (!$found) {
+            $allFound = false;
+            $missing[] = $url;
         }
     }
     
-    if ($found) {
-        echo "   ✓ Frontend URL ({$frontendUrl}) is in stateful domains\n";
-        $passed[] = "Frontend URL in stateful domains";
+    if ($allFound) {
+        echo "   ✓ All Frontend URLs are in stateful domains\n";
+        $passed[] = "Frontend URLs in stateful domains";
     } else {
-        echo "   ✗ Frontend URL ({$frontendUrl}) is NOT in stateful domains\n";
-        $errors[] = "FRONTEND_URL ({$frontendUrl}) must be included in SANCTUM_STATEFUL_DOMAINS";
+        $missingStr = implode(', ', $missing);
+        echo "   ✗ Some Frontend URLs ({$missingStr}) are NOT in stateful domains\n";
+        $errors[] = "Some FRONTEND_URLs must be included in SANCTUM_STATEFUL_DOMAINS";
     }
 } else {
     echo "   ⚠ FRONTEND_URL is not set\n";

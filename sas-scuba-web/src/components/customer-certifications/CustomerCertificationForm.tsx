@@ -21,13 +21,14 @@ import { useCreateCustomerCertification, useUpdateCustomerCertification } from "
 import { customerService, Customer } from "@/lib/api/services/customer.service";
 import { agencyService, Agency } from "@/lib/api/services/agency.service";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarIcon, Award, User, Building, UserCircle, FileText, Upload, X, CheckCircle2 } from "lucide-react";
+import { CalendarIcon, Award, User, Building, UserCircle, FileText, Upload, X, CheckCircle2, Eye, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { safeParseDate } from "@/lib/utils/date-format";
 import { cn } from "@/lib/utils";
 import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
 import { fileUploadService } from "@/lib/api/services/file-upload.service";
 import { Switch } from "@/components/ui/switch";
+import { getMediaUrl } from "@/lib/api/client";
 
 const certificationSchema = z.object({
     customer_id: z.string().min(1, "Customer is required"),
@@ -49,9 +50,11 @@ interface CustomerCertificationFormProps {
     certificationId?: number;
     disableCustomerSelect?: boolean;
     redirectToCustomer?: boolean;
+    onSuccess?: () => void;
+    onCancel?: () => void;
 }
 
-export function CustomerCertificationForm({ initialData, certificationId, disableCustomerSelect = false, redirectToCustomer = false }: CustomerCertificationFormProps) {
+export function CustomerCertificationForm({ initialData, certificationId, disableCustomerSelect = false, redirectToCustomer = false, onSuccess, onCancel }: CustomerCertificationFormProps) {
     const router = useRouter();
     const createMutation = useCreateCustomerCertification();
     const updateMutation = useUpdateCustomerCertification();
@@ -109,14 +112,28 @@ export function CustomerCertificationForm({ initialData, certificationId, disabl
             form.setValue('customer_id', String(initialData.customer_id));
         }
         if (initialData?.file_url) {
-            setUploadedFile({ name: 'Current file', url: initialData.file_url });
+            setUploadedFile({ 
+                name: initialData.file_url.split('/').pop() || 'Current file', 
+                url: initialData.file_url 
+            });
         }
     }, [initialData, certificationId, form]);
+
+    const fileUrl = form.watch('file_url');
+    const isImage = (url: string) => /\.(jpg|jpeg|png|webp|gif)$/i.test(url);
+    const isPDF = (url: string) => /\.pdf$/i.test(url);
 
     const handleFileUpload = async (file: File) => {
         setUploading(true);
         try {
-            const result = await fileUploadService.upload(file);
+            // Pass entity metadata for certificate uploads
+            // entityType must be 'customer', category must be 'dive-certificate'
+            const result = await fileUploadService.upload(file, {
+                entityType: 'customer',
+                entityId: String(form.getValues('customer_id')),
+                category: 'dive-certificate'
+            });
+
             if (result.success) {
                 form.setValue('file_url', result.url);
                 setUploadedFile({ name: result.original_name, url: result.url });
@@ -181,12 +198,16 @@ export function CustomerCertificationForm({ initialData, certificationId, disabl
             }
             
             // Redirect based on context
-            if (redirectToCustomer && customerId) {
+            if (onSuccess) {
+                onSuccess();
+            } else if (redirectToCustomer && customerId) {
                 router.push(`/dashboard/customers/${customerId}`);
             } else {
                 router.push("/dashboard/customer-certifications");
             }
-            router.refresh();
+            if (!onSuccess) {
+                router.refresh();
+            }
         } catch (error: any) {
             console.error("Failed to save certification", error);
             console.error("Error response:", error?.response?.data);
@@ -431,33 +452,97 @@ export function CustomerCertificationForm({ initialData, certificationId, disabl
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-6">
-                        {uploadedFile ? (
-                            <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
-                                <div className="flex items-center gap-3">
-                                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                    <div>
-                                        <p className="text-sm font-medium">{uploadedFile.name}</p>
-                                        <a 
-                                            href={uploadedFile.url} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="text-xs text-primary hover:underline"
+                        {fileUrl && (
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className="bg-primary/10 p-2 rounded-md">
+                                            {isPDF(fileUrl) ? (
+                                                <FileText className="h-5 w-5 text-primary" />
+                                            ) : isImage(fileUrl) ? (
+                                                <Award className="h-5 w-5 text-primary" />
+                                            ) : (
+                                                <FileText className="h-5 w-5 text-primary" />
+                                            )}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium truncate">
+                                                {uploadedFile?.name || fileUrl.split('/').pop() || 'Certificate Document'}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {isPDF(fileUrl) ? 'PDF Document' : isImage(fileUrl) ? 'Image File' : 'Attachment'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => window.open(getMediaUrl(fileUrl), '_blank')}
+                                            className="h-8 gap-1.5"
                                         >
-                                            View file
-                                        </a>
+                                            <ExternalLink className="h-3.5 w-3.5" />
+                                            Open
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={removeFile}
+                                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
                                     </div>
                                 </div>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={removeFile}
-                                    className="text-destructive hover:text-destructive"
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button>
+
+                                {isImage(fileUrl) && (
+                                    <div className="relative aspect-video w-full overflow-hidden rounded-lg border bg-muted/20 group">
+                                        <img 
+                                            src={getMediaUrl(fileUrl)} 
+                                            alt="Certificate Preview" 
+                                            className="h-full w-full object-contain transition-transform group-hover:scale-[1.02]"
+                                        />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <Button 
+                                                type="button"
+                                                variant="secondary" 
+                                                size="sm" 
+                                                className="gap-2"
+                                                onClick={() => window.open(getMediaUrl(fileUrl), '_blank')}
+                                            >
+                                                <Eye className="h-4 w-4" />
+                                                View Full Size
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {isPDF(fileUrl) && (
+                                    <div className="w-full rounded-lg border bg-muted/20 p-8 flex flex-col items-center justify-center gap-4 text-center">
+                                        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                                            <FileText className="h-8 w-8 text-primary" />
+                                        </div>
+                                        <div>
+                                            <p className="font-medium">PDF Certificate Attached</p>
+                                            <p className="text-sm text-muted-foreground mt-1">PDF previews are not supported in this view.</p>
+                                        </div>
+                                        <Button 
+                                            type="button"
+                                            variant="outline" 
+                                            className="gap-2"
+                                            onClick={() => window.open(getMediaUrl(fileUrl), '_blank')}
+                                        >
+                                            <ExternalLink className="h-4 w-4" />
+                                            Open PDF to View
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
-                        ) : (
+                        )}
+
+                        {!fileUrl && (
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium mb-2">
@@ -514,7 +599,7 @@ export function CustomerCertificationForm({ initialData, certificationId, disabl
                 </Card>
 
                 <div className="flex justify-end gap-4">
-                    <Button type="button" variant="outline" size="lg" onClick={() => router.back()}>
+                    <Button type="button" variant="outline" size="lg" onClick={() => onCancel ? onCancel() : router.back()}>
                         Cancel
                     </Button>
                     <Button type="submit" size="lg" disabled={loading}>

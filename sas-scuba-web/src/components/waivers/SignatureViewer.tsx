@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { WaiverSignature } from "@/lib/api/services/waiver.service";
 import { safeFormatDate } from "@/lib/utils/date-format";
 import { FileText, Calendar, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { getMediaUrl } from "@/lib/api/client";
 
 interface SignatureViewerProps {
     signature: WaiverSignature;
@@ -58,7 +59,7 @@ export function SignatureViewer({ signature, className }: SignatureViewerProps) 
                         <h4 className="text-sm font-semibold">Signature</h4>
                         <div className="border rounded-lg p-4 bg-white">
                             <img
-                                src={signature.signature_data}
+                                src={getMediaUrl(signature.signature_data)}
                                 alt={`Signature for ${signature.waiver?.name || 'waiver'}`}
                                 className="max-w-full border rounded"
                             />

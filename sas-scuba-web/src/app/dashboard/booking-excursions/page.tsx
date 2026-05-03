@@ -201,7 +201,7 @@ export default function BookingExcursionsPage() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            ${bookingExcursion.price?.toFixed(2) || '0.00'}
+                                            ${Number(bookingExcursion.price || 0).toFixed(2)}
                                         </TableCell>
                                         <TableCell>
                                             <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(bookingExcursion.status)}`}>
@@ -304,7 +304,7 @@ export default function BookingExcursionsPage() {
                                     </div>
                                     <div>
                                         <CardDescription>Price</CardDescription>
-                                        <p className="font-medium">${bookingExcursion.price?.toFixed(2) || '0.00'}</p>
+                                        <p className="font-medium">${Number(bookingExcursion.price || 0).toFixed(2)}</p>
                                     </div>
                                     <div className="flex gap-2 pt-2">
                                         <Link href={`/dashboard/booking-excursions/${bookingExcursion.id}`} className="flex-1">

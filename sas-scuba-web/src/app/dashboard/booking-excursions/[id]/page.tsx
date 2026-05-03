@@ -133,7 +133,7 @@ export default function BookingExcursionDetailPage() {
                                         <DollarSign className="h-4 w-4" />
                                         Price
                                     </CardDescription>
-                                    <p className="font-medium">${bookingExcursion.price.toFixed(2)}</p>
+                                    <p className="font-medium">${Number(bookingExcursion.price || 0).toFixed(2)}</p>
                                 </div>
                             )}
                             <div>

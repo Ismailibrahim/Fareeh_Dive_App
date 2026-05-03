@@ -4,55 +4,84 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import { useEffect, useState } from "react";
 import { DollarSign, Users, Calendar, Activity } from "lucide-react";
-
-const stats = [
-    {
-        title: "Total Revenue",
-        value: "$45,231.89",
-        description: "+20.1% from last month",
-        icon: DollarSign,
-        className: "text-emerald-500",
-    },
-    {
-        title: "Active Bookings",
-        value: "+573",
-        description: "+201 since last hour",
-        icon: Calendar,
-        className: "text-blue-500",
-    },
-    {
-        title: "Active Customers",
-        value: "+2350",
-        description: "+180 new customers",
-        icon: Users,
-        className: "text-orange-500",
-    },
-    {
-        title: "Dives Today",
-        value: "+12",
-        description: "+9 since last hour",
-        icon: Activity,
-        className: "text-purple-500",
-    },
-];
+import { dashboardService, DashboardStats } from "@/lib/api/services/dashboard.service";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function StatsGrid() {
+    const [stats, setStats] = useState<DashboardStats | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function fetchStats() {
+            try {
+                const data = await dashboardService.getStats();
+                setStats(data);
+            } catch (error) {
+                console.error("Failed to fetch dashboard stats", error);
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchStats();
+    }, []);
+
+    const statItems = [
+        {
+            title: "Total Revenue",
+            value: stats ? `$${stats.revenue.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "$0.00",
+            description: stats ? `${stats.revenue.growth >= 0 ? '+' : ''}${stats.revenue.growth}% from last month` : "No data",
+            icon: DollarSign,
+            className: "text-emerald-500",
+        },
+        {
+            title: "Active Bookings",
+            value: stats ? `+${stats.bookings.active}` : "0",
+            description: stats ? `+${stats.bookings.new_last_hour} since last hour` : "No data",
+            icon: Calendar,
+            className: "text-blue-500",
+        },
+        {
+            title: "Active Customers",
+            value: stats ? `+${stats.customers.total}` : "0",
+            description: stats ? `+${stats.customers.new_this_month} new this month` : "No data",
+            icon: Users,
+            className: "text-orange-500",
+        },
+        {
+            title: "Dives Today",
+            value: stats ? `+${stats.dives.today}` : "0",
+            description: stats ? `+${stats.dives.new_last_hour} since last hour` : "No data",
+            icon: Activity,
+            className: "text-purple-500",
+        },
+    ];
+
     return (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {stats.map((stat, index) => (
-                <Card key={index} className="border-l-4" style={{ borderLeftColor: 'var(--border)' }}> {/* Simplified border logic, can be enhanced */}
+            {statItems.map((stat, index) => (
+                <Card key={index} className="border-l-4 border-l-primary/10 hover:border-l-primary transition-all duration-300">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">
                             {stat.title}
                         </CardTitle>
-                        <stat.icon className={`h-4 w-4 text-muted-foreground ${stat.className}`} />
+                        <stat.icon className={`h-4 w-4 ${stat.className}`} />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stat.value}</div>
-                        <p className="text-xs text-muted-foreground">
-                            {stat.description}
-                        </p>
+                        {loading ? (
+                            <div className="space-y-2">
+                                <Skeleton className="h-7 w-24" />
+                                <Skeleton className="h-4 w-32" />
+                            </div>
+                        ) : (
+                            <>
+                                <div className="text-2xl font-bold">{stat.value}</div>
+                                <p className="text-xs text-muted-foreground">
+                                    {stat.description}
+                                </p>
+                            </>
+                        )}
                     </CardContent>
                 </Card>
             ))}

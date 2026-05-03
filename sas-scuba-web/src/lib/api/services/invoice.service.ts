@@ -73,6 +73,16 @@ export interface AddInvoiceItemRequest {
     booking_equipment_id?: number;
 }
 
+export interface GenerateBulkInvoiceRequest {
+    booking_ids: number[];
+    customer_id: number; // Primary customer for billing
+    invoice_type?: 'Advance' | 'Final' | 'Full';
+    include_dives?: boolean;
+    include_equipment?: boolean;
+    include_excursions?: boolean;
+    tax_percentage?: number;
+}
+
 export const invoiceService = {
     getAll: async (filters?: InvoiceFilters, page = 1) => {
         const params = new URLSearchParams();
@@ -99,6 +109,11 @@ export const invoiceService = {
 
     generateFromBooking: async (data: GenerateInvoiceRequest) => {
         const response = await apiClient.post<Invoice>("/api/v1/invoices/generate-from-booking", data);
+        return response.data;
+    },
+
+    generateBulk: async (data: GenerateBulkInvoiceRequest) => {
+        const response = await apiClient.post<Invoice>("/api/v1/invoices/generate-bulk", data);
         return response.data;
     },
 

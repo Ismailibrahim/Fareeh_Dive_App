@@ -17,6 +17,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { FileText, ChevronDown, Plus, Calendar, CheckCircle2, XCircle, Clock, Eye } from "lucide-react";
+import { getMediaUrl } from "@/lib/api/client";
 import { WaiverSignature } from "@/lib/api/services/waiver.service";
 import { useWaiverSignatures } from "@/lib/hooks/use-waiver-signatures";
 import { safeFormatDate } from "@/lib/utils/date-format";
@@ -157,7 +158,7 @@ export function CustomerWaiversSection({ customerId }: CustomerWaiversSectionPro
                                                             {signature.signature_data && (
                                                                 <div className="mt-2">
                                                                     <img
-                                                                        src={signature.signature_data}
+                                                                        src={getMediaUrl(signature.signature_data)}
                                                                         alt={`Signature for ${signature.waiver?.name || 'waiver'}`}
                                                                         className="max-w-[200px] max-h-20 border rounded bg-white p-2 object-contain"
                                                                     />
@@ -214,7 +215,7 @@ export function CustomerWaiversSection({ customerId }: CustomerWaiversSectionPro
                                     <h4 className="text-sm font-semibold">Signature</h4>
                                     <div className="border rounded-lg p-4 bg-white">
                                         <img
-                                            src={selectedSignature.signature_data}
+                                            src={getMediaUrl(selectedSignature.signature_data)}
                                             alt={`Signature for ${selectedSignature.waiver?.name || 'waiver'}`}
                                             className="max-w-full border rounded"
                                         />

@@ -4,7 +4,7 @@ import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, User, Mail, Phone, FileText, Globe, Calendar, UserCircle, Edit, MapPin, Plane, Building2 } from "lucide-react";
+import { ArrowLeft, User, Mail, Phone, FileText, Globe, Calendar, UserCircle, Edit, MapPin, Plane, Building2, Receipt } from "lucide-react";
 import { EmergencyContactsSection } from "@/components/customers/EmergencyContactsSection";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -13,6 +13,8 @@ import { CustomerCertificationsSection } from "@/components/customers/CustomerCe
 import { CustomerInsuranceSection } from "@/components/customers/CustomerInsuranceSection";
 import { CustomerAccommodationSection } from "@/components/customers/CustomerAccommodationSection";
 import { CustomerWaiversSection } from "@/components/customers/CustomerWaiversSection";
+import { CustomerEquipmentCard } from "@/components/customers/CustomerEquipmentCard";
+import { CustomerPDFFillSection } from "@/components/customers/CustomerPDFFillSection";
 import { safeFormatDate } from "@/lib/utils/date-format";
 
 export default function CustomerDetailPage() {
@@ -314,10 +316,34 @@ export default function CustomerDetailPage() {
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* Billing Information Section */}
+                                    <div className="pt-4 border-t">
+                                        <div className="flex items-center gap-2 text-sm font-semibold text-primary mb-3">
+                                            <Receipt className="h-4 w-4" />
+                                            Billing Information
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2 text-sm font-medium">
+                                                <Receipt className="h-4 w-4 text-muted-foreground" />
+                                                Default Price List
+                                            </div>
+                                            {customer.price_list ? (
+                                                <Link href={`/dashboard/price-list/${customer.price_list.id}/edit`}>
+                                                    <p className="text-sm text-primary hover:underline">{customer.price_list.name}</p>
+                                                </Link>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">No price list assigned</p>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* Equipment Request Section */}
+                    <CustomerEquipmentCard customerId={parseInt(id)} />
 
                     {/* Emergency Contacts Section */}
                     <EmergencyContactsSection customerId={id} />
@@ -330,6 +356,9 @@ export default function CustomerDetailPage() {
 
                     {/* Accommodation Section */}
                     <CustomerAccommodationSection customerId={id} />
+
+                    {/* PDF Fill Section */}
+                    <CustomerPDFFillSection customer={customer} />
 
                     {/* Waivers Section */}
                     <CustomerWaiversSection customerId={id} />

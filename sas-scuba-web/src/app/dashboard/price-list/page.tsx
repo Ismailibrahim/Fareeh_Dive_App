@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, List, Edit, Trash2, Eye, Copy } from "lucide-react";
+import { Plus, List, Edit, Trash2, Eye, Copy, Star, CheckCircle } from "lucide-react";
 import { priceListService, PriceList, PaginatedResponse } from "@/lib/api/services/price-list.service";
 import Link from "next/link";
 import {
@@ -77,6 +77,19 @@ export default function PriceListsPage() {
         router.push(`/dashboard/price-list/${newPriceList.id}/edit`);
     };
 
+    const handleSetDefault = async (priceList: PriceList) => {
+        try {
+            await priceListService.update(priceList.id, {
+                name: priceList.name,
+                notes: priceList.notes,
+                is_default: true,
+            });
+            fetchPriceLists();
+        } catch (error) {
+            console.error("Failed to set default price list", error);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex flex-col min-h-screen bg-slate-50/50 dark:bg-slate-900/50">
@@ -134,6 +147,12 @@ export default function PriceListsPage() {
                                                 {priceList.notes || "No description"}
                                             </CardDescription>
                                         </div>
+                                        {priceList.is_default && (
+                                            <Badge variant="default" className="bg-amber-500 hover:bg-amber-600 text-white gap-1 py-1">
+                                                <Star className="h-3 w-3 fill-current" />
+                                                Default
+                                            </Badge>
+                                        )}
                                     </div>
                                 </CardHeader>
                                 <CardContent>
@@ -175,6 +194,18 @@ export default function PriceListsPage() {
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
+                                            {!priceList.is_default && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleSetDefault(priceList)}
+                                                    className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 ml-auto"
+                                                    title="Set as global default"
+                                                >
+                                                    <Star className="mr-1 h-4 w-4" />
+                                                    Set Default
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                 </CardContent>

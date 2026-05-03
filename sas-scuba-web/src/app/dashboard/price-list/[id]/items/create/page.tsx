@@ -32,6 +32,7 @@ import { unitService, Unit } from "@/lib/api/services/unit.service";
 import { Tag, DollarSign, Package, Calendar } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { PriceTierManager } from "@/components/price-list/PriceTierManager";
+import { taxService, Tax } from "@/lib/api/services/tax.service";
 
 const schema = z.object({
     service_type: z.string().min(1, "Service type is required"),
@@ -49,7 +50,7 @@ const schema = z.object({
     valid_until: z.string().optional(),
     applicable_to: z.enum(['ALL', 'MEMBER', 'NON_MEMBER', 'GROUP', 'CORPORATE']).optional(),
     unit: z.string().optional(),
-    tax_percentage: z.number().min(0).max(100).optional(),
+    tax_percentage: z.coerce.number().min(0).max(100).optional(),
     tax_inclusive: z.boolean().optional(),
     service_charge_inclusive: z.boolean().optional(),
     sort_order: z.number().optional(),
@@ -76,6 +77,7 @@ export default function CreatePriceListItemPage() {
     const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
     const [equipmentItems, setEquipmentItems] = useState<EquipmentItem[]>([]);
     const [units, setUnits] = useState<Unit[]>([]);
+    const [taxes, setTaxes] = useState<Tax[]>([]);
 
     const form = useForm<z.infer<typeof schema>>({
         resolver: zodResolver(schema),
@@ -111,12 +113,26 @@ export default function CreatePriceListItemPage() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [priceListData, serviceTypesData, unitsData] = await Promise.all([
+                const [priceListData, serviceTypesData, unitsData, taxesData] = await Promise.all([
                     priceListService.getById(priceListId),
                     serviceTypeService.getAll(),
                     unitService.getAll(),
+                    taxService.getAll(),
                 ]);
                 setPriceList(priceListData);
+                
+                // Only keep T-GST/TGST taxes
+                const tgstTaxes = taxesData.filter(t => 
+                    t.name.toUpperCase().includes('T-GST') || 
+                    t.name.toUpperCase().includes('TGST')
+                );
+                setTaxes(tgstTaxes);
+
+                // Auto-set T-GST if found
+                const tgst = tgstTaxes.find(t => t.name.toUpperCase() === 'T-GST' || t.name.toUpperCase() === 'TGST') || tgstTaxes[0];
+                if (tgst) {
+                    form.setValue('tax_percentage', tgst.percentage);
+                }
                 
                 // Filter to only show price list relevant service types
                 const priceListServiceTypes = [
@@ -408,7 +424,7 @@ export default function CreatePriceListItemPage() {
                                                             <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                                             <Input
                                                                 type="number"
-                                                                step="0.01"
+                                                                step="any"
                                                                 min="0"
                                                                 placeholder="0.00"
                                                                 className="pl-9"
@@ -453,28 +469,33 @@ export default function CreatePriceListItemPage() {
                                         />
                                     </div>
 
-                                    <FormField
-                                        control={form.control}
-                                        name="tax_percentage"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Tax Percentage (%)</FormLabel>
-                                                <FormControl>
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        max="100"
-                                                        placeholder="0.00"
-                                                        {...field}
-                                                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
-                                                        value={field.value || ""}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                        <FormField
+                                            control={form.control}
+                                            name="tax_percentage"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>T-GST (%)</FormLabel>
+                                                    <FormControl>
+                                                        <Input
+                                                            type="number"
+                                                            step="any"
+                                                            min="0"
+                                                            max="100"
+                                                            placeholder="0.00"
+                                                            {...field}
+                                                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                                                            value={field.value || ""}
+                                                            readOnly
+                                                            className="bg-slate-100 dark:bg-slate-800 cursor-not-allowed"
+                                                        />
+                                                    </FormControl>
+                                                    <FormDescription>
+                                                        T-GST is fixed based on your system settings.
+                                                    </FormDescription>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
 
                                     {/* Dive Pricing Configuration */}
                                     <div className="space-y-4 border-t pt-4">
