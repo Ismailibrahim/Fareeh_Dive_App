@@ -9,6 +9,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use App\Models\EmergencyContact;
+use App\Models\CustomerCertification;
+use App\Models\CustomerInsurance;
+use App\Models\CustomerAccommodation;
+use App\Models\EquipmentBasket;
+use App\Models\BookingEquipment;
 
 class CustomerController extends Controller
 {
@@ -103,6 +109,33 @@ class CustomerController extends Controller
             'agent_id' => 'nullable|exists:agents,id',
             'price_list_id' => 'nullable|exists:price_lists,id',
             'dive_center_id' => 'required|exists:dive_centers,id',
+
+            // Nested Relationships
+            'emergency_contacts' => 'nullable|array',
+            'emergency_contacts.*.name' => 'nullable|string|max:255',
+            'emergency_contacts.*.relationship' => 'nullable|string|max:255',
+            'emergency_contacts.*.phone_1' => 'nullable|string|max:50',
+            'emergency_contacts.*.email' => 'nullable|email|max:255',
+            'emergency_contacts.*.is_primary' => 'nullable|boolean',
+
+            'certifications' => 'nullable|array',
+            'certifications.*.certification_name' => 'nullable|string|max:255',
+            'certifications.*.certification_no' => 'nullable|string|max:255',
+            'certifications.*.expiry_date' => 'nullable|date',
+
+            'insurance' => 'nullable|array',
+            'insurance.insurance_provider' => 'nullable|string|max:255',
+            'insurance.insurance_no' => 'nullable|string|max:255',
+            'insurance.insurance_hotline_no' => 'nullable|string|max:255',
+            'insurance.expiry_date' => 'nullable|date',
+
+            'accommodation' => 'nullable|array',
+            'accommodation.name' => 'nullable|string|max:255',
+            'accommodation.contact_no' => 'nullable|string|max:50',
+            'accommodation.address' => 'nullable|string',
+            
+            'medical_forms' => 'nullable|array',
+            'equipment_request' => 'nullable|array',
         ]);
 
         // Validate agent belongs to same dive center if provided
@@ -118,8 +151,128 @@ class CustomerController extends Controller
             }
         }
 
-        $customer = Customer::create($validated);
-        return response()->json($customer, 201);
+        DB::beginTransaction();
+        try {
+            // Extract nested data before creating customer
+            $emergencyContacts = $request->input('emergency_contacts', []);
+            $certifications = $request->input('certifications', []);
+            $insurance = $request->input('insurance');
+            $accommodation = $request->input('accommodation');
+            $medicalForms = $request->input('medical_forms', []);
+            $equipmentRequest = $request->input('equipment_request', []);
+
+            // 1. Create the base Customer
+            $customerData = collect($validated)->except([
+                'emergency_contacts', 'certifications', 'insurance', 'accommodation', 'medical_forms', 'equipment_request'
+            ])->toArray();
+            
+            $customer = Customer::create($customerData);
+
+            // 2. Save Emergency Contacts
+            if (!empty($emergencyContacts)) {
+                foreach ($emergencyContacts as $index => $contact) {
+                    if (!empty($contact['name']) || !empty($contact['phone_1'])) {
+                        EmergencyContact::create([
+                            'customer_id' => $customer->id,
+                            'name' => $contact['name'] ?? null,
+                            'relationship' => $contact['relationship'] ?? null,
+                            'phone_1' => $contact['phone_1'] ?? null,
+                            'email' => $contact['email'] ?? null,
+                            'is_primary' => $contact['is_primary'] ?? ($index === 0), // First is primary if not specified
+                        ]);
+                    }
+                }
+            }
+
+            // 3. Save Certifications
+            if (!empty($certifications)) {
+                foreach ($certifications as $cert) {
+                    if (!empty($cert['certification_name'])) {
+                        CustomerCertification::create([
+                            'customer_id' => $customer->id,
+                            'certification_name' => $cert['certification_name'] ?? null,
+                            'certification_no' => $cert['certification_no'] ?? null,
+                            'expiry_date' => $cert['expiry_date'] ?? null,
+                        ]);
+                    }
+                }
+            }
+
+            // 4. Save Insurance
+            if (!empty($insurance) && (!empty($insurance['insurance_provider']) || !empty($insurance['insurance_no']))) {
+                CustomerInsurance::create([
+                    'customer_id' => $customer->id,
+                    'insurance_provider' => $insurance['insurance_provider'] ?? null,
+                    'insurance_no' => $insurance['insurance_no'] ?? null,
+                    'insurance_hotline_no' => $insurance['insurance_hotline_no'] ?? null,
+                    'expiry_date' => $insurance['expiry_date'] ?? null,
+                ]);
+            }
+
+            // 5. Save Accommodation
+            if (!empty($accommodation) && !empty($accommodation['name'])) {
+                CustomerAccommodation::create([
+                    'customer_id' => $customer->id,
+                    'name' => $accommodation['name'] ?? null,
+                    'contact_no' => $accommodation['contact_no'] ?? null,
+                    'address' => $accommodation['address'] ?? null,
+                ]);
+            }
+
+            // 6. Save Medical Form Checkboxes (as simple notes or dummy records if needed, 
+            // but the prompt specified just basic toggles. We'll store them via notes or form type).
+            if (!empty($medicalForms)) {
+                foreach ($medicalForms as $formType => $checked) {
+                    if ($checked) {
+                        DB::table('customer_medical_forms')->insert([
+                            'customer_id' => $customer->id,
+                            'form_type' => $formType,
+                            'signed_date' => now(),
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+            }
+
+            // 7. Save Equipment Request (Basket)
+            if (!empty($equipmentRequest) && !empty($equipmentRequest['items'])) {
+                $basket = EquipmentBasket::create([
+                    'dive_center_id' => $customer->dive_center_id,
+                    'customer_id' => $customer->id,
+                    'basket_no' => EquipmentBasket::generateBasketNumber($customer->dive_center_id),
+                    'status' => 'Active',
+                ]);
+
+                $newItems = [];
+                foreach ($equipmentRequest['items'] as $item) {
+                    if ($item['rent'] || $item['own']) {
+                        $newItems[] = [
+                            'booking_id' => null,
+                            'basket_id' => $basket->id,
+                            'equipment_item_id' => null,
+                            'equipment_source' => $item['rent'] ? 'Center' : 'Customer Own',
+                            'customer_equipment_type' => $item['equipment_type_name'],
+                            'customer_equipment_notes' => $item['note'] ?? null,
+                            'assignment_status' => 'Pending',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ];
+                    }
+                }
+                if (!empty($newItems)) {
+                    BookingEquipment::insert($newItems);
+                }
+            }
+
+            DB::commit();
+            return response()->json($customer->load(['emergencyContacts', 'insurance', 'accommodation', 'certification']), 201);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error creating customer with relations: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to create customer', 'error' => $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -173,6 +326,33 @@ class CustomerController extends Controller
                 'departure_to' => 'nullable|string|max:255',
                 'agent_id' => 'nullable|exists:agents,id',
                 'price_list_id' => 'nullable|exists:price_lists,id',
+
+                // Nested Relationships
+                'emergency_contacts' => 'nullable|array',
+                'emergency_contacts.*.name' => 'nullable|string|max:255',
+                'emergency_contacts.*.relationship' => 'nullable|string|max:255',
+                'emergency_contacts.*.phone_1' => 'nullable|string|max:50',
+                'emergency_contacts.*.email' => 'nullable|email|max:255',
+                'emergency_contacts.*.is_primary' => 'nullable|boolean',
+
+                'certifications' => 'nullable|array',
+                'certifications.*.certification_name' => 'nullable|string|max:255',
+                'certifications.*.certification_no' => 'nullable|string|max:255',
+                'certifications.*.expiry_date' => 'nullable|date',
+
+                'insurance' => 'nullable|array',
+                'insurance.insurance_provider' => 'nullable|string|max:255',
+                'insurance.insurance_no' => 'nullable|string|max:255',
+                'insurance.insurance_hotline_no' => 'nullable|string|max:255',
+                'insurance.expiry_date' => 'nullable|date',
+
+                'accommodation' => 'nullable|array',
+                'accommodation.name' => 'nullable|string|max:255',
+                'accommodation.contact_no' => 'nullable|string|max:50',
+                'accommodation.address' => 'nullable|string',
+                
+                'medical_forms' => 'nullable|array',
+                'equipment_request' => 'nullable|array',
             ]);
 
             // Validate agent belongs to same dive center if provided
@@ -188,8 +368,160 @@ class CustomerController extends Controller
                 }
             }
 
-            $customer->update($validated);
-            return response()->json($customer);
+            DB::beginTransaction();
+
+            // Extract nested data before updating customer
+            $emergencyContacts = $request->input('emergency_contacts', null);
+            $certifications = $request->input('certifications', null);
+            $insurance = $request->input('insurance', null);
+            $accommodation = $request->input('accommodation', null);
+            $medicalForms = $request->input('medical_forms', null);
+            $equipmentRequest = $request->input('equipment_request', null);
+
+            // 1. Update the base Customer
+            $customerData = collect($validated)->except([
+                'emergency_contacts', 'certifications', 'insurance', 'accommodation', 'medical_forms', 'equipment_request'
+            ])->toArray();
+
+            $customer->update($customerData);
+
+            // 2. Sync Emergency Contacts
+            if ($emergencyContacts !== null) {
+                $customer->emergencyContacts()->delete();
+                foreach ($emergencyContacts as $index => $contact) {
+                    if (!empty($contact['name']) || !empty($contact['phone_1'])) {
+                        EmergencyContact::create([
+                            'customer_id' => $customer->id,
+                            'name' => $contact['name'] ?? null,
+                            'relationship' => $contact['relationship'] ?? null,
+                            'phone_1' => $contact['phone_1'] ?? null,
+                            'email' => $contact['email'] ?? null,
+                            'is_primary' => $contact['is_primary'] ?? ($index === 0),
+                        ]);
+                    }
+                }
+            }
+
+            // 3. Sync Certifications
+            if ($certifications !== null) {
+                CustomerCertification::where('customer_id', $customer->id)->delete();
+                foreach ($certifications as $cert) {
+                    if (!empty($cert['certification_name'])) {
+                        CustomerCertification::create([
+                            'customer_id' => $customer->id,
+                            'certification_name' => $cert['certification_name'] ?? null,
+                            'certification_no' => $cert['certification_no'] ?? null,
+                            'expiry_date' => $cert['expiry_date'] ?? null,
+                        ]);
+                    }
+                }
+            }
+
+            // 4. Update Insurance
+            if ($insurance !== null) {
+                if (!empty($insurance['insurance_provider']) || !empty($insurance['insurance_no'])) {
+                    CustomerInsurance::updateOrCreate(
+                        ['customer_id' => $customer->id],
+                        [
+                            'insurance_provider' => $insurance['insurance_provider'] ?? null,
+                            'insurance_no' => $insurance['insurance_no'] ?? null,
+                            'insurance_hotline_no' => $insurance['insurance_hotline_no'] ?? null,
+                            'expiry_date' => $insurance['expiry_date'] ?? null,
+                        ]
+                    );
+                } else {
+                    CustomerInsurance::where('customer_id', $customer->id)->delete();
+                }
+            }
+
+            // 5. Update Accommodation
+            if ($accommodation !== null) {
+                if (!empty($accommodation['name'])) {
+                    CustomerAccommodation::updateOrCreate(
+                        ['customer_id' => $customer->id],
+                        [
+                            'name' => $accommodation['name'] ?? null,
+                            'contact_no' => $accommodation['contact_no'] ?? null,
+                            'address' => $accommodation['address'] ?? null,
+                        ]
+                    );
+                } else {
+                    CustomerAccommodation::where('customer_id', $customer->id)->delete();
+                }
+            }
+
+            // 6. Update Medical Form Checkboxes
+            if ($medicalForms !== null) {
+                DB::table('customer_medical_forms')->where('customer_id', $customer->id)->delete();
+                foreach ($medicalForms as $formType => $checked) {
+                    if ($checked) {
+                        DB::table('customer_medical_forms')->insert([
+                            'customer_id' => $customer->id,
+                            'form_type' => $formType,
+                            'signed_date' => now(),
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+            }
+
+            // 7. Update Equipment Request (Basket)
+            if ($equipmentRequest !== null) {
+                $basket = EquipmentBasket::where('customer_id', $customer->id)
+                    ->where('status', 'Active')
+                    ->whereNull('booking_id')
+                    ->latest()
+                    ->first();
+
+                if (empty($equipmentRequest['items'])) {
+                    if ($basket) {
+                        BookingEquipment::where('basket_id', $basket->id)->delete();
+                        $basket->delete();
+                    }
+                } else {
+                    if (!$basket) {
+                        $basket = EquipmentBasket::create([
+                            'dive_center_id' => $customer->dive_center_id,
+                            'customer_id' => $customer->id,
+                            'basket_no' => EquipmentBasket::generateBasketNumber($customer->dive_center_id),
+                            'status' => 'Active',
+                            'expected_return_date' => $equipmentRequest['expected_return_date'] ?? null,
+                            'notes' => $equipmentRequest['notes'] ?? null,
+                        ]);
+                    } else {
+                        $basket->update([
+                            'expected_return_date' => $equipmentRequest['expected_return_date'] ?? null,
+                            'notes' => $equipmentRequest['notes'] ?? null,
+                        ]);
+                        // Clear existing unassigned items
+                        BookingEquipment::where('basket_id', $basket->id)->delete();
+                    }
+
+                    $newItems = [];
+                    foreach ($equipmentRequest['items'] as $item) {
+                        if ($item['rent'] || $item['own']) {
+                            $newItems[] = [
+                                'booking_id' => null,
+                                'basket_id' => $basket->id,
+                                'equipment_item_id' => null,
+                                'equipment_source' => $item['rent'] ? 'Center' : 'Customer Own',
+                                'customer_equipment_type' => $item['equipment_type_name'],
+                                'customer_equipment_notes' => $item['note'] ?? null,
+                                'assignment_status' => 'Pending',
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ];
+                        }
+                    }
+                    if (!empty($newItems)) {
+                        BookingEquipment::insert($newItems);
+                    }
+                }
+            }
+
+            DB::commit();
+            return response()->json($customer->load(['emergencyContacts', 'insurance', 'accommodation', 'certification']));
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'message' => 'Validation failed',

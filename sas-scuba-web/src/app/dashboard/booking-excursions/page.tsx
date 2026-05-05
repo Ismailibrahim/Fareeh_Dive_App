@@ -4,42 +4,35 @@ import { useEffect, useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { BookingExcursion, bookingExcursionService } from "@/lib/api/services/booking-excursion.service";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
+    Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, MoreHorizontal, Calendar, Plus, MapPin, Clock, Users, Eye } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+    Search, MoreHorizontal, Calendar, Plus, MapPin, Clock, Users, Eye, Receipt
+} from "lucide-react";
 import { safeFormatDate } from "@/lib/utils/date-format";
 import Link from "next/link";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+    DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { CombinedInvoiceDialog } from "@/components/invoices/CombinedInvoiceDialog";
 
 export default function BookingExcursionsPage() {
     const [bookingExcursions, setBookingExcursions] = useState<BookingExcursion[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+
+    // Selection state
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const [showCombineDialog, setShowCombineDialog] = useState(false);
 
     // Delete state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -49,8 +42,8 @@ export default function BookingExcursionsPage() {
         setLoading(true);
         try {
             const data = await bookingExcursionService.getAll();
-            const bookingExcursionsList = Array.isArray(data) ? data : (data as any).data || [];
-            setBookingExcursions(bookingExcursionsList);
+            const list = Array.isArray(data) ? data : (data as any).data || [];
+            setBookingExcursions(list);
         } catch (error) {
             console.error("Failed to fetch booking excursions", error);
         } finally {
@@ -58,22 +51,39 @@ export default function BookingExcursionsPage() {
         }
     };
 
+    useEffect(() => { fetchBookingExcursions(); }, []);
+
     useEffect(() => {
-        fetchBookingExcursions();
+        const handleFocus = () => fetchBookingExcursions();
+        window.addEventListener("focus", handleFocus);
+        return () => window.removeEventListener("focus", handleFocus);
     }, []);
 
-    // Refresh data when page comes into focus
-    useEffect(() => {
-        const handleFocus = () => {
-            fetchBookingExcursions();
-        };
-        
-        window.addEventListener('focus', handleFocus);
-        return () => window.removeEventListener('focus', handleFocus);
-    }, []);
+    // --- Selection helpers ---
+    const toggleRow = (id: number) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
 
-    const handleDeleteClick = (bookingExcursion: BookingExcursion) => {
-        setBookingExcursionToDelete(bookingExcursion);
+    const toggleAll = () => {
+        if (selectedIds.size === filteredBookingExcursions.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(filteredBookingExcursions.map((r) => r.id)));
+        }
+    };
+
+    const selectedRows = bookingExcursions.filter((r) => selectedIds.has(r.id));
+    // Get unique booking IDs from selected rows
+    const selectedBookingIds = [...new Set(selectedRows.map((r) => r.booking_id).filter(Boolean))] as number[];
+
+    // --- Delete ---
+    const handleDeleteClick = (be: BookingExcursion) => {
+        setBookingExcursionToDelete(be);
         setDeleteDialogOpen(true);
     };
 
@@ -81,7 +91,8 @@ export default function BookingExcursionsPage() {
         if (!bookingExcursionToDelete) return;
         try {
             await bookingExcursionService.delete(bookingExcursionToDelete.id);
-            setBookingExcursions(bookingExcursions.filter(be => be.id !== bookingExcursionToDelete.id));
+            setBookingExcursions((prev) => prev.filter((be) => be.id !== bookingExcursionToDelete.id));
+            setSelectedIds((prev) => { const next = new Set(prev); next.delete(bookingExcursionToDelete.id); return next; });
         } catch (error) {
             console.error("Failed to delete booking excursion", error);
         } finally {
@@ -90,31 +101,38 @@ export default function BookingExcursionsPage() {
         }
     };
 
-    const filteredBookingExcursions = bookingExcursions.filter(bookingExcursion =>
-        bookingExcursion.booking?.customer?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        bookingExcursion.excursion?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredBookingExcursions = bookingExcursions.filter((be) =>
+        be.booking?.customer?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        be.excursion?.name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const getStatusColor = (status?: string) => {
         switch (status) {
-            case 'Completed':
-                return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-            case 'In Progress':
-                return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-            case 'Cancelled':
-                return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-            default:
-                return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+            case "Completed":  return "bg-green-100 text-green-800";
+            case "In Progress":return "bg-blue-100 text-blue-800";
+            case "Cancelled":  return "bg-red-100 text-red-800";
+            default:           return "bg-gray-100 text-gray-800";
         }
     };
+
+    const allSelected =
+        filteredBookingExcursions.length > 0 &&
+        selectedIds.size === filteredBookingExcursions.length;
 
     return (
         <div className="flex flex-col min-h-screen">
             <Header title="Booking Excursions" />
             <div className="flex-1 space-y-4 p-8 pt-6">
-                <div className="flex items-center justify-between space-y-2">
+                {/* Page Header */}
+                <div className="flex items-center justify-between">
                     <h2 className="text-3xl font-bold tracking-tight">Booking Excursions</h2>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center gap-2">
+                        <Link href="/dashboard/invoices/create-combined">
+                            <Button variant="outline">
+                                <Receipt className="mr-2 h-4 w-4" />
+                                Combined Invoice
+                            </Button>
+                        </Link>
                         <Link href="/dashboard/booking-excursions/create">
                             <Button>
                                 <Plus className="mr-2 h-4 w-4" /> Book Excursion
@@ -122,6 +140,8 @@ export default function BookingExcursionsPage() {
                         </Link>
                     </div>
                 </div>
+
+                {/* Search */}
                 <div className="flex items-center gap-2">
                     <div className="relative flex-1 max-w-sm">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -132,13 +152,25 @@ export default function BookingExcursionsPage() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
+                    {selectedIds.size > 0 && (
+                        <span className="text-sm text-muted-foreground">
+                            {selectedIds.size} selected
+                        </span>
+                    )}
                 </div>
 
-                {/* Desktop Table View */}
+                {/* Desktop Table */}
                 <div className="rounded-md border hidden md:block">
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-10">
+                                    <Checkbox
+                                        checked={allSelected}
+                                        onCheckedChange={toggleAll}
+                                        aria-label="Select all"
+                                    />
+                                </TableHead>
                                 <TableHead>Customer</TableHead>
                                 <TableHead>Excursion</TableHead>
                                 <TableHead>Date</TableHead>
@@ -152,60 +184,60 @@ export default function BookingExcursionsPage() {
                         <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center">
-                                        Loading...
-                                    </TableCell>
+                                    <TableCell colSpan={9} className="h-24 text-center">Loading...</TableCell>
                                 </TableRow>
                             ) : filteredBookingExcursions.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center">
-                                        No booking excursions found.
-                                    </TableCell>
+                                    <TableCell colSpan={9} className="h-24 text-center">No booking excursions found.</TableCell>
                                 </TableRow>
                             ) : (
-                                filteredBookingExcursions.map((bookingExcursion) => (
-                                    <TableRow key={bookingExcursion.id}>
+                                filteredBookingExcursions.map((be) => (
+                                    <TableRow
+                                        key={be.id}
+                                        className={selectedIds.has(be.id) ? "bg-primary/5" : ""}
+                                    >
+                                        <TableCell>
+                                            <Checkbox
+                                                checked={selectedIds.has(be.id)}
+                                                onCheckedChange={() => toggleRow(be.id)}
+                                                aria-label={`Select booking ${be.id}`}
+                                            />
+                                        </TableCell>
                                         <TableCell className="font-medium">
-                                            {bookingExcursion.booking?.customer?.full_name || '-'}
+                                            {be.booking?.customer?.full_name || "-"}
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex items-center gap-2">
                                                 <MapPin className="h-4 w-4 text-muted-foreground" />
-                                                {bookingExcursion.excursion?.name || '-'}
+                                                {be.excursion?.name || "-"}
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            {bookingExcursion.excursion_date ? (
+                                            {be.excursion_date ? (
                                                 <div className="flex items-center gap-2">
                                                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                    {safeFormatDate(bookingExcursion.excursion_date, "MMM d, yyyy", "-")}
+                                                    {safeFormatDate(be.excursion_date, "MMM d, yyyy", "-")}
                                                 </div>
-                                            ) : (
-                                                '-'
-                                            )}
+                                            ) : "-"}
                                         </TableCell>
                                         <TableCell>
-                                            {bookingExcursion.excursion_time ? (
+                                            {be.excursion_time ? (
                                                 <div className="flex items-center gap-2">
                                                     <Clock className="h-4 w-4 text-muted-foreground" />
-                                                    {bookingExcursion.excursion_time}
+                                                    {be.excursion_time}
                                                 </div>
-                                            ) : (
-                                                '-'
-                                            )}
+                                            ) : "-"}
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex items-center gap-2">
                                                 <Users className="h-4 w-4 text-muted-foreground" />
-                                                {bookingExcursion.number_of_participants || 1}
+                                                {be.number_of_participants || 1}
                                             </div>
                                         </TableCell>
+                                        <TableCell>${Number(be.price || 0).toFixed(2)}</TableCell>
                                         <TableCell>
-                                            ${Number(bookingExcursion.price || 0).toFixed(2)}
-                                        </TableCell>
-                                        <TableCell>
-                                            <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(bookingExcursion.status)}`}>
-                                                {bookingExcursion.status || 'Scheduled'}
+                                            <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(be.status)}`}>
+                                                {be.status || "Scheduled"}
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-right">
@@ -220,14 +252,13 @@ export default function BookingExcursionsPage() {
                                                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={`/dashboard/booking-excursions/${bookingExcursion.id}`}>
-                                                            <Eye className="mr-2 h-4 w-4" />
-                                                            View
+                                                        <Link href={`/dashboard/booking-excursions/${be.id}`}>
+                                                            <Eye className="mr-2 h-4 w-4" /> View
                                                         </Link>
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
                                                         className="text-destructive"
-                                                        onClick={() => handleDeleteClick(bookingExcursion)}
+                                                        onClick={() => handleDeleteClick(be)}
                                                     >
                                                         Delete
                                                     </DropdownMenuItem>
@@ -244,73 +275,47 @@ export default function BookingExcursionsPage() {
                 {/* Mobile Card View */}
                 <div className="grid grid-cols-1 gap-4 md:hidden">
                     {loading ? (
-                        <Card>
-                            <CardContent className="pt-6">
-                                <p className="text-center text-muted-foreground">Loading...</p>
-                            </CardContent>
-                        </Card>
+                        <Card><CardContent className="pt-6"><p className="text-center text-muted-foreground">Loading...</p></CardContent></Card>
                     ) : filteredBookingExcursions.length === 0 ? (
-                        <Card>
-                            <CardContent className="pt-6">
-                                <p className="text-center text-muted-foreground">No booking excursions found.</p>
-                            </CardContent>
-                        </Card>
+                        <Card><CardContent className="pt-6"><p className="text-center text-muted-foreground">No booking excursions found.</p></CardContent></Card>
                     ) : (
-                        filteredBookingExcursions.map((bookingExcursion) => (
-                            <Card key={bookingExcursion.id}>
+                        filteredBookingExcursions.map((be) => (
+                            <Card key={be.id} className={selectedIds.has(be.id) ? "border-primary/50 bg-primary/5" : ""}>
                                 <CardHeader>
                                     <div className="flex items-start justify-between">
-                                        <div>
-                                            <CardDescription>Customer</CardDescription>
-                                            <p className="font-medium">{bookingExcursion.booking?.customer?.full_name || '-'}</p>
+                                        <div className="flex items-center gap-3">
+                                            <Checkbox
+                                                checked={selectedIds.has(be.id)}
+                                                onCheckedChange={() => toggleRow(be.id)}
+                                            />
+                                            <div>
+                                                <CardDescription>Customer</CardDescription>
+                                                <p className="font-medium">{be.booking?.customer?.full_name || "-"}</p>
+                                            </div>
                                         </div>
-                                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(bookingExcursion.status)}`}>
-                                            {bookingExcursion.status || 'Scheduled'}
+                                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(be.status)}`}>
+                                            {be.status || "Scheduled"}
                                         </span>
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-3">
                                     <div>
-                                        <CardDescription className="flex items-center gap-2">
-                                            <MapPin className="h-4 w-4" />
-                                            Excursion
-                                        </CardDescription>
-                                        <p>{bookingExcursion.excursion?.name || '-'}</p>
+                                        <CardDescription className="flex items-center gap-2"><MapPin className="h-4 w-4" />Excursion</CardDescription>
+                                        <p>{be.excursion?.name || "-"}</p>
                                     </div>
-                                    {bookingExcursion.excursion_date && (
+                                    {be.excursion_date && (
                                         <div>
-                                            <CardDescription className="flex items-center gap-2">
-                                                <Calendar className="h-4 w-4" />
-                                                Date
-                                            </CardDescription>
-                                            <p>{safeFormatDate(bookingExcursion.excursion_date, "MMM d, yyyy", "-")}</p>
+                                            <CardDescription className="flex items-center gap-2"><Calendar className="h-4 w-4" />Date</CardDescription>
+                                            <p>{safeFormatDate(be.excursion_date, "MMM d, yyyy", "-")}</p>
                                         </div>
                                     )}
-                                    {bookingExcursion.excursion_time && (
-                                        <div>
-                                            <CardDescription className="flex items-center gap-2">
-                                                <Clock className="h-4 w-4" />
-                                                Time
-                                            </CardDescription>
-                                            <p>{bookingExcursion.excursion_time}</p>
-                                        </div>
-                                    )}
-                                    <div>
-                                        <CardDescription className="flex items-center gap-2">
-                                            <Users className="h-4 w-4" />
-                                            Participants
-                                        </CardDescription>
-                                        <p>{bookingExcursion.number_of_participants || 1}</p>
-                                    </div>
                                     <div>
                                         <CardDescription>Price</CardDescription>
-                                        <p className="font-medium">${Number(bookingExcursion.price || 0).toFixed(2)}</p>
+                                        <p className="font-medium">${Number(be.price || 0).toFixed(2)}</p>
                                     </div>
                                     <div className="flex gap-2 pt-2">
-                                        <Link href={`/dashboard/booking-excursions/${bookingExcursion.id}`} className="flex-1">
-                                            <Button variant="outline" className="w-full" size="sm">
-                                                View
-                                            </Button>
+                                        <Link href={`/dashboard/booking-excursions/${be.id}`} className="flex-1">
+                                            <Button variant="outline" className="w-full" size="sm">View</Button>
                                         </Link>
                                     </div>
                                 </CardContent>
@@ -320,13 +325,51 @@ export default function BookingExcursionsPage() {
                 </div>
             </div>
 
-            {/* Delete Confirmation Dialog */}
+            {/* Floating Selection Action Bar */}
+            {selectedIds.size >= 2 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+                    <div className="flex items-center gap-3 bg-foreground text-background rounded-full px-5 py-3 shadow-2xl border border-background/10">
+                        <span className="text-sm font-medium">
+                            {selectedIds.size} bookings selected
+                        </span>
+                        <Button
+                            size="sm"
+                            className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 h-8"
+                            onClick={() => setShowCombineDialog(true)}
+                        >
+                            <Receipt className="h-4 w-4 mr-1.5" />
+                            Combine into Invoice
+                        </Button>
+                        <button
+                            type="button"
+                            className="text-background/60 hover:text-background text-sm ml-1"
+                            onClick={() => setSelectedIds(new Set())}
+                        >
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Combined Invoice Dialog */}
+            <CombinedInvoiceDialog
+                open={showCombineDialog}
+                onOpenChange={setShowCombineDialog}
+                bookingIds={selectedBookingIds}
+                selectedRows={selectedRows}
+                onSuccess={() => {
+                    setSelectedIds(new Set());
+                    fetchBookingExcursions();
+                }}
+            />
+
+            {/* Delete Dialog */}
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the booking excursion.
+                            This will permanently delete the booking excursion.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

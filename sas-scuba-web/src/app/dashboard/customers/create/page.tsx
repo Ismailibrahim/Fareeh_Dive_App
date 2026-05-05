@@ -24,7 +24,7 @@ export default function CreateCustomerPage() {
                     </div>
                 </div>
 
-                <div className="mx-auto max-w-3xl">
+                <div className="mx-auto w-full">
                     <CustomerForm />
                 </div>
             </div>

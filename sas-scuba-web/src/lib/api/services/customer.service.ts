@@ -51,6 +51,33 @@ export interface CustomerFormData {
     departure_to?: string;
     agent_id?: number;
     price_list_id?: number | null;
+
+    // Nested relations
+    emergency_contacts?: Array<{
+        name?: string;
+        relationship?: string;
+        phone_1?: string;
+        email?: string;
+        is_primary?: boolean;
+    }>;
+    certifications?: Array<{
+        certification_name?: string;
+        certification_no?: string;
+        expiry_date?: string;
+    }>;
+    insurance?: {
+        insurance_provider?: string;
+        insurance_no?: string;
+        insurance_hotline_no?: string;
+        expiry_date?: string;
+    };
+    accommodation?: {
+        name?: string;
+        contact_no?: string;
+        address?: string;
+    };
+    medical_forms?: Record<string, boolean>;
+    equipment_request?: EquipmentRequestData;
 }
 
 export interface PaginationParams {

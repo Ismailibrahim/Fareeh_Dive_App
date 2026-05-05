@@ -61,6 +61,7 @@ export interface InvoiceFilters {
     status?: string;
     customer_id?: number;
     invoice_type?: string;
+    booking_id?: number;
 }
 
 export interface AddInvoiceItemRequest {
@@ -75,7 +76,7 @@ export interface AddInvoiceItemRequest {
 
 export interface GenerateBulkInvoiceRequest {
     booking_ids: number[];
-    customer_id: number; // Primary customer for billing
+    customer_id: number;  // Billing customer
     invoice_type?: 'Advance' | 'Final' | 'Full';
     include_dives?: boolean;
     include_equipment?: boolean;
@@ -86,20 +87,23 @@ export interface GenerateBulkInvoiceRequest {
 export const invoiceService = {
     getAll: async (filters?: InvoiceFilters, page = 1) => {
         const params = new URLSearchParams();
-        if (filters?.status) {
-            params.append('status', filters.status);
-        }
-        if (filters?.customer_id) {
-            params.append('customer_id', filters.customer_id.toString());
-        }
-        if (filters?.invoice_type) {
-            params.append('invoice_type', filters.invoice_type);
-        }
+        if (filters?.status) params.append('status', filters.status);
+        if (filters?.customer_id) params.append('customer_id', filters.customer_id.toString());
+        if (filters?.invoice_type) params.append('invoice_type', filters.invoice_type);
+        if (filters?.booking_id) params.append('booking_id', filters.booking_id.toString());
         params.append('page', page.toString());
+        params.append('per_page', '100'); // fetch all for booking-level views
         const queryString = params.toString();
         const url = `/api/v1/invoices${queryString ? `?${queryString}` : ''}`;
         const response = await apiClient.get<{ data: Invoice[]; meta: any }>(url);
         return response.data;
+    },
+
+    getByBookingId: async (bookingId: number): Promise<Invoice[]> => {
+        const data = await invoiceService.getAll({ booking_id: bookingId }, 1);
+        const list = Array.isArray(data) ? data : (data as any).data || [];
+        // Client-side filter as fallback if backend doesn't support booking_id filter
+        return list.filter((inv: Invoice) => inv.booking_id === bookingId);
     },
 
     create: async (data: { booking_id?: number; customer_id?: number; invoice_type?: string; invoice_date?: string; tax_percentage?: number }) => {

@@ -48,8 +48,13 @@ export default function InvoiceDetailPage() {
             try {
                 const data = await invoiceService.getById(invoiceId);
                 setInvoice(data);
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Failed to load invoice", error);
+                const status = error?.response?.status;
+                if (status === 404) {
+                    // Invoice doesn't exist — redirect to list
+                    router.replace('/dashboard/invoices');
+                }
             } finally {
                 setLoading(false);
             }
@@ -101,8 +106,12 @@ export default function InvoiceDetailPage() {
             } catch (error) {
                 console.error("Failed to load tax calculation mode", error);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to load invoice", error);
+            const status = error?.response?.status;
+            if (status === 404) {
+                router.replace('/dashboard/invoices');
+            }
         } finally {
             setLoading(false);
         }

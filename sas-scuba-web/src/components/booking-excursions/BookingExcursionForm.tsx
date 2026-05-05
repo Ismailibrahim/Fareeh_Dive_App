@@ -25,12 +25,15 @@ import { diveGroupService, DiveGroup } from "@/lib/api/services/dive-group.servi
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, MapPin, Clock, DollarSign, User } from "lucide-react";
+import { Calendar, MapPin, Clock, DollarSign, User, Trash2 } from "lucide-react";
 import { SafeDatePicker as DatePicker } from "@/components/ui/safe-date-picker";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Badge } from "@/components/ui/badge";
 
 const bookingExcursionSchema = z.object({
     booking_id: z.string().optional(),
     customer_id: z.string().optional(),
+    customer_ids: z.array(z.string()).optional(),
     dive_group_id: z.string().optional(),
     booking_date: z.string().optional(),
     number_of_participants: z.string().optional(),
@@ -42,7 +45,7 @@ const bookingExcursionSchema = z.object({
     status: z.enum(['Scheduled', 'In Progress', 'Completed', 'Cancelled']).optional(),
     notes: z.string().optional(),
 }).refine((data) => {
-    return data.booking_id || data.customer_id || data.dive_group_id;
+    return data.booking_id || data.customer_id || data.dive_group_id || (data.customer_ids && data.customer_ids.length > 0);
 }, {
     message: "Either select an existing booking, provide customer for quick booking, or select a dive group",
     path: ["booking_id"],
@@ -57,6 +60,7 @@ export function BookingExcursionForm({ initialData, bookingExcursionId }: Bookin
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [createMode, setCreateMode] = useState<'existing' | 'quick' | 'group'>('existing');
+    const [memberParticipantCounts, setMemberParticipantCounts] = useState<Record<number, number>>({});
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [diveGroups, setDiveGroups] = useState<DiveGroup[]>([]);
@@ -106,6 +110,7 @@ export function BookingExcursionForm({ initialData, bookingExcursionId }: Bookin
         defaultValues: {
             booking_id: initialData?.booking_id ? String(initialData.booking_id) : "",
             customer_id: "",
+            customer_ids: [],
             dive_group_id: "",
             booking_date: "",
             number_of_participants: initialData?.number_of_participants ? String(initialData.number_of_participants) : "1",
@@ -120,15 +125,41 @@ export function BookingExcursionForm({ initialData, bookingExcursionId }: Bookin
     });
 
     const priceListItemId = form.watch('price_list_item_id');
+    const numberOfParticipants = form.watch('number_of_participants');
+
     useEffect(() => {
         if (priceListItemId) {
             const item = priceListItems.find(p => String(p.id) === priceListItemId);
             if (item) {
-                const price = item.base_price || item.price;
-                form.setValue('price', String(price));
+                const basePrice = item.base_price || item.price;
+                const qty = parseInt(numberOfParticipants || "1", 10);
+                const totalPrice = basePrice * (isNaN(qty) ? 1 : qty);
+                form.setValue('price', String(totalPrice.toFixed(2)));
             }
         }
-    }, [priceListItemId, priceListItems, form]);
+    }, [priceListItemId, numberOfParticipants, priceListItems, form]);
+
+    const excursionId = form.watch('excursion_id');
+    useEffect(() => {
+        if (excursionId && !initialData?.id) {
+            // Find the selected excursion
+            const excursion = excursions.find(e => String(e.id) === excursionId);
+            if (excursion) {
+                // Try to find a matching price list item by name
+                const matchingPriceItem = priceListItems.find(p => 
+                    p.name.toLowerCase() === excursion.name.toLowerCase() || 
+                    p.name.toLowerCase().includes(excursion.name.toLowerCase())
+                );
+                
+                if (matchingPriceItem) {
+                    form.setValue('price_list_item_id', String(matchingPriceItem.id));
+                }
+            }
+        }
+    }, [excursionId, excursions, priceListItems, form, initialData]);
+
+    const diveGroupId = form.watch('dive_group_id');
+    const selectedDiveGroup = diveGroups.find(g => String(g.id) === diveGroupId);
 
     async function onSubmit(data: BookingExcursionFormValues) {
         setLoading(true);
@@ -146,12 +177,23 @@ export function BookingExcursionForm({ initialData, bookingExcursionId }: Bookin
 
             if (createMode === 'existing' && data.booking_id) {
                 payload.booking_id = parseInt(data.booking_id);
-            } else if (createMode === 'quick' && data.customer_id) {
-                payload.customer_id = parseInt(data.customer_id);
+            } else if (createMode === 'quick') {
+                if (data.customer_ids && data.customer_ids.length > 0) {
+                    (payload as any).customer_ids = data.customer_ids.map(id => parseInt(id));
+                    (payload as any).member_participant_counts = memberParticipantCounts;
+                } else if (data.customer_id) {
+                    payload.customer_id = parseInt(data.customer_id);
+                }
                 payload.booking_date = data.booking_date || data.excursion_date || undefined;
             } else if (createMode === 'group' && data.dive_group_id) {
                 payload.dive_group_id = parseInt(data.dive_group_id);
                 payload.booking_date = data.booking_date || data.excursion_date || undefined;
+                if (selectedDiveGroup && selectedDiveGroup.members) {
+                    (payload as any).member_participant_counts = {};
+                    selectedDiveGroup.members.forEach((member) => {
+                        (payload as any).member_participant_counts[member.id] = memberParticipantCounts[member.id] || 1;
+                    });
+                }
             }
 
             if (bookingExcursionId) {
@@ -193,14 +235,24 @@ export function BookingExcursionForm({ initialData, bookingExcursionId }: Bookin
                                 <Button
                                     type="button"
                                     variant={createMode === 'quick' ? 'default' : 'outline'}
-                                    onClick={() => setCreateMode('quick')}
+                                    onClick={() => {
+                                        setCreateMode('quick');
+                                        form.setValue('booking_id', '');
+                                        form.setValue('dive_group_id', '');
+                                    }}
                                 >
                                     Quick Booking
                                 </Button>
                                 <Button
                                     type="button"
                                     variant={createMode === 'group' ? 'default' : 'outline'}
-                                    onClick={() => setCreateMode('group')}
+                                    onClick={() => {
+                                        setCreateMode('group');
+                                        form.setValue('booking_id', '');
+                                        form.setValue('customer_id', '');
+                                        form.setValue('customer_ids', []);
+                                        setMemberParticipantCounts({});
+                                    }}
                                 >
                                     Group Booking
                                 </Button>
@@ -246,30 +298,83 @@ export function BookingExcursionForm({ initialData, bookingExcursionId }: Bookin
 
                         {createMode === 'quick' && (
                             <>
-                                <FormField
-                                    control={form.control}
-                                    name="customer_id"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Customer</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value}>
-                                                <FormControl>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select customer" />
-                                                    </SelectTrigger>
-                                                </FormControl>
-                                                <SelectContent>
-                                                    {customers.map((customer) => (
-                                                        <SelectItem key={customer.id} value={String(customer.id)}>
-                                                            {customer.full_name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
+                                <div className="space-y-3">
+                                    <FormLabel className="flex items-center gap-2">
+                                        <User className="h-4 w-4 text-primary" />
+                                        Select Participants (Walk-in Group)
+                                    </FormLabel>
+                                    
+                                    {/* List of selected participants */}
+                                    <div className="grid gap-3 min-h-[40px]">
+                                        {(form.watch('customer_ids') || []).length === 0 && (
+                                            <div className="p-3 bg-muted/30 rounded-md border border-dashed text-sm text-muted-foreground italic">
+                                                No participants selected. Add at least one participant below.
+                                            </div>
+                                        )}
+                                        {form.watch('customer_ids')?.map(id => {
+                                            const customer = customers.find(c => String(c.id) === id);
+                                            return (
+                                                <div key={id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
+                                                    <div className="flex items-center gap-3">
+                                                        <User className="h-4 w-4 text-muted-foreground" />
+                                                        <div>
+                                                            <p className="text-sm font-medium">{customer?.full_name}</p>
+                                                            <p className="text-xs text-muted-foreground">{customer?.email}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Input
+                                                            type="number"
+                                                            min="1"
+                                                            className="w-20 h-8"
+                                                            value={memberParticipantCounts[Number(id)] || 1}
+                                                            onChange={(e) => {
+                                                                const val = parseInt(e.target.value) || 1;
+                                                                setMemberParticipantCounts(prev => ({
+                                                                    ...prev,
+                                                                    [Number(id)]: val
+                                                                }));
+                                                            }}
+                                                        />
+                                                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                                            participant{memberParticipantCounts[Number(id)] !== 1 ? 's' : ''}
+                                                        </span>
+                                                        <Button 
+                                                            type="button" 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="h-8 w-8 ml-2 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                                                            onClick={() => {
+                                                                const current = form.getValues('customer_ids') || [];
+                                                                form.setValue('customer_ids', current.filter(cid => cid !== id));
+                                                            }}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <SearchableSelect
+                                        options={customers.map((customer) => ({
+                                            value: String(customer.id),
+                                            label: customer.full_name,
+                                            searchTerms: `${customer.full_name} ${customer.email || ""} ${customer.passport_no || ""}`
+                                        }))}
+                                        onValueChange={(value) => {
+                                            const current = form.getValues('customer_ids') || [];
+                                            if (!current.includes(value)) {
+                                                form.setValue('customer_ids', [...current, value]);
+                                                if (current.length === 0) form.setValue('customer_id', value);
+                                            }
+                                        }}
+                                        placeholder="Add participant..."
+                                        searchPlaceholder="Search by name, email or passport..."
+                                    />
+                                    <FormMessage />
+                                </div>
                                 <FormField
                                     control={form.control}
                                     name="booking_date"
@@ -292,30 +397,72 @@ export function BookingExcursionForm({ initialData, bookingExcursionId }: Bookin
                         )}
 
                         {createMode === 'group' && (
-                            <FormField
-                                control={form.control}
-                                name="dive_group_id"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Dive Group</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select dive group" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {diveGroups.map((group) => (
-                                                    <SelectItem key={group.id} value={String(group.id)}>
-                                                        {group.group_name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
+                            <div className="space-y-6">
+                                <FormField
+                                    control={form.control}
+                                    name="dive_group_id"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Dive Group</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select dive group" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {diveGroups.map((group) => (
+                                                        <SelectItem key={group.id} value={String(group.id)}>
+                                                            {group.group_name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                {selectedDiveGroup && (
+                                    <div className="space-y-4 pt-4 border-t">
+                                        <FormLabel>Group Members & Participants</FormLabel>
+                                        <div className="grid gap-3">
+                                            {selectedDiveGroup.members?.map((member) => (
+                                                <div key={member.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
+                                                    <div className="flex items-center gap-3">
+                                                        <User className="h-4 w-4 text-muted-foreground" />
+                                                        <div>
+                                                            <p className="text-sm font-medium">{member.full_name}</p>
+                                                            <p className="text-xs text-muted-foreground">{member.email}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Input
+                                                            type="number"
+                                                            min="1"
+                                                            className="w-20 h-8"
+                                                            value={memberParticipantCounts[member.id] || 1}
+                                                            onChange={(e) => {
+                                                                const val = parseInt(e.target.value) || 1;
+                                                                setMemberParticipantCounts(prev => ({
+                                                                    ...prev,
+                                                                    [member.id]: val
+                                                                }));
+                                                            }}
+                                                        />
+                                                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                                            participant{memberParticipantCounts[member.id] !== 1 ? 's' : ''}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Total participants: {selectedDiveGroup.members?.reduce((sum, member) => sum + (memberParticipantCounts[member.id] || 1), 0) || 0}
+                                        </p>
+                                    </div>
                                 )}
-                            />
+                            </div>
                         )}
                     </CardContent>
                 </Card>

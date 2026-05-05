@@ -2,8 +2,6 @@
 
 import { Header } from "@/components/layout/Header";
 import { CustomerForm } from "@/components/customers/CustomerForm";
-import { CustomerCertificationsSection } from "@/components/customers/CustomerCertificationsSection";
-import { EmergencyContactsSection } from "@/components/customers/EmergencyContactsSection";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -53,18 +51,12 @@ export default function EditCustomerPage() {
                     </Link>
                     <div>
                         <h2 className="text-3xl font-bold tracking-tight">Edit Customer</h2>
-                        <p className="text-muted-foreground">Update customer details.</p>
+                        <p className="text-muted-foreground">Update customer details across all tabs.</p>
                     </div>
                 </div>
 
-                <div className="mx-auto max-w-3xl space-y-6">
-                    <CustomerForm initialData={customer} customerId={id} />
-                    
-                    {/* Emergency Contacts Section */}
-                    <EmergencyContactsSection customerId={id} />
-                    
-                    {/* Certifications Section */}
-                    <CustomerCertificationsSection customerId={id} customer={customer} />
+                <div className="mx-auto w-full space-y-6">
+                    <CustomerForm initialData={customer} />
                 </div>
             </div>
         </div>

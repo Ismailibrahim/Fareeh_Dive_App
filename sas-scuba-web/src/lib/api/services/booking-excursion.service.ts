@@ -36,9 +36,11 @@ export interface BookingExcursion {
 export interface BookingExcursionFormData {
     booking_id?: number;
     customer_id?: number;
+    customer_ids?: number[];
     dive_group_id?: number;
     booking_date?: string;
     number_of_participants?: number;
+    member_participant_counts?: Record<number, number>;
     excursion_id: number;
     excursion_date?: string;
     excursion_time?: string;

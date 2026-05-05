@@ -1,12 +1,17 @@
-import apiClient, { getApiUrl } from '../client';
+import apiClient from '../client';
+
 import { LoginCredentials, RegisterCredentials, User } from '@/types/auth';
 import axios from 'axios';
 
 export const authService = {
     async getCsrfToken() {
-        const baseURL = getApiUrl();
+        // Use same-origin URL — Next.js proxy forwards /sanctum/* to the Laravel backend.
+        // This avoids cross-origin requests entirely, eliminating CORS and cookie domain issues.
+        const baseURL = typeof window !== 'undefined'
+            ? `${window.location.protocol}//${window.location.host}`
+            : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
+
         try {
-            // Standard Sanctum CSRF cookie initialization
             await axios.get(`${baseURL}/sanctum/csrf-cookie`, {
                 withCredentials: true,
                 headers: {
@@ -19,6 +24,7 @@ export const authService = {
             throw new Error('Could not connect to the security service. Please ensure the backend is running and refresh.');
         }
     },
+
 
     async login(credentials: LoginCredentials) {
         // Initialize CSRF first

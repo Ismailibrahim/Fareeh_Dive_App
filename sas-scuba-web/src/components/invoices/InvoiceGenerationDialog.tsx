@@ -40,6 +40,7 @@ export function InvoiceGenerationDialog({
     const [includeEquipment, setIncludeEquipment] = useState(true);
     const [includeExcursions, setIncludeExcursions] = useState(true);
     const [taxPercentage, setTaxPercentage] = useState<number>(0);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (open && bookingId) {
@@ -49,6 +50,7 @@ export function InvoiceGenerationDialog({
 
     const handleGenerate = async () => {
         setLoading(true);
+        setError(null);
         try {
             const request: GenerateInvoiceRequest = {
                 booking_id: bookingId,
@@ -68,8 +70,10 @@ export function InvoiceGenerationDialog({
             onOpenChange(false);
             router.push(`/dashboard/invoices/${invoice.id}`);
             router.refresh();
-        } catch (error) {
-            console.error("Failed to generate invoice", error);
+        } catch (err: any) {
+            console.error("Failed to generate invoice", err);
+            const msg = err?.response?.data?.message || 'Failed to generate invoice. Please try again.';
+            setError(msg);
         } finally {
             setLoading(false);
         }
@@ -86,6 +90,12 @@ export function InvoiceGenerationDialog({
                         )}
                     </DialogDescription>
                 </DialogHeader>
+
+                {error && (
+                    <div className="bg-destructive/10 border border-destructive/30 rounded-md px-4 py-3 text-sm text-destructive">
+                        {error}
+                    </div>
+                )}
 
                 <div className="space-y-6 py-4">
                     {/* Invoice Type */}

@@ -2,7 +2,7 @@
 
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MapPin, Clock, Users, Calendar, DollarSign } from "lucide-react";
+import { ArrowLeft, MapPin, Clock, Users, Calendar, DollarSign, FileText } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -83,6 +83,16 @@ export default function BookingExcursionDetailPage() {
                         </h2>
                         <p className="text-muted-foreground">View booking excursion details</p>
                     </div>
+                    <div className="flex gap-2">
+                        {bookingExcursion.booking_id && (
+                            <Link href={`/dashboard/bookings/${bookingExcursion.booking_id}`}>
+                                <Button variant="outline">
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    Go to Booking / Invoice
+                                </Button>
+                            </Link>
+                        )}
+                    </div>
                 </div>
 
                 <div className="mx-auto max-w-3xl space-y-4">
@@ -91,6 +101,17 @@ export default function BookingExcursionDetailPage() {
                             <CardTitle>Booking Information</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                            <div>
+                                <CardDescription>Booking</CardDescription>
+                                <p className="mt-1">
+                                    <Link 
+                                        href={`/dashboard/bookings/${bookingExcursion.booking_id}`} 
+                                        className="font-semibold hover:underline text-primary"
+                                    >
+                                        Booking #{bookingExcursion.booking_id}
+                                    </Link>
+                                </p>
+                            </div>
                             <div>
                                 <CardDescription>Customer</CardDescription>
                                 <p className="font-medium">{bookingExcursion.booking?.customer?.full_name || '-'}</p>

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { invoiceService, Invoice } from "@/lib/api/services/invoice.service";
 import { CreateInvoiceDialog } from "@/components/invoices/CreateInvoiceDialog";
-import { FileText, MoreHorizontal, Eye, Calendar, Plus, Trash2 } from "lucide-react";
+import { FileText, MoreHorizontal, Eye, Calendar, Plus, Trash2, Receipt } from "lucide-react";
 import Link from "next/link";
 import { safeFormatDate } from "@/lib/utils/date-format";
 import {
@@ -114,10 +114,18 @@ export default function InvoicesPage() {
             <div className="flex-1 space-y-4 p-8 pt-6">
                 <div className="flex items-center justify-between space-y-2">
                     <h2 className="text-3xl font-bold tracking-tight">Invoices</h2>
-                    <Button onClick={() => setShowCreateDialog(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Invoice
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Link href="/dashboard/invoices/create-combined">
+                            <Button variant="outline">
+                                <Receipt className="h-4 w-4 mr-2" />
+                                Combined Invoice
+                            </Button>
+                        </Link>
+                        <Button onClick={() => setShowCreateDialog(true)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create Invoice
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Filters */}

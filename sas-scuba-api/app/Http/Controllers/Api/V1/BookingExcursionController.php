@@ -43,9 +43,13 @@ class BookingExcursionController extends Controller
         $validated = $request->validate([
             'booking_id' => 'nullable|exists:bookings,id',
             'customer_id' => 'nullable|exists:customers,id',
+            'customer_ids' => 'nullable|array',
+            'customer_ids.*' => 'exists:customers,id',
             'dive_group_id' => 'nullable|exists:dive_groups,id',
             'booking_date' => 'nullable|date',
             'number_of_participants' => 'nullable|integer|min:1',
+            'member_participant_counts' => 'nullable|array',
+            'member_participant_counts.*' => 'integer|min:1',
             'excursion_id' => 'required|exists:excursions,id',
             'excursion_date' => 'nullable|date',
             'excursion_time' => 'nullable|date_format:H:i',
@@ -55,6 +59,91 @@ class BookingExcursionController extends Controller
             'completed_at' => 'nullable|date',
             'notes' => 'nullable|string',
         ]);
+
+        // Handle multiple customer quick booking (Walk-in Group)
+        if (isset($validated['customer_ids']) && !empty($validated['customer_ids'])) {
+            $customers = \App\Models\Customer::whereIn('id', $validated['customer_ids'])
+                ->where('dive_center_id', $diveCenterId)
+                ->get();
+
+            if ($customers->isEmpty()) {
+                return response()->json(['message' => 'No valid customers found'], 422);
+            }
+
+            DB::beginTransaction();
+            try {
+                $bookings = [];
+                $bookingExcursions = [];
+                $memberParticipantCounts = $validated['member_participant_counts'] ?? [];
+
+                foreach ($customers as $customer) {
+                    $participantCount = 1;
+                    if (!empty($memberParticipantCounts)) {
+                        if (isset($memberParticipantCounts[$customer->id])) {
+                            $participantCount = (int)$memberParticipantCounts[$customer->id];
+                        } elseif (isset($memberParticipantCounts[(string)$customer->id])) {
+                            $participantCount = (int)$memberParticipantCounts[(string)$customer->id];
+                        } elseif (isset($validated['number_of_participants'])) {
+                            $participantCount = (int)$validated['number_of_participants'];
+                        }
+                    } elseif (isset($validated['number_of_participants'])) {
+                        $participantCount = (int)$validated['number_of_participants'];
+                    }
+
+                    $booking = Booking::create([
+                        'dive_center_id' => $diveCenterId,
+                        'customer_id' => $customer->id,
+                        'agent_id' => $customer->agent_id ?? null,
+                        'booking_date' => $validated['booking_date'] ?? $validated['excursion_date'] ?? now()->toDateString(),
+                        'number_of_divers' => $participantCount,
+                        'status' => 'Pending',
+                    ]);
+
+                    $excursionData = [
+                        'booking_id' => $booking->id,
+                        'excursion_id' => $validated['excursion_id'],
+                        'excursion_date' => $validated['excursion_date'] ?? null,
+                        'excursion_time' => $validated['excursion_time'] ?? null,
+                        'price_list_item_id' => $validated['price_list_item_id'] ?? null,
+                        'price' => $validated['price'] ?? null,
+                        'status' => $validated['status'] ?? 'Scheduled',
+                        'completed_at' => $validated['completed_at'] ?? null,
+                        'notes' => $validated['notes'] ?? null,
+                        'number_of_participants' => $participantCount,
+                    ];
+
+                    // Auto-select price if not provided
+                    if (!isset($excursionData['price_list_item_id'])) {
+                        $priceListItem = \App\Models\PriceListItem::where('service_type', 'Excursion Trip')
+                            ->where('is_active', true)
+                            ->whereHas('priceList', function ($q) use ($diveCenterId) {
+                                $q->where('dive_center_id', $diveCenterId);
+                            })
+                            ->orderBy('price', 'asc')
+                            ->first();
+                        
+                        if ($priceListItem) {
+                            $excursionData['price_list_item_id'] = $priceListItem->id;
+                            $excursionData['price'] = $priceListItem->base_price ?? $priceListItem->price;
+                        }
+                    }
+
+                    $bookingExcursion = BookingExcursion::create($excursionData);
+                    $bookings[] = $booking;
+                    $bookingExcursions[] = $bookingExcursion;
+                }
+
+                DB::commit();
+                return response()->json([
+                    'message' => 'Multiple bookings created successfully',
+                    'bookings' => $bookings,
+                    'booking_excursions' => $bookingExcursions,
+                ], 201);
+            } catch (\Exception $e) {
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to create multiple bookings', 'error' => $e->getMessage()], 500);
+            }
+        }
 
         // Handle dive group booking
         if (isset($validated['dive_group_id'])) {
@@ -81,16 +170,29 @@ class BookingExcursionController extends Controller
             try {
                 $bookings = [];
                 $bookingExcursions = [];
-                $numberOfParticipants = $validated['number_of_participants'] ?? 1;
+                $memberParticipantCounts = $validated['member_participant_counts'] ?? [];
 
                 foreach ($members as $member) {
+                    $participantCount = 1;
+                    if (!empty($memberParticipantCounts)) {
+                        if (isset($memberParticipantCounts[$member->id])) {
+                            $participantCount = (int)$memberParticipantCounts[$member->id];
+                        } elseif (isset($memberParticipantCounts[(string)$member->id])) {
+                            $participantCount = (int)$memberParticipantCounts[(string)$member->id];
+                        } elseif (isset($validated['number_of_participants'])) {
+                            $participantCount = (int)$validated['number_of_participants'];
+                        }
+                    } elseif (isset($validated['number_of_participants'])) {
+                        $participantCount = (int)$validated['number_of_participants'];
+                    }
+
                     $booking = Booking::create([
                         'dive_center_id' => $diveCenterId,
                         'customer_id' => $member->id,
                         'agent_id' => $diveGroup->agent_id,
                         'dive_group_id' => $diveGroup->id,
                         'booking_date' => $validated['booking_date'] ?? $validated['excursion_date'] ?? now()->toDateString(),
-                        'number_of_divers' => $numberOfParticipants,
+                        'number_of_divers' => $participantCount,
                         'status' => 'Pending',
                     ]);
 
@@ -105,7 +207,7 @@ class BookingExcursionController extends Controller
                         'status' => $validated['status'] ?? 'Scheduled',
                         'completed_at' => $validated['completed_at'] ?? null,
                         'notes' => $validated['notes'] ?? null,
-                        'number_of_participants' => $numberOfParticipants,
+                        'number_of_participants' => $participantCount,
                     ];
 
                     // Auto-select price if not provided
